@@ -1,0 +1,67 @@
+import { apiClient } from "./apiClient";
+import type { AppUser, NotificationPreferences, UserRole, UserStatus } from "@/types/user";
+
+interface BackendUser {
+  id: string;
+  username: string;
+  email: string;
+  avatar: string | null;
+  role: UserRole;
+  status: UserStatus;
+  createdAt: string;
+  updatedAt: string;
+  balance?: number;
+  totalDeposited?: number;
+  totalSpent?: number;
+  moviesPurchased?: number;
+}
+
+function mapUser(u: BackendUser): AppUser {
+  return {
+    id: u.id,
+    name: u.username,
+    email: u.email,
+    avatarUrl: u.avatar ?? `https://i.pravatar.cc/150?u=${encodeURIComponent(u.username)}`,
+    role: u.role,
+    status: u.status,
+    walletBalance: u.balance ?? 0,
+    totalDeposited: u.totalDeposited ?? 0,
+    totalSpent: u.totalSpent ?? 0,
+    moviesPurchasedCount: u.moviesPurchased ?? 0,
+    joinDate: u.createdAt,
+  };
+}
+
+// Notification preferences have no backend model yet — kept in memory for this session only.
+let notificationPreferences: NotificationPreferences = {
+  purchaseConfirmations: true,
+  newReleases: true,
+  promotions: false,
+  announcements: true,
+};
+
+export const profileService = {
+  async getProfile(): Promise<AppUser> {
+    const user = await apiClient.get<BackendUser>("/users/me");
+    return mapUser(user);
+  },
+
+  changePassword(_currentPassword: string, _newPassword: string): Promise<void> {
+    // No backend endpoint yet for self-service password change.
+    return Promise.resolve();
+  },
+
+  getNotificationPreferences(): Promise<NotificationPreferences> {
+    return Promise.resolve(notificationPreferences);
+  },
+
+  updateNotificationPreferences(values: Partial<NotificationPreferences>): Promise<NotificationPreferences> {
+    notificationPreferences = { ...notificationPreferences, ...values };
+    return Promise.resolve(notificationPreferences);
+  },
+
+  deleteAccount(): Promise<void> {
+    // No backend endpoint yet for self-service account deletion.
+    return Promise.resolve();
+  },
+};
