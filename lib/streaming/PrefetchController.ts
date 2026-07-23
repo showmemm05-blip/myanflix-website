@@ -8,10 +8,23 @@ import { createHlsCacheLoader } from "./HlsCacheLoader";
 import type { CacheEntry, PrefetchWindowConfig } from "./types";
 
 export interface PrefetchSystemOptions {
-  /** Max concurrent segment downloads (background prefetch + on-demand combined). */
+  /** Max concurrent segment downloads on a good connection — the ceiling adaptive concurrency scales down from. */
   maxConcurrentDownloads?: number;
   /** LRU safety cap on cached segments, independent of the sliding window. */
   maxCacheEntries?: number;
+}
+
+// Roughly "3G"/constrained vs "decent" bandwidth, in bits/sec. Below these
+// thresholds, splitting the pipe across several concurrent segment fetches
+// means none of them finish in time — better to give the whole connection to
+// whichever segment is most urgent.
+const LOW_BANDWIDTH_BPS = 1_000_000;
+const MEDIUM_BANDWIDTH_BPS = 3_000_000;
+
+function concurrencyForBandwidth(bandwidthEstimateBps: number, ceiling: number): number {
+  if (bandwidthEstimateBps < LOW_BANDWIDTH_BPS) return 1;
+  if (bandwidthEstimateBps < MEDIUM_BANDWIDTH_BPS) return Math.min(2, ceiling);
+  return ceiling;
 }
 
 export interface PrefetchStatus {
@@ -60,9 +73,28 @@ export function createPrefetchSystem(window: PrefetchWindowConfig, options: Pref
     attach(hls: Hls, video: HTMLVideoElement): PrefetchHandle {
       const segmentManager = new SegmentManager(hls);
       const prefetchManager = new PrefetchManager(segmentManager, cache, downloader, window);
+      const concurrencyCeiling = options.maxConcurrentDownloads ?? 3;
+
+      // hls.js's own bandwidth estimate (now fed only honest samples — see
+      // HlsCacheLoader) doubles as our signal for how many segments should
+      // fetch in parallel: full ceiling on a fast link, strictly one-at-a-time
+      // on something 3G-like. Below that same floor, background prefetch is
+      // switched off entirely — with only one download slot, a speculative
+      // prefetch and hls.js's own just-in-time request for the segment
+      // actually about to play would otherwise fight over that one slot,
+      // repeatedly cancelling whichever download loses.
+      const adaptConcurrency = () => {
+        const bandwidthEstimate = hls.bandwidthEstimate;
+        downloader.setMaxConcurrent(concurrencyForBandwidth(bandwidthEstimate, concurrencyCeiling));
+        prefetchManager.setPrefetchEnabled(bandwidthEstimate >= LOW_BANDWIDTH_BPS);
+      };
+      adaptConcurrency();
 
       const tracker = new PlaybackTracker(video, {
-        onPositionChange: (time) => prefetchManager.update(time),
+        onPositionChange: (time) => {
+          adaptConcurrency();
+          prefetchManager.update(time);
+        },
         onSeek: (time) => prefetchManager.onSeek(time),
       });
 

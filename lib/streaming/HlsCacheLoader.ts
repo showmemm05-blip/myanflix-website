@@ -52,7 +52,6 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
     ): void {
       this.context = context;
       this.aborted = false;
-      this.stats.loading.start = performance.now();
 
       const frag = context.frag;
       const segment: SegmentMeta = {
@@ -63,13 +62,27 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
         duration: frag.duration,
       };
 
+      // A cache hit resolves on the next microtask regardless of how long the
+      // segment actually took to fetch over the network during prefetch. If we
+      // reported that as a ~0ms load, hls.js's bandwidth estimator would read it
+      // as near-infinite bandwidth and keep pushing ABR toward higher renditions
+      // even on a slow connection. Backdating loading.start by the real,
+      // previously-recorded fetch duration keeps every sample — cache hit or
+      // not — an honest reflection of actual network speed.
+      const cachedEntry = cache.get(context.url);
+      const replayDurationMs =
+        cachedEntry?.status === "downloaded" && cachedEntry.data ? (cachedEntry.downloadDurationMs ?? 0) : 0;
+      const callStart = performance.now();
+      this.stats.loading.start = callStart - replayDurationMs;
+
       downloader
         .requestImmediate(segment)
         .then((data) => {
           if (this.aborted) return;
           this.stats.loaded = data.byteLength;
           this.stats.total = data.byteLength;
-          this.stats.loading.first = this.stats.loading.end = performance.now();
+          this.stats.loading.first = replayDurationMs > 0 ? this.stats.loading.start : performance.now();
+          this.stats.loading.end = performance.now();
           callbacks.onSuccess({ url: context.url, data }, this.stats, context, null);
         })
         .catch((err: unknown) => {

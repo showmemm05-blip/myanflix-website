@@ -227,16 +227,28 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
     else video.pause();
   };
 
-  const handleSeek = (percent: number) => {
+  // Optimistically move the reported position immediately instead of waiting on the
+  // browser's own `timeupdate` event, which on a slow connection can lag well behind
+  // the moment the user actually dragged/skipped — otherwise the seek bar and clock
+  // appear stuck at the old spot until buffering at the new position catches up.
+  const applySeek = (time: number) => {
     const video = videoRef.current;
-    if (!video || durationSeconds === 0) return;
-    video.currentTime = (percent / 100) * durationSeconds;
+    if (!video) return;
+    const clamped = Math.min(durationSeconds, Math.max(0, time));
+    video.currentTime = clamped;
+    currentTimeRef.current = clamped;
+    setCurrentTime(clamped);
+  };
+
+  const handleSeek = (percent: number) => {
+    if (durationSeconds === 0) return;
+    applySeek((percent / 100) * durationSeconds);
   };
 
   const handleSkip = (deltaSeconds: number) => {
     const video = videoRef.current;
     if (!video) return;
-    video.currentTime = Math.min(durationSeconds, Math.max(0, video.currentTime + deltaSeconds));
+    applySeek(video.currentTime + deltaSeconds);
   };
 
   const handleQualityChange = (label: string) => {

@@ -39,7 +39,7 @@ export class CacheManager {
   ensure(segment: SegmentMeta): CacheEntry {
     let entry = this.entries.get(segment.url);
     if (!entry) {
-      entry = { segment, status: "idle", data: null, lastAccessed: Date.now() };
+      entry = { segment, status: "idle", data: null, lastAccessed: Date.now(), downloadDurationMs: null };
       this.entries.set(segment.url, entry);
     }
     return entry;
@@ -55,12 +55,13 @@ export class CacheManager {
     if (entry && entry.status !== "downloaded") entry.status = "downloading";
   }
 
-  markDownloaded(url: string, data: ArrayBuffer): void {
+  markDownloaded(url: string, data: ArrayBuffer, downloadDurationMs: number): void {
     const entry = this.entries.get(url);
     if (!entry) return;
     entry.status = "downloaded";
     entry.data = data;
     entry.lastAccessed = Date.now();
+    entry.downloadDurationMs = downloadDurationMs;
     this.enforceMaxEntries();
   }
 
