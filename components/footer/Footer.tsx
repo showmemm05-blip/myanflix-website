@@ -1,36 +1,41 @@
+"use client";
+
 import Link from "next/link";
 import { Film, Link2, AtSign, X as XIcon } from "lucide-react";
-
-const FOOTER_LINKS = [
-  {
-    heading: "Browse",
-    links: [
-      { href: "/movies", label: "All Movies" },
-      { href: "/categories", label: "Categories" },
-      { href: "/search", label: "Search" },
-    ],
-  },
-  {
-    heading: "Account",
-    links: [
-      { href: "/library", label: "My Library" },
-      { href: "/watchlist", label: "Watchlist" },
-      { href: "/wallet", label: "Wallet" },
-      { href: "/settings", label: "Settings" },
-    ],
-  },
-  {
-    heading: "Support",
-    links: [
-      { href: "#", label: "Help Center" },
-      { href: "#", label: "Contact Us" },
-      { href: "#", label: "Terms of Service" },
-      { href: "#", label: "Privacy Policy" },
-    ],
-  },
-];
+import { useLanguage } from "@/lib/context/language-context";
 
 export function Footer() {
+  const { t } = useLanguage();
+
+  const footerLinks = [
+    {
+      heading: t.footer.browse,
+      links: [
+        { href: "/movies", label: t.footer.allMovies },
+        { href: "/categories", label: t.nav.categories },
+        { href: "/search", label: t.nav.search },
+      ],
+    },
+    {
+      heading: t.footer.account,
+      links: [
+        { href: "/library", label: t.nav.myLibrary },
+        { href: "/watchlist", label: t.nav.watchlist },
+        { href: "/wallet", label: t.nav.wallet },
+        { href: "/settings", label: t.nav.settings },
+      ],
+    },
+    {
+      heading: t.footer.support,
+      links: [
+        { href: "#", label: t.footer.helpCenter },
+        { href: "#", label: t.footer.contactUs },
+        { href: "#", label: t.footer.termsOfService },
+        { href: "#", label: t.footer.privacyPolicy },
+      ],
+    },
+  ];
+
   return (
     <footer className="border-t border-white/[0.06] bg-background">
       <div className="mx-auto max-w-[1600px] px-4 py-12 sm:px-6 lg:px-8">
@@ -42,9 +47,7 @@ export function Footer() {
               </div>
               <span className="text-lg font-bold tracking-tight">MyanFlix</span>
             </Link>
-            <p className="text-sm text-muted-foreground">
-              Stream and own your favorite Myanmar and international films, all in one place.
-            </p>
+            <p className="text-sm text-muted-foreground">{t.footer.tagline}</p>
             <div className="flex items-center gap-3 pt-1">
               <a href="#" aria-label="Facebook" className="text-muted-foreground hover:text-foreground">
                 <Link2 className="size-4" />
@@ -58,7 +61,7 @@ export function Footer() {
             </div>
           </div>
 
-          {FOOTER_LINKS.map((group) => (
+          {footerLinks.map((group) => (
             <div key={group.heading} className="flex flex-col gap-3">
               <p className="text-sm font-semibold">{group.heading}</p>
               <ul className="flex flex-col gap-2">
@@ -75,7 +78,7 @@ export function Footer() {
         </div>
 
         <div className="mt-10 border-t border-white/[0.06] pt-6 text-center text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} MyanFlix. All rights reserved.
+          {t.footer.allRightsReserved(new Date().getFullYear())}
         </div>
       </div>
     </footer>

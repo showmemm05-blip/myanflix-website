@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Download,
   Maximize,
@@ -75,6 +76,13 @@ interface PlayerControlsProps {
   onSubtitleChange: (value: string) => void;
   audio: string;
   onAudioChange: (value: string) => void;
+  /**
+   * Fullscreen mode only renders the fullscreened element's own subtree — a
+   * dropdown portaled to the default `document.body` becomes invisible and
+   * unclickable once fullscreen is active. Passing the player's own
+   * fullscreen container here keeps these menus inside that subtree instead.
+   */
+  fullscreenContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
 export function PlayerControls({
@@ -103,9 +111,16 @@ export function PlayerControls({
   onSubtitleChange,
   audio,
   onAudioChange,
+  fullscreenContainerRef,
 }: PlayerControlsProps) {
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
   const pct = (seconds: number) => (durationSeconds > 0 ? Math.min(100, (seconds / durationSeconds) * 100) : 0);
+
+  // Controlled explicitly (rather than relying on the menu's own default
+  // close behavior) so selecting any option — subtitle, audio, speed, or
+  // quality — reliably closes its dropdown.
+  const [subtitleMenuOpen, setSubtitleMenuOpen] = useState(false);
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-2 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-4 pb-3 pt-10 sm:px-6">
@@ -176,7 +191,7 @@ export function PlayerControls({
         </div>
 
         <div className="flex items-center gap-1 sm:gap-1.5">
-          <DropdownMenu>
+          <DropdownMenu open={subtitleMenuOpen} onOpenChange={setSubtitleMenuOpen}>
             <DropdownMenuTrigger
               render={
                 <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 hover:text-white" />
@@ -184,11 +199,17 @@ export function PlayerControls({
             >
               <Subtitles className="size-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" container={fullscreenContainerRef}>
               <DropdownMenuGroup>
                 <DropdownMenuLabel>Subtitles</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuRadioGroup value={subtitle} onValueChange={onSubtitleChange}>
+                <DropdownMenuRadioGroup
+                  value={subtitle}
+                  onValueChange={(v) => {
+                    onSubtitleChange(v);
+                    setSubtitleMenuOpen(false);
+                  }}
+                >
                   {SUBTITLE_OPTIONS.map((option) => (
                     <DropdownMenuRadioItem key={option} value={option}>
                       {option}
@@ -198,7 +219,13 @@ export function PlayerControls({
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Audio</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuRadioGroup value={audio} onValueChange={onAudioChange}>
+                <DropdownMenuRadioGroup
+                  value={audio}
+                  onValueChange={(v) => {
+                    onAudioChange(v);
+                    setSubtitleMenuOpen(false);
+                  }}
+                >
                   {AUDIO_OPTIONS.map((option) => (
                     <DropdownMenuRadioItem key={option} value={option}>
                       {option}
@@ -209,7 +236,7 @@ export function PlayerControls({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
+          <DropdownMenu open={settingsMenuOpen} onOpenChange={setSettingsMenuOpen}>
             <DropdownMenuTrigger
               render={
                 <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 hover:text-white" />
@@ -217,11 +244,17 @@ export function PlayerControls({
             >
               <Settings className="size-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" container={fullscreenContainerRef}>
               <DropdownMenuGroup>
                 <DropdownMenuLabel>Playback speed</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuRadioGroup value={speed.toString()} onValueChange={(v) => onSpeedChange(Number(v))}>
+                <DropdownMenuRadioGroup
+                  value={speed.toString()}
+                  onValueChange={(v) => {
+                    onSpeedChange(Number(v));
+                    setSettingsMenuOpen(false);
+                  }}
+                >
                   {SPEED_OPTIONS.map((option) => (
                     <DropdownMenuRadioItem key={option} value={option.toString()}>
                       {option}x
@@ -231,7 +264,13 @@ export function PlayerControls({
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Quality</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuRadioGroup value={quality} onValueChange={onQualityChange}>
+                <DropdownMenuRadioGroup
+                  value={quality}
+                  onValueChange={(v) => {
+                    onQualityChange(v);
+                    setSettingsMenuOpen(false);
+                  }}
+                >
                   {qualityOptions.map((option) => (
                     <DropdownMenuRadioItem key={option} value={option}>
                       {option}

@@ -42,7 +42,7 @@ function Slider({
             <div
               key={i}
               data-slot="slider-buffered"
-              className="absolute inset-y-0 rounded-full bg-white/35"
+              className="absolute inset-y-0 rounded-full bg-muted-foreground"
               style={{
                 left: `${((start - min) / (max - min)) * 100}%`,
                 width: `${((Math.min(end, max) - start) / (max - min)) * 100}%`,

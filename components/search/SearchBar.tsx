@@ -8,11 +8,13 @@ import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useSearchSuggestions } from "@/hooks/use-movies";
+import { useLanguage } from "@/lib/context/language-context";
 import { FALLBACK_POSTER_URL } from "@/lib/placeholder";
 import { cn } from "@/lib/utils";
 
 export function SearchBar({ className, autoFocus }: { className?: string; autoFocus?: boolean }) {
   const router = useRouter();
+  const { t } = useLanguage();
   const [term, setTerm] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const debouncedTerm = useDebounce(term, 250);
@@ -38,7 +40,7 @@ export function SearchBar({ className, autoFocus }: { className?: string; autoFo
           onFocus={() => setIsFocused(true)}
           onBlur={() => setTimeout(() => setIsFocused(false), 150)}
           onKeyDown={(e) => e.key === "Enter" && goToSearch()}
-          placeholder="Search movies..."
+          placeholder={t.nav.searchPlaceholder}
           className="bg-secondary/60 pl-9 pr-9"
         />
         {term && (
@@ -77,7 +79,7 @@ export function SearchBar({ className, autoFocus }: { className?: string; autoFo
             onClick={goToSearch}
             className="w-full px-3 py-2 text-left text-xs font-medium text-primary hover:bg-secondary/60"
           >
-            See all results for &ldquo;{term}&rdquo;
+            {t.search.seeAllResultsFor(term)}
           </button>
         </div>
       )}

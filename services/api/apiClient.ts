@@ -7,10 +7,14 @@
  * `{ success: false, message }` on failure — this client unwraps that
  * envelope so callers just get `data` back (or a thrown ApiError).
  */
-import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
+import axios, {
+  type AxiosRequestConfig,
+  type InternalAxiosRequestConfig,
+} from "axios";
 import { tokenStore, notifyUnauthorized } from "@/lib/auth/token-store";
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api";
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api";
 
 /** Backend origin (no /api suffix) — resolves relative asset paths like /storage/... into absolute URLs. */
 export const API_ORIGIN = new URL(API_BASE_URL).origin;
@@ -49,9 +53,13 @@ async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
 
   try {
-    const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
-    const nextAccessToken: string | undefined = response.data?.data?.accessToken;
-    const nextRefreshToken: string | undefined = response.data?.data?.refreshToken;
+    const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+      refreshToken,
+    });
+    const nextAccessToken: string | undefined =
+      response.data?.data?.accessToken;
+    const nextRefreshToken: string | undefined =
+      response.data?.data?.refreshToken;
     if (!nextAccessToken || !nextRefreshToken) return null;
 
     tokenStore.setTokens(nextAccessToken, nextRefreshToken);
@@ -61,17 +69,29 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
   try {
     const response = await axiosClient.request({ url: path, ...options });
     if (response.data?.success === false) {
-      throw new ApiError(response.data.message ?? "Request failed", response.status);
+      throw new ApiError(
+        response.data.message ?? "Request failed",
+        response.status,
+      );
     }
     return (response.data?.data ?? response.data) as T;
   } catch (err) {
-    if (!axios.isAxiosError(err) || err.response?.status !== 401 || options.skipAuth) {
-      const message = axios.isAxiosError(err) ? err.response?.data?.message ?? err.message : "Request failed";
-      const status = axios.isAxiosError(err) ? err.response?.status ?? 0 : 0;
+    if (
+      !axios.isAxiosError(err) ||
+      err.response?.status !== 401 ||
+      options.skipAuth
+    ) {
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data?.message ?? err.message)
+        : "Request failed";
+      const status = axios.isAxiosError(err) ? (err.response?.status ?? 0) : 0;
       throw new ApiError(message, status);
     }
 
@@ -92,19 +112,24 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       headers: { ...options.headers, Authorization: `Bearer ${newToken}` },
     });
     if (retryResponse.data?.success === false) {
-      throw new ApiError(retryResponse.data.message ?? "Request failed", retryResponse.status);
+      throw new ApiError(
+        retryResponse.data.message ?? "Request failed",
+        retryResponse.status,
+      );
     }
     return (retryResponse.data?.data ?? retryResponse.data) as T;
   }
 }
 
 export const apiClient = {
-  get: <T>(path: string, options?: RequestOptions) => request<T>(path, { ...options, method: "GET" }),
+  get: <T>(path: string, options?: RequestOptions) =>
+    request<T>(path, { ...options, method: "GET" }),
   post: <T>(path: string, data?: unknown, options?: RequestOptions) =>
     request<T>(path, { ...options, method: "POST", data }),
   put: <T>(path: string, data?: unknown, options?: RequestOptions) =>
     request<T>(path, { ...options, method: "PUT", data }),
   patch: <T>(path: string, data?: unknown, options?: RequestOptions) =>
     request<T>(path, { ...options, method: "PATCH", data }),
-  delete: <T>(path: string, options?: RequestOptions) => request<T>(path, { ...options, method: "DELETE" }),
+  delete: <T>(path: string, options?: RequestOptions) =>
+    request<T>(path, { ...options, method: "DELETE" }),
 };

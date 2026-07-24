@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import { authService } from "@/services/api/authService";
 import { profileService } from "@/services/api/profileService";
 import { tokenStore, onUnauthorized } from "@/lib/auth/token-store";
@@ -44,13 +50,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => onUnauthorized(() => setUser(null)), []);
 
   const login = async (email: string, password: string) => {
-    const { accessToken, refreshToken } = await authService.login(email, password);
+    const { accessToken, refreshToken } = await authService.login(
+      email,
+      password,
+    );
     tokenStore.setTokens(accessToken, refreshToken);
     await loadProfile();
   };
 
   const register = async (name: string, email: string, password: string) => {
-    const { accessToken, refreshToken } = await authService.register(name, email, password);
+    const { accessToken, refreshToken } = await authService.register(
+      name,
+      email,
+      password,
+    );
     tokenStore.setTokens(accessToken, refreshToken);
     await loadProfile();
   };

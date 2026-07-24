@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Bell, Film, Heart, LibraryBig, LogOut, Menu, Settings, User, Wallet } from "lucide-react";
 import { MobileMenu } from "./MobileMenu";
+import { LanguageToggle } from "./LanguageToggle";
 import { SearchBar } from "@/components/search/SearchBar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -19,21 +20,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/context/auth-context";
+import { useLanguage } from "@/lib/context/language-context";
 import { notificationService } from "@/services/api/notificationService";
 import { cn } from "@/lib/utils";
-
-const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/movies", label: "Movies" },
-  { href: "/categories", label: "Categories" },
-  { href: "/library", label: "My Library" },
-  { href: "/watchlist", label: "Watchlist" },
-];
 
 export function Navbar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const navLinks = [
+    { href: "/", label: t.nav.home },
+    { href: "/movies", label: t.nav.movies },
+    { href: "/categories", label: t.nav.categories },
+    { href: "/library", label: t.nav.myLibrary },
+    { href: "/watchlist", label: t.nav.watchlist },
+  ];
 
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ["notifications", "unread-count"],
@@ -49,7 +52,7 @@ export function Navbar() {
             size="icon"
             className="lg:hidden"
             onClick={() => setMobileOpen(true)}
-            aria-label="Open navigation"
+            aria-label={t.nav.openNavigation}
           >
             <Menu className="size-5" />
           </Button>
@@ -62,7 +65,7 @@ export function Navbar() {
           </Link>
 
           <nav className="hidden items-center gap-1 lg:flex">
-            {NAV_LINKS.map((link) => {
+            {navLinks.map((link) => {
               const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
               return (
                 <Link
@@ -81,6 +84,7 @@ export function Navbar() {
 
           <div className="ml-auto flex items-center gap-2">
             <SearchBar className="hidden w-64 md:block" />
+            <LanguageToggle className="hidden sm:flex" />
 
             {user ? (
               <>
@@ -90,7 +94,7 @@ export function Navbar() {
                   className="relative"
                   render={<Link href="/notifications" />}
                   nativeButton={false}
-                  aria-label="Notifications"
+                  aria-label={t.nav.notifications}
                 >
                   <Bell className="size-5" />
                   {unreadCount > 0 && (
@@ -115,28 +119,28 @@ export function Navbar() {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem render={<Link href="/profile" />}>
                         <User className="size-4" />
-                        Profile
+                        {t.nav.profile}
                       </DropdownMenuItem>
                       <DropdownMenuItem render={<Link href="/library" />}>
                         <LibraryBig className="size-4" />
-                        My Library
+                        {t.nav.myLibrary}
                       </DropdownMenuItem>
                       <DropdownMenuItem render={<Link href="/watchlist" />}>
                         <Heart className="size-4" />
-                        Watchlist
+                        {t.nav.watchlist}
                       </DropdownMenuItem>
                       <DropdownMenuItem render={<Link href="/wallet" />}>
                         <Wallet className="size-4" />
-                        Wallet
+                        {t.nav.wallet}
                       </DropdownMenuItem>
                       <DropdownMenuItem render={<Link href="/settings" />}>
                         <Settings className="size-4" />
-                        Settings
+                        {t.nav.settings}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem variant="destructive" onClick={logout}>
                         <LogOut className="size-4" />
-                        Log out
+                        {t.nav.logOut}
                       </DropdownMenuItem>
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
@@ -144,7 +148,7 @@ export function Navbar() {
               </>
             ) : (
               <Button render={<Link href="/login" />} nativeButton={false}>
-                Sign in
+                {t.nav.signIn}
               </Button>
             )}
           </div>

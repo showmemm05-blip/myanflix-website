@@ -65,6 +65,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedAt = useRef(0);
   const currentTimeRef = useRef(0);
+  const videoClickTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
@@ -227,6 +228,37 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
     else video.pause();
   };
 
+  // A double-click always fires two native `click` events before the browser
+  // recognizes it as one — without this, each click's togglePlay() actually
+  // runs (pause, then resume), producing a visible stutter right as the video
+  // switches to fullscreen. Delaying the single-click action briefly, and
+  // cancelling it if a second click lands within that window, keeps a real
+  // single click responsive while letting a double-click go straight to
+  // fullscreen with no play/pause side effect at all.
+  const VIDEO_CLICK_DELAY_MS = 250;
+
+  const handleVideoClick = () => {
+    if (videoClickTimeout.current) return;
+    videoClickTimeout.current = setTimeout(() => {
+      videoClickTimeout.current = null;
+      togglePlay();
+    }, VIDEO_CLICK_DELAY_MS);
+  };
+
+  const handleVideoDoubleClick = () => {
+    if (videoClickTimeout.current) {
+      clearTimeout(videoClickTimeout.current);
+      videoClickTimeout.current = null;
+    }
+    toggleFullscreen();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (videoClickTimeout.current) clearTimeout(videoClickTimeout.current);
+    };
+  }, []);
+
   // Optimistically move the reported position immediately instead of waiting on the
   // browser's own `timeupdate` event, which on a slow connection can lag well behind
   // the moment the user actually dragged/skipped — otherwise the seek bar and clock
@@ -306,8 +338,10 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
 
         <video
           ref={videoRef}
-          className={`absolute inset-0 size-full ${hasStarted ? "opacity-100" : "opacity-0"}`}
+          className={`absolute inset-0 size-full ${hasStarted ? "opacity-100" : "opacity-0"} ${owned ? "cursor-pointer" : ""}`}
           playsInline
+          onClick={owned ? handleVideoClick : undefined}
+          onDoubleClick={owned ? handleVideoDoubleClick : undefined}
           onPlay={() => {
             setIsPlaying(true);
             setHasStarted(true);
@@ -370,7 +404,8 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
               {!isPlaying && !isBuffering && (
                 <button
                   type="button"
-                  onClick={togglePlay}
+                  onClick={handleVideoClick}
+                  onDoubleClick={handleVideoDoubleClick}
                   className="absolute inset-0 flex items-center justify-center"
                   aria-label="Play"
                 >
@@ -414,6 +449,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
                   onSubtitleChange={setSubtitle}
                   audio={audio}
                   onAudioChange={setAudio}
+                  fullscreenContainerRef={containerRef}
                 />
               </div>
             </>

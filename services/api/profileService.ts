@@ -1,5 +1,10 @@
 import { apiClient } from "./apiClient";
-import type { AppUser, NotificationPreferences, UserRole, UserStatus } from "@/types/user";
+import type {
+  AppUser,
+  NotificationPreferences,
+  UserRole,
+  UserStatus,
+} from "@/types/user";
 
 interface BackendUser {
   id: string;
@@ -21,7 +26,9 @@ function mapUser(u: BackendUser): AppUser {
     id: u.id,
     name: u.username,
     email: u.email,
-    avatarUrl: u.avatar ?? `https://i.pravatar.cc/150?u=${encodeURIComponent(u.username)}`,
+    avatarUrl:
+      u.avatar ??
+      `https://i.pravatar.cc/150?u=${encodeURIComponent(u.username)}`,
     role: u.role,
     status: u.status,
     walletBalance: u.balance ?? 0,
@@ -46,7 +53,10 @@ export const profileService = {
     return mapUser(user);
   },
 
-  changePassword(_currentPassword: string, _newPassword: string): Promise<void> {
+  changePassword(
+    _currentPassword: string,
+    _newPassword: string,
+  ): Promise<void> {
     // No backend endpoint yet for self-service password change.
     return Promise.resolve();
   },
@@ -55,7 +65,9 @@ export const profileService = {
     return Promise.resolve(notificationPreferences);
   },
 
-  updateNotificationPreferences(values: Partial<NotificationPreferences>): Promise<NotificationPreferences> {
+  updateNotificationPreferences(
+    values: Partial<NotificationPreferences>,
+  ): Promise<NotificationPreferences> {
     notificationPreferences = { ...notificationPreferences, ...values };
     return Promise.resolve(notificationPreferences);
   },

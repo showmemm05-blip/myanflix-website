@@ -14,7 +14,7 @@ export function PurchaseCard({ purchase }: { purchase: PurchaseEntry }) {
       </Link>
       <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
         <div>
-          <Link href={`/movie/${purchase.movieId}`} className="truncate text-sm font-semibold hover:text-primary">
+          <Link href={`/movie/${purchase.movieId}`} className="text-sm font-semibold hover:text-primary">
             {purchase.movieTitle}
           </Link>
           <p className="mt-1 text-xs text-muted-foreground">
