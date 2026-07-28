@@ -1,4 +1,11 @@
-export type NotificationType = "PURCHASE" | "PAYMENT" | "NEW_RELEASE" | "PROMOTION" | "ANNOUNCEMENT";
+export type NotificationType =
+  | "PURCHASE"
+  | "PAYMENT"
+  | "NEW_RELEASE"
+  | "PROMOTION"
+  | "ANNOUNCEMENT"
+  | "DEPOSIT_APPROVED"
+  | "DEPOSIT_REJECTED";
 
 export interface AppNotification {
   id: string;
@@ -9,4 +16,5 @@ export interface AppNotification {
   createdAt: string;
   movieId?: string;
   posterUrl?: string;
+  depositId?: string;
 }

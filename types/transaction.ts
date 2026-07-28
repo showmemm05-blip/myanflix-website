@@ -1,6 +1,5 @@
 export type TransactionType = "PURCHASE" | "DEPOSIT" | "REFUND";
 export type TransactionStatus = "COMPLETED" | "PENDING" | "FAILED";
-/** UI-only — the backend has no deposit endpoint or payment-method field on Transaction yet. */
 export type DepositMethod = "KBZ Pay" | "Wave Pay" | "AYA Pay" | "Visa/Mastercard";
 
 export interface Transaction {
@@ -10,5 +9,18 @@ export interface Transaction {
   movieTitle: string | null;
   amount: number;
   status: TransactionStatus;
+  createdAt: string;
+}
+
+export type DepositStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface Deposit {
+  id: string;
+  amount: number;
+  paymentMethod: string;
+  reference: string;
+  status: DepositStatus;
+  rejectionReason: string | null;
+  approvedAt: string | null;
   createdAt: string;
 }

@@ -10,6 +10,7 @@ import {
 import { authService } from "@/services/api/authService";
 import { profileService } from "@/services/api/profileService";
 import { tokenStore, onUnauthorized } from "@/lib/auth/token-store";
+import { connectSocket, disconnectSocket } from "@/lib/socket";
 import type { AppUser } from "@/types/user";
 
 interface AuthContextValue {
@@ -39,15 +40,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const hasToken = Boolean(tokenStore.getAccessToken());
-    if (!hasToken) {
+    const accessToken = tokenStore.getAccessToken();
+    if (!accessToken) {
       setIsLoading(false);
       return;
     }
+    connectSocket(accessToken);
     loadProfile().finally(() => setIsLoading(false));
   }, []);
 
-  useEffect(() => onUnauthorized(() => setUser(null)), []);
+  useEffect(
+    () =>
+      onUnauthorized(() => {
+        setUser(null);
+        disconnectSocket();
+      }),
+    [],
+  );
 
   const login = async (email: string, password: string) => {
     const { accessToken, refreshToken } = await authService.login(
@@ -55,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     );
     tokenStore.setTokens(accessToken, refreshToken);
+    connectSocket(accessToken);
     await loadProfile();
   };
 
@@ -65,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     );
     tokenStore.setTokens(accessToken, refreshToken);
+    connectSocket(accessToken);
     await loadProfile();
   };
 
@@ -72,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refreshToken = tokenStore.getRefreshToken();
     tokenStore.clear();
     setUser(null);
+    disconnectSocket();
     if (refreshToken) authService.logout(refreshToken).catch(() => {});
   };
 
