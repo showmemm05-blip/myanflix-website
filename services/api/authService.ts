@@ -13,15 +13,24 @@ export interface AuthTokens {
   refreshToken: string;
 }
 
-export type LoginResponse = { user: AuthUser } & AuthTokens;
+export type OtpVerifyResponse = { user: AuthUser } & AuthTokens;
 
 export const authService = {
-  login(email: string, password: string) {
-    return apiClient.post<LoginResponse>("/auth/login", { email, password }, { skipAuth: true });
+  checkPhoneExists(phone: string) {
+    return apiClient.post<{ exists: boolean }>("/auth/phone/check", { phone }, { skipAuth: true });
   },
 
-  register(username: string, email: string, password: string) {
-    return apiClient.post<LoginResponse>("/auth/register", { username, email, password }, { skipAuth: true });
+  verifyPhonePassword(phone: string, password: string) {
+    return apiClient.post<{ valid: boolean }>("/auth/phone/verify-password", { phone, password }, { skipAuth: true });
+  },
+
+  requestOtp(phone: string) {
+    return apiClient.post<{ sent: boolean }>("/auth/otp/request", { phone }, { skipAuth: true });
+  },
+
+  /** `password` is only meaningful (and required by the backend) when this phone has no account yet. */
+  verifyOtp(phone: string, code: string, password?: string) {
+    return apiClient.post<OtpVerifyResponse>("/auth/otp/verify", { phone, code, password }, { skipAuth: true });
   },
 
   logout(refreshToken: string) {

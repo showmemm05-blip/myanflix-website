@@ -17,6 +17,7 @@ const en = {
   nav: {
     home: "Home",
     movies: "Movies",
+    series: "Series",
     categories: "Categories",
     myLibrary: "My Library",
     watchlist: "Watchlist",
@@ -70,6 +71,7 @@ const mm = {
   nav: {
     home: "ပင်မ",
     movies: "ရုပ်ရှင်များ",
+    series: "ဇာတ်လမ်းတွဲများ",
     categories: "အမျိုးအစားများ",
     myLibrary: "ကျွန်ုပ်၏စာကြည့်တိုက်",
     watchlist: "ကြည့်ရန်စာရင်း",

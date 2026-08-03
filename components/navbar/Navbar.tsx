@@ -33,6 +33,7 @@ export function Navbar() {
   const navLinks = [
     { href: "/", label: t.nav.home },
     { href: "/movies", label: t.nav.movies },
+    { href: "/series", label: t.nav.series },
     { href: "/categories", label: t.nav.categories },
     { href: "/library", label: t.nav.myLibrary },
     { href: "/watchlist", label: t.nav.watchlist },

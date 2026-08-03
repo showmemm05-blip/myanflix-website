@@ -14,6 +14,7 @@ import { PurchaseDialog } from "@/components/dialogs/PurchaseDialog";
 import { Button } from "@/components/ui/button";
 import { useMovie, useSimilarMovies } from "@/hooks/use-movies";
 import { useLibrary } from "@/lib/context/library-context";
+import { seriesService } from "@/services/api/seriesService";
 import { historyService } from "@/services/api/historyService";
 import { videoService } from "@/services/api/videoService";
 import { ApiError } from "@/services/api/apiClient";
@@ -44,8 +45,20 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const { movieId } = use(params);
   const { data: movie, isLoading } = useMovie(movieId);
   const { data: similarMovies } = useSimilarMovies(movieId);
-  const { isPurchased } = useLibrary();
-  const owned = movie ? isPurchased(movie.id) : false;
+  const { isPurchased, isSeriesPurchased } = useLibrary();
+
+  // Episodes inherit access from their parent series — one series purchase
+  // unlocks every episode; per-episode ownership never exists.
+  const { data: parentSeries } = useQuery({
+    queryKey: ["series", movie?.seriesId],
+    queryFn: () => seriesService.getSeriesById(movie!.seriesId!),
+    enabled: Boolean(movie?.seriesId),
+  });
+  const owned = movie
+    ? movie.seriesId
+      ? Boolean(parentSeries && (parentSeries.isPurchased || isSeriesPurchased(movie.seriesId) || !parentSeries.isPremium))
+      : isPurchased(movie.id)
+    : false;
 
   const {
     data: streamInfo,
@@ -365,7 +378,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
             variant="ghost"
             size="icon"
             className="text-white hover:bg-white/10 hover:text-white"
-            render={<Link href={`/movie/${movie.id}`} />}
+            render={<Link href={movie.seriesId ? `/series/${movie.seriesId}` : `/movie/${movie.id}`} />}
             nativeButton={false}
           >
             <ArrowLeft className="size-5" />
@@ -459,14 +472,31 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
             <div className="flex size-14 items-center justify-center rounded-full bg-white/10 text-white">
               <Lock className="size-6" />
             </div>
-            <div>
-              <p className="text-lg font-semibold text-white">Buy this movie to watch</p>
-              <p className="mt-1 text-sm text-white/70">{movie.title} isn&rsquo;t in your library yet.</p>
-            </div>
-            <Button onClick={() => setPurchaseOpen(true)}>
-              <ShoppingBag className="size-4" />
-              Buy Now
-            </Button>
+            {movie.seriesId ? (
+              <>
+                <div>
+                  <p className="text-lg font-semibold text-white">Buy the series to watch</p>
+                  <p className="mt-1 text-sm text-white/70">
+                    Episodes are unlocked by owning the whole series — one purchase covers every episode.
+                  </p>
+                </div>
+                <Button render={<Link href={`/series/${movie.seriesId}`} />} nativeButton={false}>
+                  <ShoppingBag className="size-4" />
+                  View Series
+                </Button>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="text-lg font-semibold text-white">Buy this movie to watch</p>
+                  <p className="mt-1 text-sm text-white/70">{movie.title} isn&rsquo;t in your library yet.</p>
+                </div>
+                <Button onClick={() => setPurchaseOpen(true)}>
+                  <ShoppingBag className="size-4" />
+                  Buy Now
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>

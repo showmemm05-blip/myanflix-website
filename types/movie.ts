@@ -20,6 +20,10 @@ export interface Movie {
   price: number;
   isPremium: boolean;
   status: MovieStatus;
+  /** Set only for episodes — null means a standalone movie. Episode access is unlocked by owning the series, never per-episode. */
+  seriesId: string | null;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
   /** Derived client-side from `language === "Burmese"` — the backend has no dedicated field for this. */
   isMyanmar: boolean;
   /** Derived client-side from the caller's purchase list. */

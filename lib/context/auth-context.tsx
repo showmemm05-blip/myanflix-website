@@ -17,8 +17,14 @@ interface AuthContextValue {
   user: AppUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  /** Step 1: does an account already exist for this phone? */
+  checkPhoneExists: (phone: string) => Promise<boolean>;
+  /** Step 2 (returning phone): throws on a wrong password. */
+  verifyPassword: (phone: string, password: string) => Promise<void>;
+  /** Step 3: sends a code to `phone` — throws (e.g. cooldown/rate-limit) on failure. */
+  requestOtp: (phone: string) => Promise<void>;
+  /** Step 3: verifies the code, logging into the existing account or creating one — `password` required only when creating. */
+  verifyOtp: (phone: string, code: string, password?: string) => Promise<void>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
 }
@@ -58,22 +64,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const login = async (email: string, password: string) => {
-    const { accessToken, refreshToken } = await authService.login(
-      email,
-      password,
-    );
-    tokenStore.setTokens(accessToken, refreshToken);
-    connectSocket(accessToken);
-    await loadProfile();
+  const checkPhoneExists = async (phone: string) => {
+    const { exists } = await authService.checkPhoneExists(phone);
+    return exists;
   };
 
-  const register = async (name: string, email: string, password: string) => {
-    const { accessToken, refreshToken } = await authService.register(
-      name,
-      email,
-      password,
-    );
+  const verifyPassword = async (phone: string, password: string) => {
+    await authService.verifyPhonePassword(phone, password);
+  };
+
+  const requestOtp = async (phone: string) => {
+    await authService.requestOtp(phone);
+  };
+
+  const verifyOtp = async (phone: string, code: string, password?: string) => {
+    const { accessToken, refreshToken } = await authService.verifyOtp(phone, code, password);
     tokenStore.setTokens(accessToken, refreshToken);
     connectSocket(accessToken);
     await loadProfile();
@@ -93,8 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isAuthenticated: Boolean(user),
         isLoading,
-        login,
-        register,
+        checkPhoneExists,
+        verifyPassword,
+        requestOtp,
+        verifyOtp,
         logout,
         refreshProfile: loadProfile,
       }}

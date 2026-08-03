@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Film, Heart, Home, Layers, LibraryBig, Search } from "lucide-react";
+import { Film, Heart, Home, Layers, LibraryBig, Search, Tv } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { LanguageToggle } from "./LanguageToggle";
 import { useLanguage } from "@/lib/context/language-context";
@@ -15,6 +15,7 @@ export function MobileMenu({ open, onOpenChange }: { open: boolean; onOpenChange
   const links = [
     { href: "/", label: t.nav.home, icon: Home },
     { href: "/movies", label: t.nav.movies, icon: Film },
+    { href: "/series", label: t.nav.series, icon: Tv },
     { href: "/categories", label: t.nav.categories, icon: Layers },
     { href: "/search", label: t.nav.search, icon: Search },
     { href: "/library", label: t.nav.myLibrary, icon: LibraryBig },

@@ -4,7 +4,7 @@ import type { Category } from "@/types/category";
 import type { Movie, MovieQuery } from "@/types/movie";
 import type { PurchaseEntry } from "@/types/purchase";
 
-interface BackendMovie {
+export interface BackendMovie {
   id: string;
   title: string;
   description: string;
@@ -18,12 +18,15 @@ interface BackendMovie {
   price: number;
   isPremium: boolean;
   status: Movie["status"];
+  seriesId: string | null;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
   categories: { id: string; name: string }[];
   createdAt: string;
   updatedAt: string;
 }
 
-function mapMovie(m: BackendMovie): Movie {
+export function mapMovie(m: BackendMovie): Movie {
   return {
     id: m.id,
     title: m.title,
@@ -39,6 +42,9 @@ function mapMovie(m: BackendMovie): Movie {
     price: m.price,
     isPremium: m.isPremium,
     status: m.status,
+    seriesId: m.seriesId ?? null,
+    seasonNumber: m.seasonNumber ?? null,
+    episodeNumber: m.episodeNumber ?? null,
     isMyanmar: m.language === "Burmese",
     isPurchased: false,
     isInWatchlist: false,

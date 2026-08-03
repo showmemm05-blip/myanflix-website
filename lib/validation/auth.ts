@@ -1,15 +1,31 @@
 import { z } from "zod";
 
-export const loginSchema = z.object({
-  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+export const phoneSchema = z.object({
+  phone: z
+    .string()
+    .min(1, "Phone number is required")
+    .regex(/^\+?[0-9]{7,15}$/, "Enter a valid phone number"),
+});
+export type PhoneValues = z.infer<typeof phoneSchema>;
+
+export const otpCodeSchema = z.object({
+  code: z
+    .string()
+    .min(1, "Enter the code")
+    .length(6, "Enter the 6-digit code")
+    .regex(/^\d{6}$/, "Code must be 6 digits"),
+});
+export type OtpCodeValues = z.infer<typeof otpCodeSchema>;
+
+/** A returning phone — just needs whatever password they already set. */
+export const loginPasswordSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
-export type LoginValues = z.infer<typeof loginSchema>;
+export type LoginPasswordValues = z.infer<typeof loginPasswordSchema>;
 
-export const registerSchema = z
+/** A new phone — choosing the password that account will use going forward. */
+export const createPasswordSchema = z
   .object({
-    name: z.string().min(2, "Name must be at least 2 characters"),
-    email: z.string().min(1, "Email is required").email("Enter a valid email address"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string().min(1, "Please confirm your password"),
   })
@@ -17,9 +33,4 @@ export const registerSchema = z
     message: "Passwords don't match",
     path: ["confirmPassword"],
   });
-export type RegisterValues = z.infer<typeof registerSchema>;
-
-export const forgotPasswordSchema = z.object({
-  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
-});
-export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
+export type CreatePasswordValues = z.infer<typeof createPasswordSchema>;

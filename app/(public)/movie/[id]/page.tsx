@@ -10,8 +10,10 @@ import { PageLoader } from "@/components/loading/Spinner";
 import { EmptyState } from "@/components/empty/EmptyState";
 import { PurchaseDialog } from "@/components/dialogs/PurchaseDialog";
 import { ShareDialog } from "@/components/modals/ShareDialog";
+import { useQuery } from "@tanstack/react-query";
 import { useMovie, useSimilarMovies } from "@/hooks/use-movies";
 import { useLibrary } from "@/lib/context/library-context";
+import { seriesService } from "@/services/api/seriesService";
 import { formatDuration } from "@/lib/format";
 import { formatKyat } from "@/lib/currency";
 import { FALLBACK_COVER_URL, FALLBACK_POSTER_URL } from "@/lib/placeholder";
@@ -20,7 +22,15 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params);
   const { data: movie, isLoading } = useMovie(id);
   const { data: similarMovies, isLoading: isSimilarLoading } = useSimilarMovies(id);
-  const { isPurchased, isInWatchlist, toggleWatchlist } = useLibrary();
+  const { isPurchased, isSeriesPurchased, isInWatchlist, toggleWatchlist } = useLibrary();
+
+  // An episode's access comes from owning its series — it is never
+  // purchasable on its own, so this page must never show it a Buy button.
+  const { data: parentSeries } = useQuery({
+    queryKey: ["series", movie?.seriesId],
+    queryFn: () => seriesService.getSeriesById(movie!.seriesId!),
+    enabled: Boolean(movie?.seriesId),
+  });
 
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -44,7 +54,9 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const owned = isPurchased(movie.id);
+  const owned = movie.seriesId
+    ? Boolean(parentSeries && (parentSeries.isPurchased || isSeriesPurchased(movie.seriesId) || !parentSeries.isPremium))
+    : isPurchased(movie.id);
   const inWatchlist = isInWatchlist(movie.id);
 
   return (
@@ -100,6 +112,11 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
               <Button size="lg" render={<Link href={`/player/${movie.id}`} />} nativeButton={false}>
                 <Play className="size-4 fill-current" />
                 Watch Now
+              </Button>
+            ) : movie.seriesId ? (
+              <Button size="lg" render={<Link href={`/series/${movie.seriesId}`} />} nativeButton={false}>
+                <ShoppingBag className="size-4" />
+                Buy the Series to Watch
               </Button>
             ) : (
               <Button size="lg" onClick={() => setPurchaseOpen(true)}>
