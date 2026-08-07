@@ -1,4 +1,4 @@
-export type TransactionType = "PURCHASE" | "DEPOSIT" | "REFUND";
+export type TransactionType = "PURCHASE" | "SUBSCRIPTION" | "DEPOSIT" | "REFUND";
 export type TransactionStatus = "COMPLETED" | "PENDING" | "FAILED";
 export type DepositMethod = "KBZ Pay" | "Wave Pay" | "AYA Pay" | "Visa/Mastercard";
 

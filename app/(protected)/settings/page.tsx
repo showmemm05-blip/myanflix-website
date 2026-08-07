@@ -20,16 +20,16 @@ import {
 import { ConfirmDialog } from "@/components/modals/ConfirmDialog";
 import { PageLoader } from "@/components/loading/Spinner";
 import { useAuth } from "@/lib/context/auth-context";
+import { useLanguage } from "@/lib/context/language-context";
 import { profileService } from "@/services/api/profileService";
 import type { NotificationPreferences } from "@/types/user";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
+  const { language, setLanguage } = useLanguage();
   const router = useRouter();
   const [name, setName] = useState(user?.name ?? "");
-  const [email, setEmail] = useState(user?.email ?? "");
-  const [language, setLanguage] = useState<"en" | "my">("en");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -79,10 +79,6 @@ export default function SettingsPage() {
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="settings-name">Full name</Label>
               <Input id="settings-name" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="settings-email">Email</Label>
-              <Input id="settings-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <Button onClick={handleSaveProfile} className="w-fit">
               Save changes
@@ -148,17 +144,21 @@ export default function SettingsPage() {
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label>Language</Label>
-              <Select value={language} onValueChange={(v) => v && setLanguage(v as "en" | "my")}>
+              <Select
+                items={{ mm: "မြန်မာ (Myanmar)", en: "English" }}
+                value={language}
+                onValueChange={(v) => v && setLanguage(v as "en" | "mm")}
+              >
                 <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="mm">မြန်မာ (Myanmar)</SelectItem>
                   <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="my">မြန်မာ (Myanmar)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Theme</Label>
-              <Select value="dark" disabled>
+              <Select items={{ dark: "Dark" }} value="dark" disabled>
                 <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="dark">Dark</SelectItem>

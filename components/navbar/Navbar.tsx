@@ -4,10 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Bell, Film, Heart, LibraryBig, LogOut, Menu, Settings, User, Wallet } from "lucide-react";
+import { Bell, Film, LogOut, Menu, Settings, User, Wallet } from "lucide-react";
 import { MobileMenu } from "./MobileMenu";
-import { LanguageToggle } from "./LanguageToggle";
-import { SearchBar } from "@/components/search/SearchBar";
+import { WalletBalance } from "./WalletBalance";
+import { SubscriptionBadge } from "./SubscriptionBadge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,8 +35,6 @@ export function Navbar() {
     { href: "/movies", label: t.nav.movies },
     { href: "/series", label: t.nav.series },
     { href: "/categories", label: t.nav.categories },
-    { href: "/library", label: t.nav.myLibrary },
-    { href: "/watchlist", label: t.nav.watchlist },
   ];
 
   const { data: unreadCount = 0 } = useQuery({
@@ -84,11 +82,11 @@ export function Navbar() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            <SearchBar className="hidden w-64 md:block" />
-            <LanguageToggle className="hidden sm:flex" />
-
             {user ? (
               <>
+                <SubscriptionBadge className="hidden sm:flex" />
+                <WalletBalance />
+
                 <Button
                   variant="ghost"
                   size="icon"
@@ -121,14 +119,6 @@ export function Navbar() {
                       <DropdownMenuItem render={<Link href="/profile" />}>
                         <User className="size-4" />
                         {t.nav.profile}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem render={<Link href="/library" />}>
-                        <LibraryBig className="size-4" />
-                        {t.nav.myLibrary}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem render={<Link href="/watchlist" />}>
-                        <Heart className="size-4" />
-                        {t.nav.watchlist}
                       </DropdownMenuItem>
                       <DropdownMenuItem render={<Link href="/wallet" />}>
                         <Wallet className="size-4" />

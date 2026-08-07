@@ -7,8 +7,8 @@ import { useEffect, useState } from "react";
 import { Info, Play, Plus, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLibrary } from "@/lib/context/library-context";
+import { useSubscription } from "@/lib/context/subscription-context";
 import { formatDuration } from "@/lib/format";
-import { formatKyat } from "@/lib/currency";
 import { FALLBACK_COVER_URL } from "@/lib/placeholder";
 import type { Movie } from "@/types/movie";
 
@@ -16,7 +16,8 @@ const ROTATE_INTERVAL_MS = 7000;
 
 export function HeroBanner({ movies }: { movies: Movie[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const { isPurchased, isInWatchlist, toggleWatchlist } = useLibrary();
+  const { isInWatchlist, toggleWatchlist } = useLibrary();
+  const { isSubscribed } = useSubscription();
 
   useEffect(() => {
     if (movies.length <= 1) return;
@@ -26,7 +27,7 @@ export function HeroBanner({ movies }: { movies: Movie[] }) {
 
   if (movies.length === 0) return null;
   const movie = movies[activeIndex];
-  const owned = isPurchased(movie.id);
+  const hasAccess = movie.accessType === "FREE" || isSubscribed;
   const inWatchlist = isInWatchlist(movie.id);
 
   return (
@@ -75,7 +76,7 @@ export function HeroBanner({ movies }: { movies: Movie[] }) {
           <div className="flex flex-wrap items-center gap-3 pt-1">
             <Button size="lg" render={<Link href={`/movie/${movie.id}`} />} nativeButton={false}>
               <Play className="size-4 fill-current" />
-              {owned ? "Watch Now" : `Buy for ${formatKyat(movie.price)}`}
+              {hasAccess ? "Watch Now" : "Subscribe to Watch"}
             </Button>
             <Button
               size="lg"

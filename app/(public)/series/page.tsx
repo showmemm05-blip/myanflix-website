@@ -6,17 +6,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Tv } from "lucide-react";
 import { EmptyState } from "@/components/empty/EmptyState";
 import { MovieCardSkeleton } from "@/components/movie/MovieCard";
-import { PurchasedBadge } from "@/components/movie/PurchasedBadge";
-import { PriceBadge } from "@/components/movie/PriceBadge";
+import { AccessBadge } from "@/components/movie/AccessBadge";
 import { seriesService } from "@/services/api/seriesService";
-import { useLibrary } from "@/lib/context/library-context";
 import { FALLBACK_POSTER_URL } from "@/lib/placeholder";
 import type { SeriesListItem } from "@/types/series";
 
 function SeriesCard({ series }: { series: SeriesListItem }) {
-  const { isSeriesPurchased } = useLibrary();
-  const owned = isSeriesPurchased(series.id);
-
   return (
     <Link
       href={`/series/${series.id}`}
@@ -31,7 +26,7 @@ function SeriesCard({ series }: { series: SeriesListItem }) {
           className="object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div className="absolute left-2 top-2">
-          {owned ? <PurchasedBadge /> : <PriceBadge price={series.isPremium ? series.price : 0} />}
+          <AccessBadge accessType={series.accessType} />
         </div>
       </div>
       <div className="min-w-0">

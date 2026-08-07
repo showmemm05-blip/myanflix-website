@@ -2,20 +2,23 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Play, Plus, Check } from "lucide-react";
+import { Play, Plus, Check, Info } from "lucide-react";
 import { RatingBadge } from "./RatingBadge";
-import { PriceBadge } from "./PriceBadge";
-import { PurchasedBadge } from "./PurchasedBadge";
+import { AccessBadge } from "./AccessBadge";
 import { useLibrary } from "@/lib/context/library-context";
+import { useSubscription } from "@/lib/context/subscription-context";
 import { formatDuration } from "@/lib/format";
 import { FALLBACK_POSTER_URL } from "@/lib/placeholder";
 import { cn } from "@/lib/utils";
 import type { Movie } from "@/types/movie";
 
 export function MovieCard({ movie, className }: { movie: Movie; className?: string }) {
-  const { isPurchased, isInWatchlist, toggleWatchlist } = useLibrary();
-  const owned = isPurchased(movie.id);
+  const router = useRouter();
+  const { isInWatchlist, toggleWatchlist } = useLibrary();
+  const { isSubscribed } = useSubscription();
+  const hasAccess = movie.accessType === "FREE" || isSubscribed;
   const inWatchlist = isInWatchlist(movie.id);
 
   return (
@@ -37,17 +40,38 @@ export function MovieCard({ movie, className }: { movie: Movie; className?: stri
             <RatingBadge rating={movie.rating} />
           </div>
           <div className="absolute right-1.5 top-1.5">
-            {owned ? <PurchasedBadge /> : <PriceBadge price={movie.price} />}
+            <AccessBadge accessType={movie.accessType} />
           </div>
 
           <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100">
             <div className="flex flex-col gap-2 p-3">
               <div className="flex items-center justify-center gap-2">
-                <div className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
-                  <Play className="size-4 fill-current" />
-                </div>
                 <button
                   type="button"
+                  aria-label={hasAccess ? "Play" : "View details"}
+                  onClick={(e) => {
+                    if (!hasAccess) return;
+                    e.preventDefault();
+                    router.push(`/player/${movie.id}`);
+                  }}
+                  className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105"
+                >
+                  <Play className="size-4 fill-current" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="View details"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    router.push(`/movie/${movie.id}`);
+                  }}
+                  className="flex size-9 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+                >
+                  <Info className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={inWatchlist ? "Remove from favorites" : "Add to favorites"}
                   onClick={(e) => {
                     e.preventDefault();
                     toggleWatchlist(movie.id);

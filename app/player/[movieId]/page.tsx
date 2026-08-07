@@ -5,20 +5,23 @@ import Link from "next/link";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import Hls from "hls.js";
-import { AlertTriangle, ArrowLeft, Clapperboard, Loader2, Lock, Play, ShoppingBag } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Clapperboard, Loader2, Lock, Play } from "lucide-react";
 import { PlayerControls } from "@/components/player/PlayerControls";
+import { EpisodesSection } from "@/components/player/EpisodesSection";
+import { NetworkStatusIcon } from "@/components/player/NetworkStatusIcon";
 import { MovieRow } from "@/components/movie/MovieRow";
 import { PageLoader } from "@/components/loading/Spinner";
 import { EmptyState } from "@/components/empty/EmptyState";
-import { PurchaseDialog } from "@/components/dialogs/PurchaseDialog";
+import { SubscribeDialog } from "@/components/dialogs/SubscribeDialog";
 import { Button } from "@/components/ui/button";
 import { useMovie, useSimilarMovies } from "@/hooks/use-movies";
-import { useLibrary } from "@/lib/context/library-context";
+import { useSubscription } from "@/lib/context/subscription-context";
 import { seriesService } from "@/services/api/seriesService";
 import { historyService } from "@/services/api/historyService";
 import { videoService } from "@/services/api/videoService";
 import { ApiError } from "@/services/api/apiClient";
 import { createPrefetchSystem, type PrefetchHandle } from "@/lib/streaming/PrefetchController";
+import { useNetworkQuality } from "@/lib/hooks/use-network-quality";
 import type { PrefetchStatusDisplay } from "@/components/player/PlayerControls";
 import { formatDuration } from "@/lib/format";
 import { FALLBACK_COVER_URL } from "@/lib/placeholder";
@@ -45,20 +48,17 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const { movieId } = use(params);
   const { data: movie, isLoading } = useMovie(movieId);
   const { data: similarMovies } = useSimilarMovies(movieId);
-  const { isPurchased, isSeriesPurchased } = useLibrary();
+  const { isSubscribed } = useSubscription();
 
-  // Episodes inherit access from their parent series — one series purchase
-  // unlocks every episode; per-episode ownership never exists.
+  // Episodes inherit access from their parent series' own accessType —
+  // per-episode access never exists.
   const { data: parentSeries } = useQuery({
     queryKey: ["series", movie?.seriesId],
     queryFn: () => seriesService.getSeriesById(movie!.seriesId!),
     enabled: Boolean(movie?.seriesId),
   });
-  const owned = movie
-    ? movie.seriesId
-      ? Boolean(parentSeries && (parentSeries.isPurchased || isSeriesPurchased(movie.seriesId) || !parentSeries.isPremium))
-      : isPurchased(movie.id)
-    : false;
+  const accessType = movie ? (movie.seriesId ? parentSeries?.accessType : movie.accessType) : undefined;
+  const hasAccess = accessType === "FREE" || isSubscribed;
 
   const {
     data: streamInfo,
@@ -67,7 +67,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   } = useQuery({
     queryKey: ["stream", movieId],
     queryFn: () => videoService.getStreamInfo(movieId),
-    enabled: owned,
+    enabled: hasAccess,
     retry: false,
   });
 
@@ -79,6 +79,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const lastSavedAt = useRef(0);
   const currentTimeRef = useRef(0);
   const videoClickTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadedFragmentCountRef = useRef(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
@@ -94,11 +95,12 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const [subtitle, setSubtitle] = useState("Off");
   const [audio, setAudio] = useState("Original");
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [purchaseOpen, setPurchaseOpen] = useState(false);
+  const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [bufferedRanges, setBufferedRanges] = useState<[number, number][]>([]);
   const [prefetchStatus, setPrefetchStatus] = useState<PrefetchStatusDisplay | null>(null);
 
   const progress = durationSeconds > 0 ? (currentTime / durationSeconds) * 100 : 0;
+  const networkQuality = useNetworkQuality({ hlsRef, isBuffering, loadedFragmentCountRef, active: hasStarted });
 
   const resetHideTimer = useCallback(() => {
     setControlsVisible(true);
@@ -118,6 +120,8 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
     const video = videoRef.current;
     const playlistUrl = streamInfo?.playlistUrl;
     if (!video || !playlistUrl) return;
+
+    loadedFragmentCountRef.current = 0;
 
     if (Hls.isSupported()) {
       // Our own SegmentManager/CacheManager/DownloadManager/PrefetchManager stack owns the
@@ -149,6 +153,9 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
         ];
         setQualityLevels(levels);
         prefetchRef.current = prefetchSystem.attach(hls, video);
+      });
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        loadedFragmentCountRef.current += 1;
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
@@ -351,10 +358,10 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
 
         <video
           ref={videoRef}
-          className={`absolute inset-0 size-full ${hasStarted ? "opacity-100" : "opacity-0"} ${owned ? "cursor-pointer" : ""}`}
+          className={`absolute inset-0 size-full ${hasStarted ? "opacity-100" : "opacity-0"} ${hasAccess ? "cursor-pointer" : ""}`}
           playsInline
-          onClick={owned ? handleVideoClick : undefined}
-          onDoubleClick={owned ? handleVideoDoubleClick : undefined}
+          onClick={hasAccess ? handleVideoClick : undefined}
+          onDoubleClick={hasAccess ? handleVideoDoubleClick : undefined}
           onPlay={() => {
             setIsPlaying(true);
             setHasStarted(true);
@@ -386,7 +393,9 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
           <p className="truncate text-sm font-medium text-white">{movie.title}</p>
         </div>
 
-        {owned ? (
+        {hasStarted && <NetworkStatusIcon quality={networkQuality} />}
+
+        {hasAccess ? (
           isStreamLoading ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <Loader2 className="size-8 animate-spin text-white/80" />
@@ -472,31 +481,18 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
             <div className="flex size-14 items-center justify-center rounded-full bg-white/10 text-white">
               <Lock className="size-6" />
             </div>
-            {movie.seriesId ? (
-              <>
-                <div>
-                  <p className="text-lg font-semibold text-white">Buy the series to watch</p>
-                  <p className="mt-1 text-sm text-white/70">
-                    Episodes are unlocked by owning the whole series — one purchase covers every episode.
-                  </p>
-                </div>
-                <Button render={<Link href={`/series/${movie.seriesId}`} />} nativeButton={false}>
-                  <ShoppingBag className="size-4" />
-                  View Series
-                </Button>
-              </>
-            ) : (
-              <>
-                <div>
-                  <p className="text-lg font-semibold text-white">Buy this movie to watch</p>
-                  <p className="mt-1 text-sm text-white/70">{movie.title} isn&rsquo;t in your library yet.</p>
-                </div>
-                <Button onClick={() => setPurchaseOpen(true)}>
-                  <ShoppingBag className="size-4" />
-                  Buy Now
-                </Button>
-              </>
-            )}
+            <div>
+              <p className="text-lg font-semibold text-white">Subscribe to watch</p>
+              <p className="mt-1 text-sm text-white/70">
+                {movie.seriesId
+                  ? "Episodes are unlocked by an active subscription — one plan covers every episode."
+                  : `${movie.title} requires an active subscription to stream.`}
+              </p>
+            </div>
+            <Button onClick={() => setSubscribeOpen(true)}>
+              <Play className="size-4 fill-current" />
+              Subscribe
+            </Button>
           </div>
         )}
       </div>
@@ -510,19 +506,12 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
           <p className="mt-3 max-w-2xl text-sm text-muted-foreground">{movie.description}</p>
         </div>
 
-        <div>
-          <h2 className="mb-3 text-lg font-semibold">Episodes</h2>
-          <EmptyState
-            icon={Clapperboard}
-            title="This is a standalone movie"
-            description="Episode support is coming soon for series content."
-          />
-        </div>
+        {movie.seriesId && <EpisodesSection seriesId={movie.seriesId} currentEpisodeId={movie.id} />}
       </div>
 
       <MovieRow title="Recommended Movies" movies={similarMovies ?? []} />
 
-      <PurchaseDialog movie={movie} open={purchaseOpen} onOpenChange={setPurchaseOpen} />
+      <SubscribeDialog open={subscribeOpen} onOpenChange={setSubscribeOpen} />
     </div>
   );
 }

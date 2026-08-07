@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { History, LogOut, Pencil, ShoppingBag, Wallet } from "lucide-react";
+import { Crown, LogOut, Pencil, Wallet } from "lucide-react";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { StatCard } from "@/components/cards/StatCard";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,6 @@ import { Label } from "@/components/ui/label";
 import { PageLoader } from "@/components/loading/Spinner";
 import { useAuth } from "@/lib/context/auth-context";
 import { formatKyat } from "@/lib/currency";
-import { historyService } from "@/services/api/historyService";
 import { toast } from "sonner";
 
 export default function ProfilePage() {
@@ -29,12 +27,6 @@ export default function ProfilePage() {
   const [editOpen, setEditOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [name, setName] = useState(user?.name ?? "");
-
-  const { data: watchHistory } = useQuery({
-    queryKey: ["watch-history-count"],
-    queryFn: () => historyService.getWatchHistory({ limit: 1 }),
-    enabled: Boolean(user),
-  });
 
   if (!user) return <PageLoader />;
 
@@ -52,10 +44,17 @@ export default function ProfilePage() {
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       <ProfileHeader user={user} />
 
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard icon={Wallet} label="Wallet Balance" value={formatKyat(user.walletBalance)} />
-        <StatCard icon={ShoppingBag} label="Movies Purchased" value={user.moviesPurchasedCount.toString()} />
-        <StatCard icon={History} label="Watch History" value={(watchHistory?.total ?? 0).toString()} />
+        <StatCard
+          icon={Crown}
+          label="Subscription"
+          value={
+            user.isSubscribed && user.subscriptionExpiresAt
+              ? `Active · exp. ${new Date(user.subscriptionExpiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+              : "Not subscribed"
+          }
+        />
         <StatCard icon={Wallet} label="Total Spent" value={formatKyat(user.totalSpent)} />
       </div>
 

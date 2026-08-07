@@ -19,7 +19,6 @@ export function Footer() {
     {
       heading: t.footer.account,
       links: [
-        { href: "/library", label: t.nav.myLibrary },
         { href: "/watchlist", label: t.nav.watchlist },
         { href: "/wallet", label: t.nav.wallet },
         { href: "/settings", label: t.nav.settings },

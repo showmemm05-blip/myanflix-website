@@ -3,36 +3,38 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Calendar, Check, Clock, Film, Play, Plus, Share2, ShoppingBag, Star } from "lucide-react";
+import { Calendar, Check, Clock, Film, Play, Plus, Share2, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MovieRow } from "@/components/movie/MovieRow";
 import { PageLoader } from "@/components/loading/Spinner";
 import { EmptyState } from "@/components/empty/EmptyState";
-import { PurchaseDialog } from "@/components/dialogs/PurchaseDialog";
+import { SubscribeDialog } from "@/components/dialogs/SubscribeDialog";
 import { ShareDialog } from "@/components/modals/ShareDialog";
 import { useQuery } from "@tanstack/react-query";
 import { useMovie, useSimilarMovies } from "@/hooks/use-movies";
 import { useLibrary } from "@/lib/context/library-context";
+import { useSubscription } from "@/lib/context/subscription-context";
 import { seriesService } from "@/services/api/seriesService";
 import { formatDuration } from "@/lib/format";
-import { formatKyat } from "@/lib/currency";
 import { FALLBACK_COVER_URL, FALLBACK_POSTER_URL } from "@/lib/placeholder";
 
 export default function MovieDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: movie, isLoading } = useMovie(id);
   const { data: similarMovies, isLoading: isSimilarLoading } = useSimilarMovies(id);
-  const { isPurchased, isSeriesPurchased, isInWatchlist, toggleWatchlist } = useLibrary();
+  const { isInWatchlist, toggleWatchlist } = useLibrary();
+  const { isSubscribed } = useSubscription();
 
-  // An episode's access comes from owning its series — it is never
-  // purchasable on its own, so this page must never show it a Buy button.
+  // An episode's access is always governed by its parent series' own
+  // accessType, never its own — this page must never gate an episode on
+  // anything but the series it belongs to.
   const { data: parentSeries } = useQuery({
     queryKey: ["series", movie?.seriesId],
     queryFn: () => seriesService.getSeriesById(movie!.seriesId!),
     enabled: Boolean(movie?.seriesId),
   });
 
-  const [purchaseOpen, setPurchaseOpen] = useState(false);
+  const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
   if (isLoading) return <PageLoader />;
@@ -54,9 +56,8 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const owned = movie.seriesId
-    ? Boolean(parentSeries && (parentSeries.isPurchased || isSeriesPurchased(movie.seriesId) || !parentSeries.isPremium))
-    : isPurchased(movie.id);
+  const accessType = movie.seriesId ? parentSeries?.accessType : movie.accessType;
+  const hasAccess = accessType === "FREE" || isSubscribed;
   const inWatchlist = isInWatchlist(movie.id);
 
   return (
@@ -108,20 +109,15 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
           <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">{movie.description}</p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            {owned ? (
+            {hasAccess ? (
               <Button size="lg" render={<Link href={`/player/${movie.id}`} />} nativeButton={false}>
                 <Play className="size-4 fill-current" />
                 Watch Now
               </Button>
-            ) : movie.seriesId ? (
-              <Button size="lg" render={<Link href={`/series/${movie.seriesId}`} />} nativeButton={false}>
-                <ShoppingBag className="size-4" />
-                Buy the Series to Watch
-              </Button>
             ) : (
-              <Button size="lg" onClick={() => setPurchaseOpen(true)}>
-                <ShoppingBag className="size-4" />
-                Buy for {formatKyat(movie.price)}
+              <Button size="lg" onClick={() => setSubscribeOpen(true)}>
+                <Play className="size-4 fill-current" />
+                Subscribe to Watch
               </Button>
             )}
             <Button size="lg" variant="outline" onClick={() => toggleWatchlist(movie.id)}>
@@ -172,7 +168,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
         <MovieRow title="Similar Movies" movies={similarMovies ?? []} isLoading={isSimilarLoading} />
       </div>
 
-      <PurchaseDialog movie={movie} open={purchaseOpen} onOpenChange={setPurchaseOpen} />
+      <SubscribeDialog open={subscribeOpen} onOpenChange={setSubscribeOpen} />
       <ShareDialog
         open={shareOpen}
         onOpenChange={setShareOpen}

@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { authService } from "@/services/api/authService";
 import { profileService } from "@/services/api/profileService";
 import { tokenStore, onUnauthorized } from "@/lib/auth/token-store";
@@ -32,6 +33,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -60,8 +62,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       onUnauthorized(() => {
         setUser(null);
         disconnectSocket();
+        // Wipes every cached query (wallet balance, subscription plans,
+        // notifications, ...) — without this, stale per-user data from the
+        // now-expired session lingers and can bleed into whoever logs in
+        // next on this browser.
+        queryClient.clear();
       }),
-    [],
+    [queryClient],
   );
 
   const checkPhoneExists = async (phone: string) => {
@@ -89,6 +96,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStore.clear();
     setUser(null);
     disconnectSocket();
+    // Same reasoning as the onUnauthorized handler — a stale wallet balance,
+    // subscription-plans list, etc. must not survive into the next session
+    // on this browser (whether that's a guest view or a different account).
+    queryClient.clear();
     if (refreshToken) authService.logout(refreshToken).catch(() => {});
   };
 

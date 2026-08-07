@@ -1,8 +1,8 @@
-import { ArrowDownLeft, ArrowUpRight, RotateCcw } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Crown, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatKyat } from "@/lib/currency";
 import { cn } from "@/lib/utils";
-import type { Transaction, TransactionStatus } from "@/types/transaction";
+import type { Transaction, TransactionStatus, TransactionType } from "@/types/transaction";
 
 const STATUS_STYLES: Record<TransactionStatus, string> = {
   COMPLETED: "bg-success/15 text-success border-success/30",
@@ -10,10 +10,18 @@ const STATUS_STYLES: Record<TransactionStatus, string> = {
   FAILED: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
-const TYPE_ICON = {
+const TYPE_ICON: Record<TransactionType, typeof ArrowUpRight> = {
   PURCHASE: ArrowUpRight,
+  SUBSCRIPTION: Crown,
   DEPOSIT: ArrowDownLeft,
   REFUND: RotateCcw,
+};
+
+const TYPE_LABEL: Record<TransactionType, string> = {
+  PURCHASE: "Movie Purchase",
+  SUBSCRIPTION: "Subscription",
+  DEPOSIT: "Wallet Deposit",
+  REFUND: "Refund",
 };
 
 export function TransactionRow({ transaction }: { transaction: Transaction }) {
@@ -32,7 +40,7 @@ export function TransactionRow({ transaction }: { transaction: Transaction }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
-          {transaction.movieTitle ?? (transaction.type === "DEPOSIT" ? "Wallet Deposit" : "Refund")}
+          {transaction.movieTitle ?? TYPE_LABEL[transaction.type]}
         </p>
         <p className="text-xs text-muted-foreground">
           {new Date(transaction.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}

@@ -2,14 +2,19 @@ import { apiClient } from "./apiClient";
 import { mapMovie, type BackendMovie } from "./movieService";
 import type { PaginatedResponse, PaginationParams } from "@/types/api";
 import type { Movie } from "@/types/movie";
-import type { SeasonSummary, Series, SeriesListItem, SeriesPurchaseEntry } from "@/types/series";
+import type {
+  PlayerEpisodesResponse,
+  SeasonSummary,
+  Series,
+  SeriesListItem,
+  SeriesPurchaseEntry,
+} from "@/types/series";
 
 export const seriesService = {
   getSeries(pagination: PaginationParams = {}) {
     return apiClient.get<PaginatedResponse<SeriesListItem>>("/series", { params: pagination });
   },
 
-  /** Includes `isPurchased` for the caller — the detail page's single source of truth for showing Buy vs Watch. */
   async getSeriesById(id: string): Promise<Series | null> {
     try {
       return await apiClient.get<Series>(`/series/${id}`);
@@ -30,11 +35,12 @@ export const seriesService = {
     return episodes.map(mapMovie);
   },
 
-  /** One purchase unlocks the entire show — every season and episode, including ones added later. */
-  purchaseSeries(seriesId: string) {
-    return apiClient.post<{ id: string }>(`/series/${seriesId}/purchase`);
+  /** Episodes grouped by season, each with the caller's own watch progress — for the player page's Episodes section. */
+  getPlayerEpisodes(seriesId: string) {
+    return apiClient.get<PlayerEpisodesResponse>(`/series/${seriesId}/player-episodes`);
   },
 
+  /** Historical purchases from before the subscription model — frozen, no longer how access is granted. */
   getMySeriesPurchases() {
     return apiClient.get<SeriesPurchaseEntry[]>("/series/me/purchases");
   },

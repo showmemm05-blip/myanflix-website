@@ -15,8 +15,7 @@ export interface BackendMovie {
   releaseYear: number;
   duration: number;
   rating: number;
-  price: number;
-  isPremium: boolean;
+  accessType: Movie["accessType"];
   status: Movie["status"];
   seriesId: string | null;
   seasonNumber: number | null;
@@ -39,14 +38,12 @@ export function mapMovie(m: BackendMovie): Movie {
     releaseYear: m.releaseYear,
     duration: m.duration,
     rating: m.rating,
-    price: m.price,
-    isPremium: m.isPremium,
+    accessType: m.accessType,
     status: m.status,
     seriesId: m.seriesId ?? null,
     seasonNumber: m.seasonNumber ?? null,
     episodeNumber: m.episodeNumber ?? null,
     isMyanmar: m.language === "Burmese",
-    isPurchased: false,
     isInWatchlist: false,
     createdAt: m.createdAt,
     updatedAt: m.updatedAt,
@@ -80,34 +77,32 @@ function applyClientSort(movies: Movie[], sort?: MovieQuery["sort"]): Movie[] {
   switch (sort) {
     case "rating":
       return sorted.sort((a, b) => b.rating - a.rating);
-    case "price-asc":
-      return sorted.sort((a, b) => a.price - b.price);
-    case "price-desc":
-      return sorted.sort((a, b) => b.price - a.price);
+    case "title":
+      return sorted.sort((a, b) => a.title.localeCompare(b.title));
     case "newest":
     default:
       return sorted;
   }
 }
 
-// language/minRating/maxPrice have no backend query support yet — filtered locally over the fetched page.
+// language/minRating/releaseYear have no backend query support yet — filtered locally over the fetched page.
 function applyClientFilters(movies: Movie[], query: MovieQuery): Movie[] {
   return movies.filter((m) => {
     if (query.language && m.language !== query.language) return false;
     if (query.minRating !== undefined && m.rating < query.minRating) return false;
-    if (query.maxPrice !== undefined && m.price > query.maxPrice) return false;
+    if (query.releaseYear !== undefined && m.releaseYear !== query.releaseYear) return false;
     return true;
   });
 }
 
 export const movieService = {
   async getMovies(query: MovieQuery = {}): Promise<PaginatedResponse<Movie>> {
-    const { sort, language, minRating, maxPrice, ...backendParams } = query;
+    const { sort, language, minRating, releaseYear, ...backendParams } = query;
     const res = await apiClient.get<{ items: BackendMovie[]; total: number; page: number; limit: number }>(
       "/movies",
       { params: backendParams },
     );
-    const filtered = applyClientFilters(res.items.map(mapMovie), { language, minRating, maxPrice });
+    const filtered = applyClientFilters(res.items.map(mapMovie), { language, minRating, releaseYear });
     return { ...res, items: applyClientSort(filtered, sort), total: filtered.length };
   },
 
@@ -175,10 +170,7 @@ export const movieService = {
     }
   },
 
-  purchaseMovie(movieId: string) {
-    return apiClient.post<{ id: string }>(`/movies/${movieId}/purchase`);
-  },
-
+  /** Historical purchases from before the subscription model — frozen, no longer how access is granted. */
   async getMyPurchases(pagination: PaginationParams = {}): Promise<PaginatedResponse<PurchaseEntry>> {
     const res = await apiClient.get<PaginatedResponse<BackendPurchaseEntry>>("/movies/me/purchases", {
       params: pagination,

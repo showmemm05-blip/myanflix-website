@@ -18,7 +18,8 @@ interface BackendUser {
   balance?: number;
   totalDeposited?: number;
   totalSpent?: number;
-  moviesPurchased?: number;
+  isSubscribed?: boolean;
+  subscriptionExpiresAt?: string | null;
 }
 
 function mapUser(u: BackendUser): AppUser {
@@ -34,7 +35,8 @@ function mapUser(u: BackendUser): AppUser {
     walletBalance: u.balance ?? 0,
     totalDeposited: u.totalDeposited ?? 0,
     totalSpent: u.totalSpent ?? 0,
-    moviesPurchasedCount: u.moviesPurchased ?? 0,
+    isSubscribed: u.isSubscribed ?? false,
+    subscriptionExpiresAt: u.subscriptionExpiresAt ?? null,
     joinDate: u.createdAt,
   };
 }

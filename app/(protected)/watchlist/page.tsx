@@ -4,19 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
-import { Heart, Play, ShoppingBag, X } from "lucide-react";
+import { Heart, Play, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty/EmptyState";
-import { PurchaseDialog } from "@/components/dialogs/PurchaseDialog";
+import { SubscribeDialog } from "@/components/dialogs/SubscribeDialog";
 import { useLibrary } from "@/lib/context/library-context";
+import { useSubscription } from "@/lib/context/subscription-context";
 import { watchlistService } from "@/services/api/watchlistService";
-import { formatKyat } from "@/lib/currency";
 import { FALLBACK_POSTER_URL } from "@/lib/placeholder";
-import type { Movie } from "@/types/movie";
 
 export default function WatchlistPage() {
-  const { isPurchased, watchlistCount, toggleWatchlist } = useLibrary();
-  const [purchaseTarget, setPurchaseTarget] = useState<Movie | null>(null);
+  const { watchlistCount, toggleWatchlist } = useLibrary();
+  const { isSubscribed } = useSubscription();
+  const [subscribeOpen, setSubscribeOpen] = useState(false);
 
   const { data: watchlistMovies = [], isLoading } = useQuery({
     queryKey: ["watchlist", watchlistCount],
@@ -44,7 +44,7 @@ export default function WatchlistPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {watchlistMovies.map((movie) => {
-            const owned = isPurchased(movie.id);
+            const hasAccess = movie.accessType === "FREE" || isSubscribed;
             return (
               <div key={movie.id} className="glass-card flex gap-3 rounded-xl border-white/[0.08] p-3">
                 <Link href={`/movie/${movie.id}`} className="relative h-32 w-22 shrink-0 overflow-hidden rounded-lg bg-muted">
@@ -59,19 +59,19 @@ export default function WatchlistPage() {
                       {movie.releaseYear} &middot; {movie.genre}
                     </p>
                     <p className="mt-1 text-sm font-medium text-primary">
-                      {owned ? "Owned" : formatKyat(movie.price)}
+                      {movie.accessType === "FREE" ? "Free" : hasAccess ? "Subscribed" : "Subscription"}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {owned ? (
+                    {hasAccess ? (
                       <Button size="sm" render={<Link href={`/player/${movie.id}`} />} nativeButton={false}>
                         <Play className="size-3.5 fill-current" />
                         Watch
                       </Button>
                     ) : (
-                      <Button size="sm" onClick={() => setPurchaseTarget(movie)}>
-                        <ShoppingBag className="size-3.5" />
-                        Buy
+                      <Button size="sm" onClick={() => setSubscribeOpen(true)}>
+                        <Play className="size-3.5" />
+                        Subscribe
                       </Button>
                     )}
                     <Button size="sm" variant="outline" onClick={() => toggleWatchlist(movie.id)}>
@@ -86,7 +86,7 @@ export default function WatchlistPage() {
         </div>
       )}
 
-      <PurchaseDialog movie={purchaseTarget} open={!!purchaseTarget} onOpenChange={(o) => !o && setPurchaseTarget(null)} />
+      <SubscribeDialog open={subscribeOpen} onOpenChange={setSubscribeOpen} />
     </div>
   );
 }

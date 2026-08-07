@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/lib/query-provider";
 import { AuthProvider } from "@/lib/context/auth-context";
 import { LibraryProvider } from "@/lib/context/library-context";
+import { SubscriptionProvider } from "@/lib/context/subscription-context";
 import { LanguageProvider } from "@/lib/context/language-context";
 
 const inter = Inter({
@@ -56,12 +57,14 @@ export default function RootLayout({
           <QueryProvider>
             <LanguageProvider>
               <AuthProvider>
-                <LibraryProvider>
-                  <TooltipProvider>
-                    {children}
-                    <Toaster position="top-right" />
-                  </TooltipProvider>
-                </LibraryProvider>
+                <SubscriptionProvider>
+                  <LibraryProvider>
+                    <TooltipProvider>
+                      {children}
+                      <Toaster position="top-right" />
+                    </TooltipProvider>
+                  </LibraryProvider>
+                </SubscriptionProvider>
               </AuthProvider>
             </LanguageProvider>
           </QueryProvider>

@@ -4,15 +4,14 @@ import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
-import { Calendar, Check, Layers, Play, ShoppingBag, Tv } from "lucide-react";
+import { Calendar, Check, Layers, Play, Tv } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/loading/Spinner";
 import { EmptyState } from "@/components/empty/EmptyState";
-import { SeriesPurchaseDialog } from "@/components/dialogs/SeriesPurchaseDialog";
+import { SubscribeDialog } from "@/components/dialogs/SubscribeDialog";
 import { seriesService } from "@/services/api/seriesService";
-import { useLibrary } from "@/lib/context/library-context";
+import { useSubscription } from "@/lib/context/subscription-context";
 import { formatDuration } from "@/lib/format";
-import { formatKyat } from "@/lib/currency";
 import { FALLBACK_COVER_URL, FALLBACK_POSTER_URL } from "@/lib/placeholder";
 import type { Movie } from "@/types/movie";
 
@@ -28,13 +27,11 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
     queryFn: () => seriesService.getEpisodes(id),
     enabled: Boolean(id),
   });
-  const { isSeriesPurchased } = useLibrary();
+  const { isSubscribed } = useSubscription();
 
-  const [purchaseOpen, setPurchaseOpen] = useState(false);
+  const [subscribeOpen, setSubscribeOpen] = useState(false);
 
-  // Server truth first (detail response), then live client state so the page
-  // flips to "unlocked" the instant a purchase completes, without refetching.
-  const owned = Boolean(series && (series.isPurchased || isSeriesPurchased(series.id) || !series.isPremium));
+  const hasAccess = Boolean(series && (series.accessType === "FREE" || isSubscribed));
 
   const seasons = useMemo(() => {
     const map = new Map<number, Movie[]>();
@@ -113,7 +110,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
           <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">{series.description}</p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            {owned ? (
+            {hasAccess ? (
               firstEpisode ? (
                 <Button size="lg" render={<Link href={`/player/${firstEpisode.id}`} />} nativeButton={false}>
                   <Play className="size-4 fill-current" />
@@ -122,21 +119,20 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
               ) : (
                 <Button size="lg" disabled>
                   <Check className="size-4" />
-                  Owned — episodes coming soon
+                  No episodes yet
                 </Button>
               )
             ) : (
-              // The one and only purchase surface for the whole show —
-              // individual episodes are never sold.
-              <Button size="lg" onClick={() => setPurchaseOpen(true)}>
-                <ShoppingBag className="size-4" />
-                Buy Series for {formatKyat(series.price)}
+              // The one subscribe surface for the whole show — individual episodes are never gated separately.
+              <Button size="lg" onClick={() => setSubscribeOpen(true)}>
+                <Play className="size-4 fill-current" />
+                Subscribe to Watch
               </Button>
             )}
           </div>
-          {owned && (
+          {hasAccess && series.accessType === "SUBSCRIPTION" && (
             <p className="text-xs text-muted-foreground">
-              You own this series — every season and episode is unlocked, including future ones.
+              Unlocked by your subscription — every season and episode, including future ones.
             </p>
           )}
         </div>
@@ -154,7 +150,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                   const row = (
                     <div
                       className={`flex items-center gap-4 rounded-xl border border-white/[0.06] bg-secondary/20 p-3 transition-colors ${
-                        owned ? "hover:border-primary/40 hover:bg-secondary/40" : "opacity-80"
+                        hasAccess ? "hover:border-primary/40 hover:bg-secondary/40" : "opacity-80"
                       }`}
                     >
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-sm font-semibold text-muted-foreground">
@@ -166,18 +162,18 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                           {episode.duration > 0 ? formatDuration(episode.duration) : "—"}
                         </p>
                       </div>
-                      {/* Episodes never carry their own Buy button — access always comes from owning the series. */}
-                      {owned ? (
+                      {/* Episodes never carry their own gate — access always comes from the parent series. */}
+                      {hasAccess ? (
                         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
                           <Play className="size-4 fill-current" />
                         </span>
                       ) : (
-                        <span className="shrink-0 text-xs font-medium text-muted-foreground">Buy series to watch</span>
+                        <span className="shrink-0 text-xs font-medium text-muted-foreground">Subscribe to watch</span>
                       )}
                     </div>
                   );
 
-                  return owned ? (
+                  return hasAccess ? (
                     <Link key={episode.id} href={`/player/${episode.id}`}>
                       {row}
                     </Link>
@@ -191,7 +187,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
         )}
       </div>
 
-      <SeriesPurchaseDialog series={series} open={purchaseOpen} onOpenChange={setPurchaseOpen} />
+      <SubscribeDialog open={subscribeOpen} onOpenChange={setSubscribeOpen} />
     </div>
   );
 }

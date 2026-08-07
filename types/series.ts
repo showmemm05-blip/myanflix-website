@@ -1,3 +1,5 @@
+import type { AccessType } from "./movie";
+
 export interface Series {
   id: string;
   title: string;
@@ -7,12 +9,9 @@ export interface Series {
   genre: string;
   language: string;
   releaseYear: number;
-  /** One price for the whole show — a single purchase unlocks every season and episode, including future ones. */
-  price: number;
-  isPremium: boolean;
+  /** One access type for the whole show — governs every season and episode, including future ones. */
+  accessType: AccessType;
   categories: { id: string; name: string }[];
-  /** Only present on the detail endpoint — whether the caller already owns the show. */
-  isPurchased?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,4 +32,31 @@ export interface SeriesPurchaseEntry {
   posterUrl: string | null;
   amount: number;
   createdAt: string;
+}
+
+/** The caller's own watch progress for one episode — null when never started. */
+export interface PlayerEpisodeProgress {
+  progressPercent: number;
+  lastPositionSeconds: number;
+}
+
+/** An episode as shown in the player page's Episodes section — a lighter shape than the full `Movie`, since this list doesn't need categories/pricing/etc. */
+export interface PlayerEpisode {
+  id: string;
+  title: string;
+  episodeNumber: number | null;
+  /** Minutes, same unit as `Movie.duration`. */
+  duration: number;
+  thumbnailUrl: string | null;
+  posterUrl: string | null;
+  watchProgress: PlayerEpisodeProgress | null;
+}
+
+export interface PlayerSeasonGroup {
+  seasonNumber: number;
+  episodes: PlayerEpisode[];
+}
+
+export interface PlayerEpisodesResponse {
+  seasons: PlayerSeasonGroup[];
 }

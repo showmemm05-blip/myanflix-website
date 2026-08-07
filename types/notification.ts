@@ -1,5 +1,6 @@
 export type NotificationType =
   | "PURCHASE"
+  | "SUBSCRIPTION"
   | "PAYMENT"
   | "NEW_RELEASE"
   | "PROMOTION"

@@ -1,8 +1,8 @@
 export { apiClient, API_BASE_URL, ApiError } from "./apiClient";
 export { authService } from "./authService";
 export { movieService } from "./movieService";
-export { purchaseService } from "./purchaseService";
 export { paymentService } from "./paymentService";
+export { subscriptionService } from "./subscriptionService";
 export { profileService } from "./profileService";
 export { searchService } from "./searchService";
 export { historyService } from "./historyService";

@@ -27,6 +27,8 @@ const en = {
     notifications: "Notifications",
     profile: "Profile",
     wallet: "Wallet",
+    hideBalance: "Hide balance",
+    showBalance: "Show balance",
     settings: "Settings",
     logOut: "Log out",
     signIn: "Sign in",
@@ -143,6 +145,18 @@ const en = {
       exploreCategories: "Explore Categories",
     },
   },
+  player: {
+    episodes: {
+      title: "Episodes",
+      season: (n: number) => `Season ${n}`,
+      episodeLabel: (n: number) => `Episode ${n}`,
+      continueWatching: "Continue Watching",
+      completed: "Completed",
+      nowPlaying: "Now Playing",
+      emptyState: "No episodes available yet.",
+      loadError: "Couldn't load episodes.",
+    },
+  },
 };
 
 const mm = {
@@ -171,6 +185,8 @@ const mm = {
     notifications: "အကြောင်းကြားချက်များ",
     profile: "ကိုယ်ရေးအချက်အလက်",
     wallet: "ပိုက်ဆံအိတ်",
+    hideBalance: "လက်ကျန်ငွေဖျောက်ရန်",
+    showBalance: "လက်ကျန်ငွေပြရန်",
     settings: "ဆက်တင်များ",
     logOut: "ထွက်ရန်",
     signIn: "ဝင်ရောက်ရန်",
@@ -281,6 +297,18 @@ const mm = {
       browseMovies: "ရုပ်ရှင်များကြည့်ရန်",
       browseSeries: "ဇာတ်လမ်းတွဲများကြည့်ရန်",
       exploreCategories: "အမျိုးအစားများကြည့်ရန်",
+    },
+  },
+  player: {
+    episodes: {
+      title: "အပိုင်းများ",
+      season: (n: number) => `ရာသီ ${n}`,
+      episodeLabel: (n: number) => `အပိုင်း ${n}`,
+      continueWatching: "ဆက်ကြည့်ရန်",
+      completed: "ကြည့်ပြီးပါပြီ",
+      nowPlaying: "ယခုဖွင့်နေသည်",
+      emptyState: "အပိုင်းများ မရှိသေးပါ။",
+      loadError: "အပိုင်းများ ဖွင့်၍မရပါ။",
     },
   },
 } satisfies typeof en;

@@ -1,7 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { movieService } from "@/services/api/movieService";
 import { searchService } from "@/services/api/searchService";
+import { historyService } from "@/services/api/historyService";
 import type { MovieQuery } from "@/types/movie";
+
+const CONTINUE_WATCHING_MIN_PERCENT = 1;
+const CONTINUE_WATCHING_MAX_PERCENT = 95;
 
 export function useMovies(query: MovieQuery = {}) {
   return useQuery({
@@ -55,6 +59,20 @@ export function useSearchSuggestions(term: string) {
     queryKey: ["search-suggestions", term],
     queryFn: () => searchService.getSuggestions(term),
     enabled: term.trim().length > 0,
+  });
+}
+
+/** In-progress (not-yet-completed) watch history, most recent first — powers the "Continue Watching" row. */
+export function useContinueWatching(enabled: boolean) {
+  return useQuery({
+    queryKey: ["continue-watching"],
+    queryFn: async () => {
+      const res = await historyService.getWatchHistory({ limit: 20 });
+      return res.items.filter(
+        (e) => e.progressPercent >= CONTINUE_WATCHING_MIN_PERCENT && e.progressPercent < CONTINUE_WATCHING_MAX_PERCENT,
+      );
+    },
+    enabled,
   });
 }
 

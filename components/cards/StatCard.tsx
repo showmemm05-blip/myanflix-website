@@ -18,8 +18,8 @@ export function StatCard({
         <Icon className="size-5" />
       </div>
       <div className="min-w-0">
-        <p className="truncate text-xs text-muted-foreground">{label}</p>
-        <p className="truncate text-xl font-semibold">{value}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="break-words text-xl font-semibold">{value}</p>
       </div>
     </div>
   );

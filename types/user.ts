@@ -11,7 +11,8 @@ export interface AppUser {
   walletBalance: number;
   totalDeposited: number;
   totalSpent: number;
-  moviesPurchasedCount: number;
+  isSubscribed: boolean;
+  subscriptionExpiresAt: string | null;
   joinDate: string;
 }
 

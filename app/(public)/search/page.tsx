@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/empty/EmptyState";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RatingBadge } from "@/components/movie/RatingBadge";
-import { PriceBadge } from "@/components/movie/PriceBadge";
+import { AccessBadge } from "@/components/movie/AccessBadge";
 import { useSearch } from "@/hooks/use-movies";
 import { useDebounce } from "@/hooks/use-debounce";
 import { formatDuration } from "@/lib/format";
@@ -107,7 +107,7 @@ function SearchPageContent() {
                     <p className="line-clamp-2 text-xs text-muted-foreground">{movie.description}</p>
                     <div className="flex items-center gap-2 pt-1">
                       <RatingBadge rating={movie.rating} className={cn("static bg-secondary")} />
-                      <PriceBadge price={movie.price} className={cn("static bg-secondary")} />
+                      <AccessBadge accessType={movie.accessType} className={cn("static bg-secondary")} />
                     </div>
                   </div>
                 </Link>

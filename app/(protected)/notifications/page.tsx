@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { Bell, CheckCheck, Film, Megaphone, ShoppingBag, Tag, ThumbsDown, Trash2, Wallet } from "lucide-react";
+import { Bell, CheckCheck, Crown, Film, Megaphone, ShoppingBag, Tag, ThumbsDown, Trash2, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty/EmptyState";
 import { notificationService } from "@/services/api/notificationService";
@@ -13,6 +13,7 @@ import type { AppNotification, NotificationType } from "@/types/notification";
 
 const TYPE_ICON: Record<NotificationType, typeof Bell> = {
   PURCHASE: ShoppingBag,
+  SUBSCRIPTION: Crown,
   PAYMENT: Wallet,
   NEW_RELEASE: Film,
   PROMOTION: Tag,

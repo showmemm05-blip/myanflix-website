@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Film, Heart, Home, Layers, LibraryBig, Search, Tv } from "lucide-react";
+import { Film, Home, Layers, Search, Tv } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { LanguageToggle } from "./LanguageToggle";
 import { useLanguage } from "@/lib/context/language-context";
 import { cn } from "@/lib/utils";
 
@@ -18,8 +17,6 @@ export function MobileMenu({ open, onOpenChange }: { open: boolean; onOpenChange
     { href: "/series", label: t.nav.series, icon: Tv },
     { href: "/categories", label: t.nav.categories, icon: Layers },
     { href: "/search", label: t.nav.search, icon: Search },
-    { href: "/library", label: t.nav.myLibrary, icon: LibraryBig },
-    { href: "/watchlist", label: t.nav.watchlist, icon: Heart },
   ];
 
   return (
@@ -31,9 +28,6 @@ export function MobileMenu({ open, onOpenChange }: { open: boolean; onOpenChange
             <Film className="size-4" />
           </div>
           <span className="text-lg font-bold tracking-tight">MyanFlix</span>
-        </div>
-        <div className="border-b border-white/[0.08] px-5 py-3">
-          <LanguageToggle />
         </div>
         <nav className="flex flex-col gap-1 p-3">
           {links.map((link) => {
