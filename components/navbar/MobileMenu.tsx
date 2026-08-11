@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Film, Home, Layers, Search, Tv } from "lucide-react";
+import { Film, Home, Layers } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useLanguage } from "@/lib/context/language-context";
 import { cn } from "@/lib/utils";
@@ -11,12 +11,14 @@ export function MobileMenu({ open, onOpenChange }: { open: boolean; onOpenChange
   const pathname = usePathname();
   const { t } = useLanguage();
 
+  // Movies + Series were folded into one unified /movies page (All/Movies/
+  // Series/Books/Music tabs), so the nav only needs a single "Media" entry
+  // now — same reasoning that already dropped the standalone "Search" entry
+  // (search lives inline at the top of the Movies/Series tabs).
   const links = [
     { href: "/", label: t.nav.home, icon: Home },
-    { href: "/movies", label: t.nav.movies, icon: Film },
-    { href: "/series", label: t.nav.series, icon: Tv },
+    { href: "/movies", label: t.nav.media, icon: Film },
     { href: "/categories", label: t.nav.categories, icon: Layers },
-    { href: "/search", label: t.nav.search, icon: Search },
   ];
 
   return (
@@ -31,7 +33,8 @@ export function MobileMenu({ open, onOpenChange }: { open: boolean; onOpenChange
         </div>
         <nav className="flex flex-col gap-1 p-3">
           {links.map((link) => {
-            const active = pathname === link.href;
+            const linkPath = link.href.split("?")[0];
+            const active = pathname === linkPath;
             return (
               <Link
                 key={link.href}

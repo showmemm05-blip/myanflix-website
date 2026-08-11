@@ -47,7 +47,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
           title="Movie not found"
           description="This title may have been removed."
           action={
-            <Button render={<Link href="/movies" />} nativeButton={false}>
+            <Button render={<Link href="/movies?tab=movies" />} nativeButton={false}>
               Back to Movies
             </Button>
           }

@@ -1,12 +1,25 @@
 import { apiClient } from "./apiClient";
 import { profileService } from "./profileService";
 import type { PaginatedResponse, PaginationParams } from "@/types/api";
-import type { Deposit, DepositMethod, DepositStatus, Transaction } from "@/types/transaction";
+import type {
+  Deposit,
+  DepositStatus,
+  Transaction,
+  Withdrawal,
+  WithdrawalStatus,
+} from "@/types/transaction";
 
 export interface WalletSummary {
   balance: number;
   totalDeposited: number;
   totalSpent: number;
+}
+
+export interface FinanceSettings {
+  minDepositAmount: number;
+  maxDepositAmount: number;
+  minWithdrawalAmount: number;
+  maxWithdrawalAmount: number;
 }
 
 interface BackendTransaction {
@@ -55,15 +68,45 @@ export const paymentService = {
    * balance does not move until an admin approves it (see the wallet page's
    * realtime handling for the approval/rejection update).
    */
-  requestDeposit(amount: number, method: DepositMethod, reference: string): Promise<Deposit> {
+  requestDeposit(amount: number, method: string, reference: string, accountName?: string): Promise<Deposit> {
     return apiClient.post<Deposit>("/deposits", {
       amount,
       paymentMethod: method,
+      accountName,
       reference,
     });
   },
 
   async getMyDeposits(query: PaginationParams & { status?: DepositStatus } = {}): Promise<PaginatedResponse<Deposit>> {
     return apiClient.get<PaginatedResponse<Deposit>>("/deposits/me", { params: query });
+  },
+
+  /**
+   * Submits a withdrawal request — this only creates a PENDING record; the
+   * balance is never touched until an admin approves it (see the wallet
+   * page's realtime handling for the approval/rejection update).
+   */
+  requestWithdrawal(
+    amount: number,
+    accountType: string,
+    accountName: string,
+    accountNumber: string,
+  ): Promise<Withdrawal> {
+    return apiClient.post<Withdrawal>("/withdrawals", {
+      amount,
+      accountType,
+      accountName,
+      accountNumber,
+    });
+  },
+
+  async getMyWithdrawals(
+    query: PaginationParams & { status?: WithdrawalStatus } = {},
+  ): Promise<PaginatedResponse<Withdrawal>> {
+    return apiClient.get<PaginatedResponse<Withdrawal>>("/withdrawals/me", { params: query });
+  },
+
+  getSettings(): Promise<FinanceSettings> {
+    return apiClient.get<FinanceSettings>("/finance-settings");
   },
 };

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { getSocket } from "@/lib/socket";
 import { formatKyat } from "@/lib/currency";
 import type { WalletSummary } from "@/services/api/paymentService";
-import type { DepositStatus } from "@/types/transaction";
+import type { DepositStatus, WithdrawalStatus } from "@/types/transaction";
 
 interface DepositUpdatedPayload {
   id: string;
@@ -14,6 +14,16 @@ interface DepositUpdatedPayload {
   amount: number;
   paymentMethod: string;
   reference: string;
+  rejectionReason?: string | null;
+}
+
+interface WithdrawalUpdatedPayload {
+  id: string;
+  status: WithdrawalStatus;
+  amount: number;
+  accountType: string;
+  accountName: string;
+  accountNumber: string;
   rejectionReason?: string | null;
 }
 
@@ -56,6 +66,21 @@ export function useRealtimeWallet() {
       }
     };
 
+    const handleWithdrawalUpdated = (payload: WithdrawalUpdatedPayload) => {
+      queryClient.invalidateQueries({ queryKey: ["wallet-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["withdrawals"] });
+
+      if (payload.status === "APPROVED") {
+        toast.success("Withdrawal approved", {
+          description: `Your withdrawal of ${formatKyat(payload.amount)} has been approved and deducted from your balance.`,
+        });
+      } else if (payload.status === "REJECTED") {
+        toast.error("Withdrawal rejected", {
+          description: payload.rejectionReason ?? `Your withdrawal of ${formatKyat(payload.amount)} was rejected.`,
+        });
+      }
+    };
+
     const handleNotificationCreated = () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
@@ -63,11 +88,13 @@ export function useRealtimeWallet() {
 
     socket.on("wallet.balanceUpdated", handleBalanceUpdated);
     socket.on("deposit.updated", handleDepositUpdated);
+    socket.on("withdrawal.updated", handleWithdrawalUpdated);
     socket.on("notification.created", handleNotificationCreated);
 
     return () => {
       socket.off("wallet.balanceUpdated", handleBalanceUpdated);
       socket.off("deposit.updated", handleDepositUpdated);
+      socket.off("withdrawal.updated", handleWithdrawalUpdated);
       socket.off("notification.created", handleNotificationCreated);
     };
   }, [queryClient]);

@@ -32,8 +32,7 @@ export function Navbar() {
 
   const navLinks = [
     { href: "/", label: t.nav.home },
-    { href: "/movies", label: t.nav.movies },
-    { href: "/series", label: t.nav.series },
+    { href: "/movies", label: t.nav.media },
     { href: "/categories", label: t.nav.categories },
   ];
 
@@ -65,7 +64,8 @@ export function Navbar() {
 
           <nav className="hidden items-center gap-1 lg:flex">
             {navLinks.map((link) => {
-              const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+              const linkPath = link.href.split("?")[0];
+              const active = linkPath === "/" ? pathname === "/" : pathname.startsWith(linkPath);
               return (
                 <Link
                   key={link.href}

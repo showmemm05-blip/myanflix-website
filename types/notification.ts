@@ -6,7 +6,9 @@ export type NotificationType =
   | "PROMOTION"
   | "ANNOUNCEMENT"
   | "DEPOSIT_APPROVED"
-  | "DEPOSIT_REJECTED";
+  | "DEPOSIT_REJECTED"
+  | "WITHDRAWAL_APPROVED"
+  | "WITHDRAWAL_REJECTED";
 
 export interface AppNotification {
   id: string;
@@ -18,4 +20,5 @@ export interface AppNotification {
   movieId?: string;
   posterUrl?: string;
   depositId?: string;
+  withdrawalId?: string;
 }

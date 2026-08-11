@@ -11,9 +11,9 @@ export function Footer() {
     {
       heading: t.footer.browse,
       links: [
-        { href: "/movies", label: t.footer.allMovies },
+        { href: "/movies?tab=movies", label: t.footer.allMovies },
         { href: "/categories", label: t.nav.categories },
-        { href: "/search", label: t.nav.search },
+        { href: "/movies?tab=movies", label: t.nav.search },
       ],
     },
     {

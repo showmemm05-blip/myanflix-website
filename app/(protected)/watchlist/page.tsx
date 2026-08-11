@@ -36,7 +36,7 @@ export default function WatchlistPage() {
           title="Your watchlist is empty"
           description="Tap the + icon on any movie to save it here."
           action={
-            <Button render={<Link href="/movies" />} nativeButton={false}>
+            <Button render={<Link href="/movies?tab=movies" />} nativeButton={false}>
               Browse Movies
             </Button>
           }

@@ -7,8 +7,7 @@ import { ctaIcons } from "./content";
 /** Closing band — real internal links only. */
 export function HomeCta() {
   const { t } = useLanguage();
-  const MoviesIcon = ctaIcons.movies;
-  const SeriesIcon = ctaIcons.series;
+  const MediaIcon = ctaIcons.media;
   const CategoriesIcon = ctaIcons.categories;
 
   return (
@@ -20,12 +19,8 @@ export function HomeCta() {
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground sm:text-base">{t.home.cta.subtitle}</p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Button size="lg" render={<Link href="/movies" />} nativeButton={false}>
-            <MoviesIcon className="size-4" />
-            {t.home.cta.browseMovies}
-          </Button>
-          <Button size="lg" variant="outline" render={<Link href="/series" />} nativeButton={false}>
-            <SeriesIcon className="size-4" />
-            {t.home.cta.browseSeries}
+            <MediaIcon className="size-4" />
+            {t.home.cta.browseMedia}
           </Button>
           <Button size="lg" variant="ghost" render={<Link href="/categories" />} nativeButton={false}>
             <CategoriesIcon className="size-4" />

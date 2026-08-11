@@ -19,7 +19,7 @@ interface BackendNotification {
   type: NotificationType;
   title: string;
   message: string;
-  payload: { depositId?: string } | null;
+  payload: { depositId?: string; withdrawalId?: string } | null;
   isRead: boolean;
   createdAt: string;
 }
@@ -33,6 +33,7 @@ function mapBackendNotification(n: BackendNotification): AppNotification {
     isRead: n.isRead,
     createdAt: n.createdAt,
     depositId: n.payload?.depositId,
+    withdrawalId: n.payload?.withdrawalId,
   };
 }
 

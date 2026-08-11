@@ -40,4 +40,4 @@ export const roadmapStatusIcons: Record<string, LucideIcon> = {
   upcoming: CircleDashed,
 };
 
-export const ctaIcons = { movies: Clapperboard, series: Tv2, categories: Rocket };
+export const ctaIcons = { media: Clapperboard, categories: Rocket };

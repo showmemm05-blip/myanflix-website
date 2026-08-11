@@ -15,6 +15,7 @@ const TYPE_ICON: Record<TransactionType, typeof ArrowUpRight> = {
   SUBSCRIPTION: Crown,
   DEPOSIT: ArrowDownLeft,
   REFUND: RotateCcw,
+  WITHDRAWAL: ArrowUpRight,
 };
 
 const TYPE_LABEL: Record<TransactionType, string> = {
@@ -22,6 +23,7 @@ const TYPE_LABEL: Record<TransactionType, string> = {
   SUBSCRIPTION: "Subscription",
   DEPOSIT: "Wallet Deposit",
   REFUND: "Refund",
+  WITHDRAWAL: "Wallet Withdrawal",
 };
 
 export function TransactionRow({ transaction }: { transaction: Transaction }) {
