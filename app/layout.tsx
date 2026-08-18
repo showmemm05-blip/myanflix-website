@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter, Noto_Sans_Myanmar, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -39,6 +39,16 @@ const notoSansMyanmar = Noto_Sans_Myanmar({
 export const metadata: Metadata = {
   title: "MyanFlix — Stream & Own Your Favorite Movies",
   description: "MyanFlix is a premium movie streaming platform. Buy and stream your favorite Myanmar and international films.",
+};
+
+/**
+ * `viewportFit: "cover"` is what makes `env(safe-area-inset-*)` report real
+ * values on notched phones — without it the bottom tab bar would float above
+ * the home indicator instead of sitting under it.
+ */
+export const viewport: Viewport = {
+  themeColor: "#0b0d16",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

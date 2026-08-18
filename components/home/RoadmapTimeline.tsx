@@ -2,10 +2,19 @@
 
 import { motion } from "framer-motion";
 import { CircleDashed } from "lucide-react";
+
+import { Chip } from "@/components/system/Chip";
 import { useLanguage } from "@/lib/context/language-context";
 import { RevealSection } from "./RevealSection";
 import { SectionHeading } from "./SectionHeading";
 import { roadmapStatusIcons } from "./content";
+
+/** The tone each roadmap state wears: done is emerald, in-flight violet, later grey. */
+const STATUS_TONE: Record<string, "success" | "primary" | "neutral"> = {
+  shipped: "success",
+  inProgress: "primary",
+  upcoming: "neutral",
+};
 
 /** PLACEHOLDER — merges "upcoming projects/events" + "future plans/roadmap"; vertical on mobile/tablet, horizontal at lg. */
 export function RoadmapTimeline() {
@@ -31,9 +40,10 @@ export function RoadmapTimeline() {
           className="absolute top-[11px] right-8 left-8 hidden h-px origin-left bg-border lg:block"
         />
 
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-5">
           {items.map((item, i) => {
             const Icon = roadmapStatusIcons[item.status] ?? CircleDashed;
+            const tone = STATUS_TONE[item.status] ?? "neutral";
             return (
               <RevealSection
                 key={item.title}
@@ -41,13 +51,15 @@ export function RoadmapTimeline() {
                 delay={Math.min(i * 0.08, 0.4)}
                 className="relative flex gap-3 lg:flex-1 lg:flex-col lg:gap-3"
               >
-                <div className="z-10 flex size-6 shrink-0 items-center justify-center rounded-full bg-background text-primary ring-2 ring-primary">
+                <span className="z-10 flex size-6 shrink-0 items-center justify-center rounded-full bg-background text-primary ring-2 ring-primary">
                   <Icon className="size-3.5" />
-                </div>
-                <div>
-                  <span className="text-[11px] font-semibold tracking-wide text-primary uppercase">{item.period}</span>
-                  <p className="text-sm font-semibold">{item.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{item.description}</p>
+                </span>
+                <div className="min-w-0">
+                  <Chip tone={tone} variant="outline" size="sm" className="mb-2 uppercase">
+                    {item.period}
+                  </Chip>
+                  <p className="font-heading text-sm font-semibold tracking-tight">{item.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
                 </div>
               </RevealSection>
             );

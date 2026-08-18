@@ -1,3 +1,18 @@
+/**
+ * Playback clock — `m:ss` for anything under an hour, `h:mm:ss` past it, so a
+ * feature-length film doesn't read as "94:12" the way a plain minute count would.
+ */
+export function formatTimecode(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return "0:00";
+  const whole = Math.floor(totalSeconds);
+  const hours = Math.floor(whole / 3600);
+  const minutes = Math.floor((whole % 3600) / 60);
+  const seconds = whole % 60;
+  const paddedSeconds = seconds.toString().padStart(2, "0");
+  if (hours === 0) return `${minutes}:${paddedSeconds}`;
+  return `${hours}:${minutes.toString().padStart(2, "0")}:${paddedSeconds}`;
+}
+
 export function formatDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;

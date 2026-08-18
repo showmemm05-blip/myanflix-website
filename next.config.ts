@@ -8,7 +8,6 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "picsum.photos" },
-      { protocol: "https", hostname: "i.pravatar.cc" },
       { protocol: "https", hostname: "image.tmdb.org" },
       // Poster/cover images are served from the storage server via the cache
       // server, not directly from the backend.

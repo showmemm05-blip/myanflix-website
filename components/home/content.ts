@@ -17,16 +17,7 @@ export const behindTheScenesImages = [
 ];
 export const behindTheScenesIcons: LucideIcon[] = [Clapperboard, Palette, Captions, Cpu];
 
-export const teamAvatarSeeds = ["myanflix-team-1", "myanflix-team-2", "myanflix-team-3", "myanflix-team-4"];
-
 export const partnerInitials = ["GR", "SFC", "YSW", "FWP", "SLD"];
-
-export const testimonialAvatarSeeds = [
-  "myanflix-voice-1",
-  "myanflix-voice-2",
-  "myanflix-voice-3",
-  "myanflix-voice-4",
-];
 
 export const newsImages = [
   "https://picsum.photos/seed/myanflix-news-1/700/420",

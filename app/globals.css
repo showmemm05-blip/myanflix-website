@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Reveal-on-hover chrome (MediaCard info shelf, card affordances) is only a
+   good idea where a real pointer can hover. On touch there is no hover state
+   to enter, so anything hidden behind one is simply unreachable — this variant
+   lets a component say "hide me only on hover-capable devices". */
+@custom-variant hover-device (@media (hover: hover) and (pointer: fine));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -41,65 +47,119 @@
 }
 
 :root {
-  --background: oklch(0.07 0 0);
+  --background: oklch(0.15 0.015 265);
   --foreground: oklch(0.97 0 0);
-  --card: oklch(0.12 0 0);
+  --card: oklch(0.195 0.017 265);
   --card-foreground: oklch(0.97 0 0);
-  --popover: oklch(0.11 0 0);
+  --popover: oklch(0.185 0.017 265);
   --popover-foreground: oklch(0.97 0 0);
-  --primary: oklch(0.577 0.226 27.3);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.17 0 0);
+  --primary: oklch(0.66 0.19 292);
+  --primary-foreground: oklch(0.14 0.03 292);
+  --secondary: oklch(0.24 0.018 265);
   --secondary-foreground: oklch(0.97 0 0);
-  --muted: oklch(0.15 0 0);
-  --muted-foreground: oklch(0.64 0 0);
-  --accent: oklch(0.22 0.04 27.3);
+  --muted: oklch(0.22 0.018 265);
+  --muted-foreground: oklch(0.66 0.012 265);
+  --accent: oklch(0.28 0.03 290);
   --accent-foreground: oklch(0.97 0 0);
-  --destructive: oklch(0.55 0.22 17);
+  --destructive: oklch(0.68 0.19 25);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.577 0.226 27.3 / 60%);
-  --chart-1: oklch(0.577 0.226 27.3);
-  --chart-2: oklch(0.65 0.18 45);
-  --chart-3: oklch(0.75 0.15 85);
-  --chart-4: oklch(0.6 0.12 200);
-  --chart-5: oklch(0.55 0.02 0);
+  --ring: oklch(0.66 0.19 292 / 60%);
+  --chart-1: oklch(0.66 0.19 292);
+  --chart-2: oklch(0.72 0.16 162);
+  --chart-3: oklch(0.82 0.15 88);
+  --chart-4: oklch(0.72 0.13 235);
+  --chart-5: oklch(0.68 0.16 35);
   --radius: 0.75rem;
-  --success: oklch(0.65 0.16 145);
-  --warning: oklch(0.75 0.16 75);
+  --success: oklch(0.72 0.16 162);
+  --warning: oklch(0.79 0.15 70);
+  --brand: oklch(0.6 0.22 25);
+  --brand-foreground: oklch(0.99 0 0);
+  --premium: oklch(0.82 0.15 88);
+  --premium-foreground: oklch(0.28 0.06 80);
+  --finance: oklch(0.72 0.16 162);
+  --finance-foreground: oklch(0.2 0.04 162);
+  --info: oklch(0.72 0.13 235);
+  --info-foreground: oklch(0.2 0.04 235);
+
+  /* ── Aurora Theater additions ──────────────────────────────────────────
+     Ambient wash stops (violet → sky, with a faint warm ember) and the
+     elevation ramp used by Surface. These ADD to the semantic system above;
+     no existing role meaning changes. */
+  --aurora-violet: oklch(0.66 0.19 292 / 30%);
+  --aurora-sky: oklch(0.72 0.13 235 / 22%);
+  --aurora-ember: oklch(0.68 0.16 35 / 12%);
+  --hairline: oklch(1 0 0 / 8%);
+  --hairline-strong: oklch(1 0 0 / 14%);
+  --elevation-1: 0 1px 0 0 oklch(1 0 0 / 4%) inset, 0 2px 8px -2px oklch(0 0 0 / 40%);
+  --elevation-2: 0 1px 0 0 oklch(1 0 0 / 5%) inset, 0 10px 30px -12px oklch(0 0 0 / 55%);
+  --elevation-3: 0 1px 0 0 oklch(1 0 0 / 6%) inset, 0 24px 60px -20px oklch(0 0 0 / 65%);
 }
 
 .dark {
-  --background: oklch(0.07 0 0);
+  --background: oklch(0.15 0.015 265);
   --foreground: oklch(0.97 0 0);
-  --card: oklch(0.12 0 0);
+  --card: oklch(0.195 0.017 265);
   --card-foreground: oklch(0.97 0 0);
-  --popover: oklch(0.11 0 0);
+  --popover: oklch(0.185 0.017 265);
   --popover-foreground: oklch(0.97 0 0);
-  --primary: oklch(0.577 0.226 27.3);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.17 0 0);
+  --primary: oklch(0.66 0.19 292);
+  --primary-foreground: oklch(0.14 0.03 292);
+  --secondary: oklch(0.24 0.018 265);
   --secondary-foreground: oklch(0.97 0 0);
-  --muted: oklch(0.15 0 0);
-  --muted-foreground: oklch(0.64 0 0);
-  --accent: oklch(0.22 0.04 27.3);
+  --muted: oklch(0.22 0.018 265);
+  --muted-foreground: oklch(0.66 0.012 265);
+  --accent: oklch(0.28 0.03 290);
   --accent-foreground: oklch(0.97 0 0);
-  --destructive: oklch(0.55 0.22 17);
+  --destructive: oklch(0.68 0.19 25);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.577 0.226 27.3 / 60%);
-  --chart-1: oklch(0.577 0.226 27.3);
-  --chart-2: oklch(0.65 0.18 45);
-  --chart-3: oklch(0.75 0.15 85);
-  --chart-4: oklch(0.6 0.12 200);
-  --chart-5: oklch(0.55 0.02 0);
-  --success: oklch(0.65 0.16 145);
-  --warning: oklch(0.75 0.16 75);
+  --ring: oklch(0.66 0.19 292 / 60%);
+  --chart-1: oklch(0.66 0.19 292);
+  --chart-2: oklch(0.72 0.16 162);
+  --chart-3: oklch(0.82 0.15 88);
+  --chart-4: oklch(0.72 0.13 235);
+  --chart-5: oklch(0.68 0.16 35);
+  --success: oklch(0.72 0.16 162);
+  --warning: oklch(0.79 0.15 70);
+  --brand: oklch(0.6 0.22 25);
+  --brand-foreground: oklch(0.99 0 0);
+  --premium: oklch(0.82 0.15 88);
+  --premium-foreground: oklch(0.28 0.06 80);
+  --finance: oklch(0.72 0.16 162);
+  --finance-foreground: oklch(0.2 0.04 162);
+  --info: oklch(0.72 0.13 235);
+  --info-foreground: oklch(0.2 0.04 235);
+
+  --aurora-violet: oklch(0.66 0.19 292 / 30%);
+  --aurora-sky: oklch(0.72 0.13 235 / 22%);
+  --aurora-ember: oklch(0.68 0.16 35 / 12%);
+  --hairline: oklch(1 0 0 / 8%);
+  --hairline-strong: oklch(1 0 0 / 14%);
+  --elevation-1: 0 1px 0 0 oklch(1 0 0 / 4%) inset, 0 2px 8px -2px oklch(0 0 0 / 40%);
+  --elevation-2: 0 1px 0 0 oklch(1 0 0 / 5%) inset, 0 10px 30px -12px oklch(0 0 0 / 55%);
+  --elevation-3: 0 1px 0 0 oklch(1 0 0 / 6%) inset, 0 24px 60px -20px oklch(0 0 0 / 65%);
 }
 
 @theme inline {
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-premium: var(--premium);
+  --color-premium-foreground: var(--premium-foreground);
+  --color-finance: var(--finance);
+  --color-finance-foreground: var(--finance-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  /* Elevation ramp — `shadow-e1`…`shadow-e3`. */
+  --shadow-e1: var(--elevation-1);
+  --shadow-e2: var(--elevation-2);
+  --shadow-e3: var(--elevation-3);
+
+  /* One easing for the whole system: everything decelerates the same way. */
+  --ease-aurora: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @layer base {
@@ -114,21 +174,298 @@
   }
 }
 
+@layer components {
+  /* ── THE SLATE: MyanFlix's toast ──────────────────────────────────────
+     A broadcast lower-third rather than a corner rectangle. Every state is
+     one variable apart — `--toast-accent` — set from the `data-type` Sonner
+     writes, so success/error/warning/info share one silhouette and differ
+     only in colour, icon and glow.
+
+     Kept in CSS rather than a wall of Tailwind classes because most of it is
+     pseudo-elements (the spine, the drain) and keyframes, which a className
+     string can express only awkwardly. */
+  .mf-toast[data-sonner-toast] {
+    --toast-accent: var(--primary);
+    /* Must equal the Toaster's `duration` prop, or the drain lies. */
+    --mf-toast-duration: 4500ms;
+
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.875rem 1rem 0.875rem 1.125rem;
+    overflow: hidden;
+    /* Square where the spine lands, rounded away from it: the asymmetry is
+       the shape's signature. */
+    border: 0;
+    border-radius: 6px 16px 16px 6px;
+    background: color-mix(in oklab, var(--popover) 92%, transparent);
+    backdrop-filter: blur(20px);
+    box-shadow:
+      var(--elevation-3),
+      /* The accent bleeds a little light into the page — the only glow, and
+         it is what makes an error feel urgent without turning red. */
+      0 0 0 1px color-mix(in oklab, var(--toast-accent) 22%, transparent),
+      0 10px 40px -16px color-mix(in oklab, var(--toast-accent) 45%, transparent);
+  }
+
+  /* The spine. */
+  .mf-toast[data-sonner-toast]::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    width: 4px;
+    background: var(--toast-accent);
+  }
+
+  /* The drain: a playhead running out along the bottom edge. It pauses with
+     the timer the instant the stack is pointed at. */
+  .mf-toast[data-sonner-toast]::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: 100%;
+    transform-origin: left center;
+    background: color-mix(in oklab, var(--toast-accent) 55%, transparent);
+    animation: mf-toast-drain var(--mf-toast-duration) linear forwards;
+  }
+  [data-sonner-toaster]:hover .mf-toast[data-sonner-toast]::after,
+  .mf-toast[data-sonner-toast]:focus-within::after {
+    animation-play-state: paused;
+  }
+  /* A toast with an action or an explicit dismiss is not on a clock. */
+  .mf-toast[data-sonner-toast][data-type="loading"]::after {
+    animation: none;
+    width: 0;
+  }
+
+  @keyframes mf-toast-drain {
+    from {
+      transform: scaleX(1);
+    }
+    to {
+      transform: scaleX(0);
+    }
+  }
+
+  /* ── States ─────────────────────────────────────────────────────────── */
+  .mf-toast[data-sonner-toast][data-type="success"] {
+    --toast-accent: var(--success);
+  }
+  .mf-toast[data-sonner-toast][data-type="error"] {
+    --toast-accent: var(--destructive);
+  }
+  .mf-toast[data-sonner-toast][data-type="warning"] {
+    --toast-accent: var(--warning);
+  }
+  .mf-toast[data-sonner-toast][data-type="info"] {
+    --toast-accent: var(--info);
+  }
+
+  /* ── Icon: a tinted slate, not a circle ─────────────────────────────── */
+  .mf-toast[data-sonner-toast] [data-icon] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin: 0;
+    border-radius: 9px;
+    color: var(--toast-accent);
+    background: color-mix(in oklab, var(--toast-accent) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--toast-accent) 28%, transparent);
+  }
+
+  /* ── Type ───────────────────────────────────────────────────────────── */
+  .mf-toast[data-sonner-toast] [data-content] {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+  }
+  .mf-toast[data-sonner-toast] [data-title] {
+    font-family: var(--font-heading), var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--foreground);
+    /* Long messages wrap to two lines, then stop — a toast is a headline,
+       not a paragraph. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .mf-toast[data-sonner-toast] [data-description] {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--muted-foreground);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ── Dismiss: revealed on approach, never shouting ──────────────────── */
+  .mf-toast[data-sonner-toast] [data-close-button] {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    left: auto;
+    transform: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 0;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--foreground) 8%, transparent);
+    color: var(--muted-foreground);
+    opacity: 0;
+    transition:
+      opacity 150ms ease-out,
+      color 150ms ease-out,
+      background-color 150ms ease-out;
+  }
+  .mf-toast[data-sonner-toast]:hover [data-close-button],
+  .mf-toast[data-sonner-toast] [data-close-button]:focus-visible {
+    opacity: 1;
+  }
+  .mf-toast[data-sonner-toast] [data-close-button]:hover {
+    background: color-mix(in oklab, var(--foreground) 14%, transparent);
+    color: var(--foreground);
+  }
+  /* Touch has no hover to reveal it, so it simply stays. */
+  @media (hover: none) {
+    .mf-toast[data-sonner-toast] [data-close-button] {
+      opacity: 1;
+    }
+  }
+  .mf-toast[data-sonner-toast]:has([data-close-button]) [data-content] {
+    padding-right: 1.25rem;
+  }
+
+  /* Sonner drives entrance, exit, stacking and swipe with transforms of its
+     own; layering a transform of ours on top would fight it. The extra
+     flourish is therefore blur and light only. */
+  .mf-toast[data-sonner-toast][data-mounted="true"] {
+    animation: mf-toast-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes mf-toast-in {
+    from {
+      filter: blur(6px);
+    }
+    to {
+      filter: blur(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mf-toast[data-sonner-toast][data-mounted="true"] {
+      animation: none;
+    }
+    .mf-toast[data-sonner-toast]::after {
+      animation-duration: var(--mf-toast-duration);
+      animation-timing-function: step-end;
+    }
+  }
+}
+
 @layer utilities {
+  /* ── Typography scale ────────────────────────────────────────────────────
+     The Aurora Theater type system, codified once so every page speaks with
+     the same voice instead of re-deriving sizes per component. */
+
+  /* Hero/display titles. */
+  .text-display {
+    @apply font-heading text-3xl leading-[1.02] font-bold tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl;
+  }
+  /* A step down from display — page titles that still need weight. */
+  .text-title {
+    @apply font-heading text-2xl leading-[1.08] font-bold tracking-tight sm:text-3xl;
+  }
+  /* The heading above every rail/grid/panel. */
+  .text-section-title {
+    @apply font-heading text-lg font-semibold tracking-tight sm:text-xl;
+  }
+  /* The signature editorial eyebrow. */
+  .text-kicker {
+    @apply text-[11px] font-semibold tracking-[0.18em] text-muted-foreground uppercase;
+  }
+  /* Secondary body copy. */
+  .text-body-muted {
+    @apply text-sm text-muted-foreground sm:text-[15px];
+  }
+  /* Money, counts, durations — digits must not dance as values update. */
+  .nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Surfaces & motion ───────────────────────────────────────────────── */
+
+  /* The standard quiet-glass panel. Components use <Surface>; this exists for
+     the odd place that needs the look on an element it already owns. */
+  .surface {
+    @apply rounded-2xl bg-card/60 ring-1 ring-white/8 ring-inset backdrop-blur-xl;
+  }
+  .hover-lift {
+    @apply transition-transform duration-200 ease-out hover:-translate-y-0.5;
+  }
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  /* The ambient aurora — page tops, hero edges, empty states. Never behind
+     body text: it is always painted on an aria-hidden layer underneath. */
+  .aurora-wash {
+    background-image:
+      radial-gradient(60% 70% at 12% 0%, var(--aurora-violet), transparent 70%),
+      radial-gradient(52% 62% at 88% 4%, var(--aurora-sky), transparent 72%),
+      radial-gradient(44% 52% at 50% 0%, var(--aurora-ember), transparent 76%);
+  }
+  .aurora-wash-soft {
+    background-image:
+      radial-gradient(70% 90% at 50% 0%, var(--aurora-violet), transparent 72%),
+      radial-gradient(60% 80% at 85% 10%, var(--aurora-sky), transparent 74%);
+  }
+
+  /* ── Safe area (bottom tab bar, notched phones) ──────────────────────── */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .px-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  /* Room for the mobile tab bar so nothing hides behind it. */
+  .pb-tabbar {
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
   .glass-card {
     @apply bg-card/60 backdrop-blur-xl border border-white/[0.08] shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset,0_8px_30px_rgba(0,0,0,0.4)];
   }
   .glass-panel {
     @apply bg-background/70 backdrop-blur-xl border border-white/[0.08];
   }
-  .text-gradient-brand {
-    background: linear-gradient(135deg, oklch(0.65 0.24 27.3), oklch(0.5 0.2 17));
+  .text-gradient-primary {
+    background: linear-gradient(135deg, oklch(0.72 0.18 292), oklch(0.55 0.21 292));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
   .glow-primary {
-    box-shadow: 0 0 0 1px oklch(0.577 0.226 27.3 / 25%), 0 8px 24px -8px oklch(0.577 0.226 27.3 / 45%);
+    box-shadow: 0 0 0 1px oklch(0.66 0.19 292 / 25%), 0 8px 24px -8px oklch(0.66 0.19 292 / 45%);
   }
   .scrollbar-thin {
     scrollbar-width: thin;
@@ -151,5 +488,104 @@
   }
   .fade-edge-x {
     mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+  }
+
+  /* ---- Player ---- */
+
+  /* The transient centered burst that confirms a keyboard/gesture action —
+     pops in fast so it reads as instant feedback, then drifts out. */
+  @keyframes player-hud-pop {
+    0% {
+      opacity: 0;
+      transform: scale(0.82);
+    }
+    18% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    62% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.18);
+    }
+  }
+  .animate-hud-pop {
+    animation: player-hud-pop 820ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes player-rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-rise-in {
+    animation: player-rise-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* Slow drift keeps the ambient wash feeling alive during a static shot,
+     without ever drawing the eye away from the picture itself. */
+  @keyframes player-ambient-drift {
+    0%,
+    100% {
+      transform: scale(1.35) translate3d(0, 0, 0);
+    }
+    50% {
+      transform: scale(1.45) translate3d(0, -1.5%, 0);
+    }
+  }
+  .animate-ambient-drift {
+    animation: player-ambient-drift 18s ease-in-out infinite;
+  }
+
+  /* Three-bar equalizer marking the episode currently on screen — the one place
+     in the list where motion is worth it, because "which one is playing?" is the
+     question the list gets asked most. */
+  @keyframes player-eq-bar {
+    0%,
+    100% {
+      transform: scaleY(0.3);
+    }
+    50% {
+      transform: scaleY(1);
+    }
+  }
+  .animate-eq-bar {
+    transform-origin: bottom;
+    animation: player-eq-bar 900ms ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-ambient-drift {
+      animation: none;
+      transform: scale(1.35);
+    }
+    .animate-eq-bar {
+      animation: none;
+      transform: scaleY(0.7);
+    }
+  }
+}
+
+/* ── prefers-reduced-motion, once, globally ────────────────────────────────
+   Every hover lift, shelf reveal and overlay fade in the design system is a
+   CSS transition or animation, so one guard covers the whole app instead of
+   each component remembering. Kept outside @layer so the !important wins
+   against utility-declared durations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

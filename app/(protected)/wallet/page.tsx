@@ -1,108 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import Image from "next/image";
-import {
-  ArrowDownToLine,
-  ArrowUpRight,
-  Check,
-  Copy,
-  ImageIcon,
-  Loader2,
-  TrendingDown,
-  TrendingUp,
-  Wallet as WalletIcon,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { StatCard } from "@/components/cards/StatCard";
-import { TransactionRow } from "@/components/cards/TransactionRow";
-import { DepositRow } from "@/components/cards/DepositRow";
-import { WithdrawalRow } from "@/components/cards/WithdrawalRow";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { WalletView } from "@/components/views/WalletView";
 import { paymentService } from "@/services/api/paymentService";
 import { paymentAccountService } from "@/services/api/paymentAccountService";
 import { ApiError } from "@/services/api/apiClient";
 import { formatKyat } from "@/lib/currency";
+import { useLanguage } from "@/lib/context/language-context";
 import type { PaymentAccount } from "@/types/payment-account";
 import { toast } from "sonner";
 
-const QUICK_AMOUNTS = [5000, 10000, 20000, 50000];
 const REFERENCE_PATTERN = /^\d{6}$/;
-
-function MethodLogo({ logoUrl, size = 20 }: { logoUrl: string | null | undefined; size?: number }) {
-  return (
-    <div
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded border border-white/[0.08] bg-secondary/20"
-      style={{ width: size, height: size }}
-    >
-      {logoUrl ? (
-        <Image src={logoUrl} alt="" width={size} height={size} className="size-full object-cover" unoptimized />
-      ) : (
-        <ImageIcon className="text-muted-foreground" style={{ width: size * 0.5, height: size * 0.5 }} />
-      )}
-    </div>
-  );
-}
-
-// Mirrors the mobile app's method-tile grid (logo above label, active state
-// via border/background) so the deposit method and withdraw account-type
-// pickers look the same on web as they do in the app.
-function MethodTileGrid({
-  methods,
-  selected,
-  onSelect,
-}: {
-  methods: { type: string; label: string; logoUrl: string | null }[];
-  selected: string | null;
-  onSelect: (type: string) => void;
-}) {
-  return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-      {methods.map((m) => {
-        const isActive = selected === m.type;
-        return (
-          <button
-            key={m.type}
-            type="button"
-            onClick={() => onSelect(m.type)}
-            className={cn(
-              "flex flex-col items-center gap-1.5 rounded-lg border py-3.5 transition-colors",
-              isActive
-                ? "border-primary bg-primary/10"
-                : "border-white/10 bg-secondary/50 hover:bg-secondary",
-            )}
-          >
-            <MethodLogo logoUrl={m.logoUrl} size={28} />
-            <span
-              className={cn(
-                "line-clamp-1 px-1 text-center text-xs font-semibold",
-                isActive ? "text-primary" : "text-muted-foreground",
-              )}
-            >
-              {m.label}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 export default function WalletPage() {
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
+
   const [depositOpen, setDepositOpen] = useState(false);
   const [amount, setAmount] = useState("10000");
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -116,6 +30,7 @@ export default function WalletPage() {
   const [withdrawAccountType, setWithdrawAccountType] = useState<string | null>(null);
   const [withdrawAccountName, setWithdrawAccountName] = useState("");
   const [withdrawAccountNumber, setWithdrawAccountNumber] = useState("");
+  const [withdrawBankName, setWithdrawBankName] = useState("");
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
@@ -127,21 +42,36 @@ export default function WalletPage() {
       setCopiedAccountId(accountId);
       setTimeout(() => setCopiedAccountId((prev) => (prev === accountId ? null : prev)), 1500);
     } catch {
-      toast.error("Couldn't copy account number");
+      toast.error(t.wallet.copyFailed);
     }
   };
 
-  const { data: summary, isLoading: isSummaryLoading } = useQuery({
+  const {
+    data: summary,
+    isLoading: isSummaryLoading,
+    isError: isSummaryError,
+    refetch: refetchSummary,
+  } = useQuery({
     queryKey: ["wallet-summary"],
     queryFn: () => paymentService.getWalletSummary(),
   });
 
-  const { data: transactions, isLoading: isTxnLoading } = useQuery({
+  const {
+    data: transactions,
+    isLoading: isTxnLoading,
+    isError: isTxnError,
+    refetch: refetchTransactions,
+  } = useQuery({
     queryKey: ["wallet-transactions"],
     queryFn: () => paymentService.getTransactions({ limit: 5 }),
   });
 
-  const { data: deposits, isLoading: isDepositsLoading } = useQuery({
+  const {
+    data: deposits,
+    isLoading: isDepositsLoading,
+    isError: isDepositsError,
+    refetch: refetchDeposits,
+  } = useQuery({
     queryKey: ["deposits", "mine"],
     queryFn: () => paymentService.getMyDeposits({ limit: 5 }),
   });
@@ -160,7 +90,12 @@ export default function WalletPage() {
     queryFn: () => paymentAccountService.getTypes(),
   });
 
-  const { data: withdrawals, isLoading: isWithdrawalsLoading } = useQuery({
+  const {
+    data: withdrawals,
+    isLoading: isWithdrawalsLoading,
+    isError: isWithdrawalsError,
+    refetch: refetchWithdrawals,
+  } = useQuery({
     queryKey: ["withdrawals", "mine"],
     queryFn: () => paymentService.getMyWithdrawals({ limit: 5 }),
   });
@@ -223,16 +158,19 @@ export default function WalletPage() {
         depositAmountNumber > financeSettings.maxDepositAmount)
     ) {
       setReferenceError(
-        `Amount must be between ${formatKyat(financeSettings.minDepositAmount)} and ${formatKyat(financeSettings.maxDepositAmount)}.`,
+        t.wallet.errAmountRange(
+          formatKyat(financeSettings.minDepositAmount),
+          formatKyat(financeSettings.maxDepositAmount),
+        ),
       );
       return;
     }
     if (!selectedAccount) {
-      setReferenceError("Select a payment method to continue.");
+      setReferenceError(t.wallet.errSelectAccount);
       return;
     }
     if (!REFERENCE_PATTERN.test(reference)) {
-      setReferenceError("Enter the exact 6-digit transaction reference from your payment.");
+      setReferenceError(t.wallet.errReference);
       return;
     }
 
@@ -243,17 +181,14 @@ export default function WalletPage() {
         methodLabel(selectedAccount),
         reference,
         selectedAccount.accountName,
+        selectedAccount.id,
       );
       queryClient.invalidateQueries({ queryKey: ["deposits", "mine"] });
       setDepositOpen(false);
       resetDepositForm();
-      toast.success("Deposit submitted", {
-        description: "Your deposit is pending admin approval — your balance will update once it's reviewed.",
-      });
+      toast.success(t.wallet.depositPending);
     } catch (err) {
-      toast.error("Couldn't submit deposit", {
-        description: err instanceof ApiError ? err.message : "Please try again.",
-      });
+      toast.error(err instanceof ApiError ? err.message : t.common.somethingWentWrong);
     } finally {
       setIsDepositing(false);
     }
@@ -264,23 +199,33 @@ export default function WalletPage() {
     setWithdrawAccountType(null);
     setWithdrawAccountName("");
     setWithdrawAccountNumber("");
+    setWithdrawBankName("");
     setWithdrawError(null);
   };
 
   const withdrawAmountNumber = Number(withdrawAmount) || 0;
   const availableBalance = summary?.balance ?? 0;
+  // Same catalog flag the admin sets per payment method — a bank transfer needs
+  // a bank named, a mobile wallet doesn't.
+  const withdrawRequiresBankName = Boolean(
+    paymentAccountTypes?.find((t) => t.value === withdrawAccountType)?.requiresBankName,
+  );
 
   const handleWithdraw = async () => {
     if (!withdrawAccountType) {
-      setWithdrawError("Select an account type to continue.");
+      setWithdrawError(t.wallet.errSelectType);
       return;
     }
     if (!withdrawAccountName.trim() || !withdrawAccountNumber.trim()) {
-      setWithdrawError("Enter the account name and account/phone number to receive your withdrawal.");
+      setWithdrawError(t.wallet.errAccountDetails);
+      return;
+    }
+    if (withdrawRequiresBankName && !withdrawBankName.trim()) {
+      setWithdrawError(t.wallet.errBankName);
       return;
     }
     if (!withdrawAmountNumber || withdrawAmountNumber <= 0) {
-      setWithdrawError("Enter a valid amount.");
+      setWithdrawError(t.wallet.errAmountPositive);
       return;
     }
     if (
@@ -289,12 +234,15 @@ export default function WalletPage() {
         withdrawAmountNumber > financeSettings.maxWithdrawalAmount)
     ) {
       setWithdrawError(
-        `Amount must be between ${formatKyat(financeSettings.minWithdrawalAmount)} and ${formatKyat(financeSettings.maxWithdrawalAmount)}.`,
+        t.wallet.errAmountRange(
+          formatKyat(financeSettings.minWithdrawalAmount),
+          formatKyat(financeSettings.maxWithdrawalAmount),
+        ),
       );
       return;
     }
     if (withdrawAmountNumber > availableBalance) {
-      setWithdrawError("You can't withdraw more than your available wallet balance.");
+      setWithdrawError(t.wallet.errInsufficient);
       return;
     }
 
@@ -305,376 +253,89 @@ export default function WalletPage() {
         withdrawAccountType,
         withdrawAccountName.trim(),
         withdrawAccountNumber.trim(),
+        withdrawRequiresBankName ? withdrawBankName.trim() : undefined,
       );
       queryClient.invalidateQueries({ queryKey: ["withdrawals", "mine"] });
       setWithdrawOpen(false);
       resetWithdrawForm();
-      toast.success("Withdrawal requested", {
-        description: "Your withdrawal is pending admin approval — your balance updates only once it's approved.",
-      });
+      toast.success(t.wallet.withdrawPending);
     } catch (err) {
-      toast.error("Couldn't submit withdrawal", {
-        description: err instanceof ApiError ? err.message : "Please try again.",
-      });
+      toast.error(err instanceof ApiError ? err.message : t.common.somethingWentWrong);
     } finally {
       setIsWithdrawing(false);
     }
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold sm:text-3xl">Wallet</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Manage your balance and deposits.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setWithdrawOpen(true)}>
-            <ArrowDownToLine className="size-4" />
-            Withdraw
-          </Button>
-          <Button onClick={() => setDepositOpen(true)}>
-            <ArrowUpRight className="size-4" />
-            Deposit
-          </Button>
-        </div>
-      </div>
-
-      {isSummaryLoading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-xl bg-muted" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatCard icon={WalletIcon} label="Current Balance" value={formatKyat(summary?.balance ?? 0)} />
-          <StatCard icon={TrendingUp} label="Total Deposited" value={formatKyat(summary?.totalDeposited ?? 0)} />
-          <StatCard icon={TrendingDown} label="Total Spent" value={formatKyat(summary?.totalSpent ?? 0)} />
-        </div>
-      )}
-
-      <Card className="glass-card mt-6 border-white/[0.08]">
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle>Recent Transactions</CardTitle>
-          <Button variant="ghost" size="sm" render={<Link href="/transactions" />} nativeButton={false}>
-            View all
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {isTxnLoading ? (
-            <div className="flex flex-col gap-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
-              ))}
-            </div>
-          ) : (
-            transactions?.items.map((transaction) => <TransactionRow key={transaction.id} transaction={transaction} />)
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="glass-card mt-6 border-white/[0.08]">
-        <CardHeader>
-          <CardTitle>Deposit History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isDepositsLoading ? (
-            <div className="flex flex-col gap-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
-              ))}
-            </div>
-          ) : deposits && deposits.items.length > 0 ? (
-            deposits.items.map((deposit) => (
-              <DepositRow key={deposit.id} deposit={deposit} types={paymentAccountTypes ?? []} />
-            ))
-          ) : (
-            <p className="py-6 text-center text-sm text-muted-foreground">No deposits yet.</p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="glass-card mt-6 border-white/[0.08]">
-        <CardHeader>
-          <CardTitle>Withdrawal History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isWithdrawalsLoading ? (
-            <div className="flex flex-col gap-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
-              ))}
-            </div>
-          ) : withdrawals && withdrawals.items.length > 0 ? (
-            withdrawals.items.map((withdrawal) => (
-              <WithdrawalRow key={withdrawal.id} withdrawal={withdrawal} types={paymentAccountTypes ?? []} />
-            ))
-          ) : (
-            <p className="py-6 text-center text-sm text-muted-foreground">No withdrawals yet.</p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Dialog
-        open={depositOpen}
-        onOpenChange={(open) => {
-          setDepositOpen(open);
-          if (!open) resetDepositForm();
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Deposit funds</DialogTitle>
-            <DialogDescription>
-              Submit your payment reference for review — your balance updates once an admin approves it.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="amount">Amount (Ks)</Label>
-              <Input id="amount" type="number" min="1000" step="1000" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {QUICK_AMOUNTS.map((qa) => (
-                  <button
-                    key={qa}
-                    type="button"
-                    onClick={() => setAmount(qa.toString())}
-                    className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-muted-foreground hover:bg-secondary"
-                  >
-                    {formatKyat(qa)}
-                  </button>
-                ))}
-              </div>
-              {financeSettings && (
-                <p className="text-xs text-muted-foreground">
-                  Amount must be between {formatKyat(financeSettings.minDepositAmount)} and{" "}
-                  {formatKyat(financeSettings.maxDepositAmount)}.
-                </p>
-              )}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Payment method</Label>
-              {isAccountsLoading ? (
-                <div className="h-9 animate-pulse rounded-md bg-muted" />
-              ) : methodTypes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No payment methods are available right now. Please try again later.
-                </p>
-              ) : (
-                <MethodTileGrid
-                  methods={methodTypes}
-                  selected={effectiveType}
-                  onSelect={(type) => {
-                    setSelectedType(type);
-                    setAccountId(null);
-                  }}
-                />
-              )}
-            </div>
-            {accountsForType.length > 0 && (
-              <div className="flex flex-col gap-1.5">
-                <Label>{accountsForType.length > 1 ? "Choose an account" : "Send to"}</Label>
-                <div className="flex flex-col gap-2">
-                  {accountsForType.map((account) => {
-                    const isSelected = selectedAccount?.id === account.id;
-                    const isCopied = copiedAccountId === account.id;
-                    return (
-                      <div
-                        key={account.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setAccountId(account.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setAccountId(account.id);
-                          }
-                        }}
-                        aria-pressed={isSelected}
-                        className={cn(
-                          "flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-left text-sm transition-colors",
-                          isSelected
-                            ? "border-primary/50 bg-primary/5"
-                            : "border-white/10 bg-secondary/50 hover:bg-secondary",
-                        )}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{account.accountName}</span>
-                          {isSelected && <Check className="size-4 text-primary" />}
-                        </div>
-                        <div className="flex items-center justify-between text-muted-foreground">
-                          <span>Account number</span>
-                          <span className="flex items-center gap-1.5">
-                            <span className="font-medium text-foreground">{account.accountNumber}</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCopyAccountNumber(account.id, account.accountNumber);
-                              }}
-                              aria-label="Copy account number"
-                              className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                            >
-                              {isCopied ? (
-                                <Check className="size-3.5 text-success" />
-                              ) : (
-                                <Copy className="size-3.5" />
-                              )}
-                            </button>
-                          </span>
-                        </div>
-                        {account.bankName && (
-                          <div className="flex items-center justify-between text-muted-foreground">
-                            <span>Bank</span>
-                            <span className="font-medium text-foreground">{account.bankName}</span>
-                          </div>
-                        )}
-                        {account.note && <p className="text-xs text-muted-foreground">{account.note}</p>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="reference">Transaction reference</Label>
-              <Input
-                id="reference"
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="000123"
-                value={reference}
-                onChange={(e) => {
-                  setReference(e.target.value.replace(/\D/g, "").slice(0, 6));
-                  setReferenceError(null);
-                }}
-              />
-              <p className="text-xs text-muted-foreground">
-                Enter the exact 6-digit reference number from your{" "}
-                {selectedAccount ? methodLabel(selectedAccount) : "payment method's"} payment.
-              </p>
-              {referenceError && <p className="text-sm text-destructive">{referenceError}</p>}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDepositOpen(false)} disabled={isDepositing}>
-              Cancel
-            </Button>
-            <Button onClick={handleDeposit} disabled={isDepositing || Number(amount) <= 0 || !selectedAccount}>
-              {isDepositing && <Loader2 className="size-4 animate-spin" />}
-              Submit {formatKyat(Number(amount) || 0)}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={withdrawOpen}
-        onOpenChange={(open) => {
-          setWithdrawOpen(open);
-          if (!open) resetWithdrawForm();
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Withdraw funds</DialogTitle>
-            <DialogDescription>
-              Submit a withdrawal request for review — your balance is only deducted once an admin approves it.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="withdraw-amount">Amount (Ks)</Label>
-              <Input
-                id="withdraw-amount"
-                type="number"
-                min="1000"
-                step="1000"
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-              />
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {QUICK_AMOUNTS.map((qa) => (
-                  <button
-                    key={qa}
-                    type="button"
-                    onClick={() => setWithdrawAmount(qa.toString())}
-                    className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-muted-foreground hover:bg-secondary"
-                  >
-                    {formatKyat(qa)}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Available balance: {formatKyat(availableBalance)}
-              </p>
-              {financeSettings && (
-                <p className="text-xs text-muted-foreground">
-                  Amount must be between {formatKyat(financeSettings.minWithdrawalAmount)} and{" "}
-                  {formatKyat(financeSettings.maxWithdrawalAmount)}.
-                </p>
-              )}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Account type</Label>
-              <MethodTileGrid
-                methods={(paymentAccountTypes ?? []).map((t) => ({ type: t.value, label: t.label, logoUrl: t.logoUrl }))}
-                selected={withdrawAccountType}
-                onSelect={setWithdrawAccountType}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="withdraw-account-name">Account name</Label>
-              <Input
-                id="withdraw-account-name"
-                type="text"
-                placeholder="Full name on the account"
-                value={withdrawAccountName}
-                onChange={(e) => setWithdrawAccountName(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="withdraw-account-number">Account number / phone number</Label>
-              <Input
-                id="withdraw-account-number"
-                type="text"
-                placeholder="e.g. 09xxxxxxxxx"
-                value={withdrawAccountNumber}
-                onChange={(e) => setWithdrawAccountNumber(e.target.value)}
-              />
-            </div>
-            <div className="rounded-lg border border-white/10 bg-secondary/50 p-3 text-sm">
-              You are requesting to withdraw{" "}
-              <span className="font-semibold">{formatKyat(withdrawAmountNumber)}</span>.
-            </div>
-            {withdrawError && <p className="text-sm text-destructive">{withdrawError}</p>}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setWithdrawOpen(false)} disabled={isWithdrawing}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleWithdraw}
-              disabled={
-                isWithdrawing ||
-                withdrawAmountNumber <= 0 ||
-                !withdrawAccountType ||
-                !withdrawAccountName.trim() ||
-                !withdrawAccountNumber.trim()
-              }
-            >
-              {isWithdrawing && <Loader2 className="size-4 animate-spin" />}
-              Request {formatKyat(withdrawAmountNumber)}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+    <WalletView
+      summary={summary}
+      isSummaryLoading={isSummaryLoading}
+      isSummaryError={isSummaryError}
+      onRetrySummary={() => refetchSummary()}
+      transactions={transactions?.items}
+      isTxnLoading={isTxnLoading}
+      isTxnError={isTxnError}
+      onRetryTransactions={() => refetchTransactions()}
+      deposits={deposits?.items}
+      isDepositsLoading={isDepositsLoading}
+      isDepositsError={isDepositsError}
+      onRetryDeposits={() => refetchDeposits()}
+      withdrawals={withdrawals?.items}
+      isWithdrawalsLoading={isWithdrawalsLoading}
+      isWithdrawalsError={isWithdrawalsError}
+      onRetryWithdrawals={() => refetchWithdrawals()}
+      paymentAccountTypes={paymentAccountTypes}
+      financeSettings={financeSettings}
+      depositOpen={depositOpen}
+      onDepositOpenChange={(open) => {
+        setDepositOpen(open);
+        if (!open) resetDepositForm();
+      }}
+      onCloseDeposit={() => setDepositOpen(false)}
+      amount={amount}
+      onAmountChange={setAmount}
+      isAccountsLoading={isAccountsLoading}
+      methodTypes={methodTypes}
+      effectiveType={effectiveType}
+      onSelectType={(type) => {
+        setSelectedType(type);
+        setAccountId(null);
+      }}
+      accountsForType={accountsForType}
+      selectedAccount={selectedAccount}
+      onSelectAccount={setAccountId}
+      copiedAccountId={copiedAccountId}
+      onCopyAccountNumber={handleCopyAccountNumber}
+      reference={reference}
+      onReferenceChange={(value) => {
+        setReference(value.replace(/\D/g, "").slice(0, 6));
+        setReferenceError(null);
+      }}
+      referenceError={referenceError}
+      isDepositing={isDepositing}
+      onSubmitDeposit={handleDeposit}
+      withdrawOpen={withdrawOpen}
+      onWithdrawOpenChange={(open) => {
+        setWithdrawOpen(open);
+        if (!open) resetWithdrawForm();
+      }}
+      onCloseWithdraw={() => setWithdrawOpen(false)}
+      withdrawAmount={withdrawAmount}
+      onWithdrawAmountChange={setWithdrawAmount}
+      withdrawAmountNumber={withdrawAmountNumber}
+      availableBalance={availableBalance}
+      withdrawAccountType={withdrawAccountType}
+      onSelectWithdrawType={setWithdrawAccountType}
+      withdrawRequiresBankName={withdrawRequiresBankName}
+      withdrawBankName={withdrawBankName}
+      onWithdrawBankNameChange={setWithdrawBankName}
+      withdrawAccountName={withdrawAccountName}
+      onWithdrawAccountNameChange={setWithdrawAccountName}
+      withdrawAccountNumber={withdrawAccountNumber}
+      onWithdrawAccountNumberChange={setWithdrawAccountNumber}
+      withdrawError={withdrawError}
+      isWithdrawing={isWithdrawing}
+      onSubmitWithdraw={handleWithdraw}
+    />
   );
 }

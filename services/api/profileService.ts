@@ -9,8 +9,9 @@ import type {
 interface BackendUser {
   id: string;
   username: string;
-  email: string;
-  avatar: string | null;
+  phone: string | null;
+  /** Absolute URL computed by the backend per-request; null when no photo is set. */
+  avatarUrl: string | null;
   role: UserRole;
   status: UserStatus;
   createdAt: string;
@@ -26,10 +27,8 @@ function mapUser(u: BackendUser): AppUser {
   return {
     id: u.id,
     name: u.username,
-    email: u.email,
-    avatarUrl:
-      u.avatar ??
-      `https://i.pravatar.cc/150?u=${encodeURIComponent(u.username)}`,
+    phone: u.phone ?? null,
+    avatarUrl: u.avatarUrl ?? null,
     role: u.role,
     status: u.status,
     walletBalance: u.balance ?? 0,
@@ -52,6 +51,20 @@ let notificationPreferences: NotificationPreferences = {
 export const profileService = {
   async getProfile(): Promise<AppUser> {
     const user = await apiClient.get<BackendUser>("/users/me");
+    return mapUser(user);
+  },
+
+  /** Uploads a new profile photo — returns the refreshed user (same shape as GET /users/me). */
+  async uploadAvatar(file: File): Promise<AppUser> {
+    const form = new FormData();
+    form.append("file", file);
+    const user = await apiClient.postMultipart<BackendUser>("/users/me/avatar", form);
+    return mapUser(user);
+  },
+
+  /** Removes the current profile photo — returns the refreshed user. */
+  async removeAvatar(): Promise<AppUser> {
+    const user = await apiClient.delete<BackendUser>("/users/me/avatar");
     return mapUser(user);
   },
 

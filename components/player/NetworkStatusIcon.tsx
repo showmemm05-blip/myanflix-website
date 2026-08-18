@@ -30,7 +30,7 @@ export function NetworkStatusIcon({ quality }: { quality: NetworkQuality }) {
     <div
       role="img"
       aria-label={LABELS[quality]}
-      className={`pointer-events-none absolute right-3 top-3 flex size-7 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm transition-colors duration-300 ${COLORS[quality]}`}
+      className={`pointer-events-none absolute top-3 right-3 z-10 flex size-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/12 backdrop-blur-xl transition-colors duration-300 ease-out ring-inset ${COLORS[quality]}`}
     >
       <Icon className="size-4" />
     </div>

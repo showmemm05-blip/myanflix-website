@@ -1,5 +1,4 @@
-import { Navbar } from "@/components/navbar/Navbar";
-import { Footer } from "@/components/footer/Footer";
+import { AppShell } from "@/components/layout/AppShell";
 import { RequireAuth } from "@/components/layout/RequireAuth";
 import { RealtimeWalletListener } from "@/components/layout/RealtimeWalletListener";
 
@@ -7,11 +6,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   return (
     <RequireAuth>
       <RealtimeWalletListener />
-      <div className="flex min-h-screen flex-col">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
-      </div>
+      <AppShell>{children}</AppShell>
     </RequireAuth>
   );
 }

@@ -1,6 +1,9 @@
 import Link from "next/link";
+
 import { useLanguage } from "@/lib/context/language-context";
 import { Button } from "@/components/ui/button";
+import { AuroraBackdrop } from "@/components/system/AuroraBackdrop";
+import { Surface } from "@/components/system/Surface";
 import { RevealSection } from "./RevealSection";
 import { ctaIcons } from "./content";
 
@@ -12,22 +15,34 @@ export function HomeCta() {
 
   return (
     <RevealSection className="px-4 sm:px-6 lg:px-8">
-      <div className="glass-card glow-primary relative overflow-hidden rounded-2xl px-6 py-12 text-center sm:px-10 sm:py-16">
-        <h2 className="text-gradient-brand font-heading text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
-          {t.home.cta.title}
-        </h2>
-        <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground sm:text-base">{t.home.cta.subtitle}</p>
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Button size="lg" render={<Link href="/movies" />} nativeButton={false}>
+      {/* The page opened on aurora light; it closes on it too. The band is the
+          standard Surface at the full-width radius — the aurora behind it is
+          the only thing making it special, not a one-off box. */}
+      <Surface
+        as="section"
+        radius="3xl"
+        className="isolate overflow-hidden px-6 py-14 text-center sm:px-10 sm:py-20"
+      >
+        <AuroraBackdrop variant="panel" />
+        <h2 className="text-title">{t.home.cta.title}</h2>
+        <p className="mx-auto mt-3 max-w-xl text-body-muted">{t.home.cta.subtitle}</p>
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <Button variant="onArt" size="pill" render={<Link href="/movies" />} nativeButton={false}>
             <MediaIcon className="size-4" />
             {t.home.cta.browseMedia}
           </Button>
-          <Button size="lg" variant="ghost" render={<Link href="/categories" />} nativeButton={false}>
+          <Button
+            size="pill"
+            variant="ghost"
+            className="bg-white/8 font-semibold text-white ring-1 ring-white/15 backdrop-blur-md ring-inset hover:bg-white/15 hover:text-white active:scale-[0.98]"
+            render={<Link href="/movies?tab=movies" />}
+            nativeButton={false}
+          >
             <CategoriesIcon className="size-4" />
             {t.home.cta.exploreCategories}
           </Button>
         </div>
-      </div>
+      </Surface>
     </RevealSection>
   );
 }

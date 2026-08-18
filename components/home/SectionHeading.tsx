@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+
+import { SectionHeader } from "@/components/system/SectionHeader";
 import { cn } from "@/lib/utils";
 
 interface SectionHeadingProps {
@@ -9,19 +11,27 @@ interface SectionHeadingProps {
   className?: string;
 }
 
+/**
+ * The home page's section heading is the app-wide SectionHeader with the page
+ * gutter baked in — the marketing sections are full-bleed, so each one pads
+ * its own heading rather than sitting inside a padded column.
+ *
+ * Kept as its own component (rather than every section importing SectionHeader
+ * directly) so the gutter is declared once and the whole page keeps one rhythm.
+ *
+ * The gutter is the ONLY thing it adds: it runs at the shared `section` scale,
+ * because a section on the home page is the same rank as a section anywhere
+ * else and a second, larger type scale just for this page made the app read as
+ * two products.
+ */
 export function SectionHeading({ eyebrow, title, subtitle, action, className }: SectionHeadingProps) {
   return (
-    <div className={cn("flex flex-col gap-3 px-4 sm:px-6 lg:px-8", className)}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-col gap-1.5">
-          {eyebrow && (
-            <span className="text-xs font-semibold tracking-widest text-primary uppercase">{eyebrow}</span>
-          )}
-          <h2 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">{title}</h2>
-        </div>
-        {action}
-      </div>
-      {subtitle && <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">{subtitle}</p>}
-    </div>
+    <SectionHeader
+      kicker={eyebrow}
+      title={title}
+      description={subtitle}
+      action={action}
+      className={cn("px-4 sm:px-6 lg:px-8", className)}
+    />
   );
 }

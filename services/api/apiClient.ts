@@ -126,6 +126,14 @@ export const apiClient = {
     request<T>(path, { ...options, method: "GET" }),
   post: <T>(path: string, data?: unknown, options?: RequestOptions) =>
     request<T>(path, { ...options, method: "POST", data }),
+  /**
+   * POST multipart/form-data (file uploads). Content-Type is deliberately NOT
+   * set here — axios leaves it to the browser for FormData bodies, which is
+   * the only way the boundary parameter gets filled in correctly. Same auth
+   * header, envelope unwrap, and refresh-on-401 behavior as every other method.
+   */
+  postMultipart: <T>(path: string, formData: FormData, options?: RequestOptions) =>
+    request<T>(path, { ...options, method: "POST", data: formData }),
   put: <T>(path: string, data?: unknown, options?: RequestOptions) =>
     request<T>(path, { ...options, method: "PUT", data }),
   patch: <T>(path: string, data?: unknown, options?: RequestOptions) =>

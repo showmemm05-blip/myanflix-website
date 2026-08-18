@@ -3,31 +3,65 @@
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Hls from "hls.js";
-import { AlertTriangle, ArrowLeft, Clapperboard, Loader2, Lock, Play } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Calendar,
+  Check,
+  Clapperboard,
+  Clock,
+  FastForward,
+  Loader2,
+  Lock,
+  Pause,
+  Play,
+  Plus,
+  Rewind,
+  Share2,
+  Sparkles,
+  Star,
+  Volume1,
+  Volume2,
+  VolumeX,
+  type LucideIcon,
+} from "lucide-react";
 import { PlayerControls } from "@/components/player/PlayerControls";
-import { EpisodesSection } from "@/components/player/EpisodesSection";
+import { AmbientBackdrop } from "@/components/player/AmbientBackdrop";
+import { PlayerHud, type HudMessage } from "@/components/player/PlayerHud";
+import { EpisodeRail } from "@/components/player/EpisodeRail";
+import { UpNextOverlay } from "@/components/player/UpNextOverlay";
 import { NetworkStatusIcon } from "@/components/player/NetworkStatusIcon";
-import { MovieRow } from "@/components/movie/MovieRow";
+import { PosterRail } from "@/components/browse/PosterRail";
+import { movieToBrowseItem } from "@/components/browse/browse-item";
 import { PageLoader } from "@/components/loading/Spinner";
 import { EmptyState } from "@/components/empty/EmptyState";
 import { SubscribeDialog } from "@/components/dialogs/SubscribeDialog";
+import { ShareDialog } from "@/components/modals/ShareDialog";
 import { Button } from "@/components/ui/button";
+import { AccessBadge, Chip, Kicker } from "@/components/system";
 import { useMovie, useSimilarMovies } from "@/hooks/use-movies";
+import { useLibrary } from "@/lib/context/library-context";
 import { useSubscription } from "@/lib/context/subscription-context";
+import { useLanguage } from "@/lib/context/language-context";
 import { seriesService } from "@/services/api/seriesService";
 import { historyService } from "@/services/api/historyService";
 import { videoService } from "@/services/api/videoService";
 import { ApiError } from "@/services/api/apiClient";
 import { createPrefetchSystem, type PrefetchHandle } from "@/lib/streaming/PrefetchController";
 import { useNetworkQuality } from "@/lib/hooks/use-network-quality";
+import { usePlayerHotkeys } from "@/lib/hooks/use-player-hotkeys";
 import type { PrefetchStatusDisplay } from "@/components/player/PlayerControls";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, formatTimecode } from "@/lib/format";
 import { FALLBACK_COVER_URL } from "@/lib/placeholder";
+import { cn } from "@/lib/utils";
 
 const AUTO_HIDE_MS = 3000;
 const PROGRESS_SAVE_INTERVAL_MS = 8000;
+const HUD_VISIBLE_MS = 800;
+const UP_NEXT_COUNTDOWN_SECONDS = 8;
 // Sliding cache window: how much video stays prefetched/cached around the current playback position.
 const PREFETCH_BEFORE_SECONDS = 10;
 const PREFETCH_AFTER_SECONDS = 10;
@@ -37,17 +71,13 @@ interface QualityLevel {
   index: number; // -1 for Auto
 }
 
-function formatClock(totalSeconds: number) {
-  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return "0:00";
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
 export default function PlayerPage({ params }: { params: Promise<{ movieId: string }> }) {
   const { movieId } = use(params);
+  const router = useRouter();
+  const { t } = useLanguage();
   const { data: movie, isLoading } = useMovie(movieId);
-  const { data: similarMovies } = useSimilarMovies(movieId);
+  const { data: similarMovies, isLoading: isSimilarLoading } = useSimilarMovies(movieId);
+  const { isInWatchlist, toggleWatchlist } = useLibrary();
   const { isSubscribed } = useSubscription();
 
   // Episodes inherit access from their parent series' own accessType —
@@ -71,6 +101,17 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
     retry: false,
   });
 
+  // Shares its query key with EpisodeRail's own fetch, so this adds no extra
+  // network round trip — just lets the page itself know what comes next.
+  const { data: playerEpisodes } = useQuery({
+    queryKey: ["series", movie?.seriesId, "player-episodes"],
+    queryFn: () => seriesService.getPlayerEpisodes(movie!.seriesId!),
+    enabled: Boolean(movie?.seriesId),
+  });
+  const flatEpisodes = playerEpisodes?.seasons.flatMap((season) => season.episodes) ?? [];
+  const currentEpisodeIndex = flatEpisodes.findIndex((episode) => episode.id === movieId);
+  const nextEpisode = currentEpisodeIndex >= 0 ? flatEpisodes[currentEpisodeIndex + 1] : undefined;
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const prefetchRef = useRef<PrefetchHandle | null>(null);
@@ -80,6 +121,8 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const currentTimeRef = useRef(0);
   const videoClickTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedFragmentCountRef = useRef(0);
+  const hudTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hudIdRef = useRef(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
@@ -89,6 +132,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const [volume, setVolume] = useState(80);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isTheater, setIsTheater] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [qualityLevels, setQualityLevels] = useState<QualityLevel[]>([{ label: "Auto", index: -1 }]);
   const [quality, setQuality] = useState("Auto");
@@ -96,24 +140,52 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const [audio, setAudio] = useState("Original");
   const [controlsVisible, setControlsVisible] = useState(true);
   const [subscribeOpen, setSubscribeOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [bufferedRanges, setBufferedRanges] = useState<[number, number][]>([]);
   const [prefetchStatus, setPrefetchStatus] = useState<PrefetchStatusDisplay | null>(null);
+  const [hud, setHud] = useState<HudMessage | null>(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [upNextSeconds, setUpNextSeconds] = useState<number | null>(null);
 
-  const progress = durationSeconds > 0 ? (currentTime / durationSeconds) * 100 : 0;
   const networkQuality = useNetworkQuality({ hlsRef, isBuffering, loadedFragmentCountRef, active: hasStarted });
 
-  const resetHideTimer = useCallback(() => {
-    setControlsVisible(true);
+  /** Arms the auto-hide countdown without touching visibility, so mount can start
+   *  the timer against the already-visible initial state instead of re-setting it. */
+  const scheduleHide = useCallback(() => {
     if (hideTimeout.current) clearTimeout(hideTimeout.current);
     hideTimeout.current = setTimeout(() => setControlsVisible(false), AUTO_HIDE_MS);
   }, []);
 
+  const resetHideTimer = useCallback(() => {
+    setControlsVisible(true);
+    scheduleHide();
+  }, [scheduleHide]);
+
+  /** Flashes a confirmation in the middle of the picture — the only feedback a
+   *  keyboard shortcut gets, since the control bar may well be hidden. */
+  const showHud = useCallback((icon: LucideIcon, label?: string, meter?: number) => {
+    hudIdRef.current += 1;
+    setHud({ id: hudIdRef.current, icon, label, meter });
+    if (hudTimeout.current) clearTimeout(hudTimeout.current);
+    hudTimeout.current = setTimeout(() => setHud(null), HUD_VISIBLE_MS);
+  }, []);
+
   useEffect(() => {
-    resetHideTimer();
+    scheduleHide();
     return () => {
       if (hideTimeout.current) clearTimeout(hideTimeout.current);
+      if (hudTimeout.current) clearTimeout(hudTimeout.current);
     };
-  }, [resetHideTimer]);
+  }, [scheduleHide]);
+
+  // Keeps the fullscreen icon correct even when fullscreen is entered/exited by
+  // something other than our own button — e.g. the browser's own Esc handling.
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
 
   // Set up HLS.js (or native HLS on Safari) once the real playlist URL is known.
   useEffect(() => {
@@ -241,27 +313,50 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const togglePlay = () => {
+  const goToEpisode = useCallback(
+    (episodeId: string) => {
+      router.push(`/player/${episodeId}`);
+    },
+    [router],
+  );
+
+  // Auto-advance countdown, ticking one second at a time so the ring in
+  // UpNextOverlay can animate against it.
+  useEffect(() => {
+    if (upNextSeconds === null) return;
+    if (upNextSeconds <= 0) {
+      if (nextEpisode) goToEpisode(nextEpisode.id);
+      return;
+    }
+    const timer = setTimeout(() => setUpNextSeconds((seconds) => (seconds === null ? null : seconds - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [upNextSeconds, nextEpisode, goToEpisode]);
+
+  const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) video.play();
     else video.pause();
-  };
+  }, []);
 
   // A double-click always fires two native `click` events before the browser
-  // recognizes it as one — without this, each click's togglePlay() actually
-  // runs (pause, then resume), producing a visible stutter right as the video
-  // switches to fullscreen. Delaying the single-click action briefly, and
-  // cancelling it if a second click lands within that window, keeps a real
-  // single click responsive while letting a double-click go straight to
-  // fullscreen with no play/pause side effect at all.
+  // recognizes it as one — without this, each click's handler actually runs twice,
+  // producing a visible stutter right as the video switches to fullscreen. Delaying
+  // the single-click action briefly, and cancelling it if a second click lands within
+  // that window, keeps a real single click responsive while letting a double-click go
+  // straight to fullscreen with no side effect from the single-click path at all.
   const VIDEO_CLICK_DELAY_MS = 250;
 
   const handleVideoClick = () => {
     if (videoClickTimeout.current) return;
     videoClickTimeout.current = setTimeout(() => {
       videoClickTimeout.current = null;
+      // A single click/tap anywhere on the picture is play/pause — the gesture the
+      // player has always had, on mouse and on touch alike. It also wakes the control
+      // bar and re-arms auto-hide, which is the only way a touch device (no hover, so
+      // no onMouseMove) can bring the controls back once they've faded.
       togglePlay();
+      resetHideTimer();
     }, VIDEO_CLICK_DELAY_MS);
   };
 
@@ -283,25 +378,26 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   // browser's own `timeupdate` event, which on a slow connection can lag well behind
   // the moment the user actually dragged/skipped — otherwise the seek bar and clock
   // appear stuck at the old spot until buffering at the new position catches up.
-  const applySeek = (time: number) => {
-    const video = videoRef.current;
-    if (!video) return;
-    const clamped = Math.min(durationSeconds, Math.max(0, time));
-    video.currentTime = clamped;
-    currentTimeRef.current = clamped;
-    setCurrentTime(clamped);
-  };
+  const applySeek = useCallback(
+    (time: number) => {
+      const video = videoRef.current;
+      if (!video) return;
+      const clamped = Math.min(durationSeconds, Math.max(0, time));
+      video.currentTime = clamped;
+      currentTimeRef.current = clamped;
+      setCurrentTime(clamped);
+    },
+    [durationSeconds],
+  );
 
-  const handleSeek = (percent: number) => {
-    if (durationSeconds === 0) return;
-    applySeek((percent / 100) * durationSeconds);
-  };
-
-  const handleSkip = (deltaSeconds: number) => {
-    const video = videoRef.current;
-    if (!video) return;
-    applySeek(video.currentTime + deltaSeconds);
-  };
+  const handleSkip = useCallback(
+    (deltaSeconds: number) => {
+      const video = videoRef.current;
+      if (!video) return;
+      applySeek(video.currentTime + deltaSeconds);
+    },
+    [applySeek],
+  );
 
   const handleQualityChange = (label: string) => {
     const level = qualityLevels.find((l) => l.label === label);
@@ -311,16 +407,53 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
     }
   };
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen?.();
-      setIsFullscreen(true);
+      containerRef.current.requestFullscreen?.().catch(() => {});
     } else {
-      document.exitFullscreen?.();
-      setIsFullscreen(false);
+      document.exitFullscreen?.().catch(() => {});
     }
-  };
+  }, []);
+
+  // Every shortcut confirms itself on screen and wakes the control bar, so the
+  // keyboard never feels like it's doing something invisible.
+  usePlayerHotkeys(hasAccess && Boolean(streamInfo), {
+    onTogglePlay: () => {
+      const willPlay = videoRef.current?.paused ?? false;
+      togglePlay();
+      showHud(willPlay ? Play : Pause);
+      resetHideTimer();
+    },
+    onSeekBy: (delta) => {
+      handleSkip(delta);
+      showHud(delta > 0 ? FastForward : Rewind, `${delta > 0 ? "+" : ""}${delta}s`);
+      resetHideTimer();
+    },
+    onSeekToFraction: (fraction) => {
+      if (durationSeconds <= 0) return;
+      const target = fraction * durationSeconds;
+      applySeek(target);
+      showHud(FastForward, formatTimecode(target));
+      resetHideTimer();
+    },
+    onVolumeBy: (delta) => {
+      const next = Math.min(100, Math.max(0, volume + delta));
+      setVolume(next);
+      if (next > 0 && isMuted) setIsMuted(false);
+      showHud(next === 0 ? VolumeX : next < 50 ? Volume1 : Volume2, `${next}%`, next);
+      resetHideTimer();
+    },
+    onToggleMute: () => {
+      const next = !isMuted;
+      setIsMuted(next);
+      showHud(next ? VolumeX : volume < 50 ? Volume1 : Volume2, next ? "Muted" : `${volume}%`);
+      resetHideTimer();
+    },
+    onToggleFullscreen: toggleFullscreen,
+    onToggleTheater: () => setIsTheater((theater) => !theater),
+    onNextEpisode: nextEpisode ? () => goToEpisode(nextEpisode.id) : undefined,
+  });
 
   if (isLoading) return <PageLoader />;
 
@@ -329,10 +462,10 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
       <div className="flex min-h-screen items-center justify-center p-4">
         <EmptyState
           icon={Clapperboard}
-          title="Movie not found"
+          title={t.player.state.notFound}
           action={
             <Button render={<Link href="/" />} nativeButton={false}>
-              Back to Home
+              {t.player.state.backHome}
             </Button>
           }
         />
@@ -341,177 +474,349 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   }
 
   const notReadyYet = streamError instanceof ApiError && streamError.status === 404;
+  const backHref = movie.seriesId ? `/series/${movie.seriesId}` : `/movie/${movie.id}`;
+  const inWatchlist = isInWatchlist(movie.id);
+  const hasEpisodeNumbers = movie.seriesId && movie.seasonNumber != null && movie.episodeNumber != null;
+  const posterUrl = movie.coverUrl ?? FALLBACK_COVER_URL;
+  const showRail = Boolean(movie.seriesId);
+  const similarItems = (similarMovies ?? []).map((m) => movieToBrowseItem(m, formatDuration(m.duration)));
+  // The bar has to survive a drag and an open menu, and there's no reason to hide
+  // it from a paused picture — nobody is watching anything at that moment.
+  const showControls = controlsVisible || !isPlaying || isScrubbing || isMenuOpen;
 
   return (
-    <div className="flex min-h-screen flex-col bg-black">
-      <div ref={containerRef} onMouseMove={resetHideTimer} className="relative aspect-video w-full bg-black">
-        {!hasStarted && (
-          <Image
-            src={movie.coverUrl ?? FALLBACK_COVER_URL}
-            alt={movie.title}
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover opacity-60"
-          />
+    <div className="relative flex min-h-screen flex-col">
+      <AmbientBackdrop videoRef={videoRef} posterUrl={posterUrl} active={hasStarted} />
+
+      <main
+        className={cn(
+          "mx-auto w-full flex-1 pb-8 lg:px-8 lg:pt-6",
+          isTheater ? "max-w-[1920px]" : "max-w-[1600px]",
         )}
-
-        <video
-          ref={videoRef}
-          className={`absolute inset-0 size-full ${hasStarted ? "opacity-100" : "opacity-0"} ${hasAccess ? "cursor-pointer" : ""}`}
-          playsInline
-          onClick={hasAccess ? handleVideoClick : undefined}
-          onDoubleClick={hasAccess ? handleVideoDoubleClick : undefined}
-          onPlay={() => {
-            setIsPlaying(true);
-            setHasStarted(true);
-          }}
-          onPause={() => setIsPlaying(false)}
-          onWaiting={() => setIsBuffering(true)}
-          onPlaying={() => setIsBuffering(false)}
-          onCanPlay={() => setIsBuffering(false)}
-          onTimeUpdate={(e) => {
-            currentTimeRef.current = e.currentTarget.currentTime;
-            setCurrentTime(e.currentTarget.currentTime);
-          }}
-          onLoadedMetadata={(e) => setDurationSeconds(e.currentTarget.duration)}
-          onEnded={() => saveProgress(true)}
-        />
-
+      >
         <div
-          className={`absolute inset-x-0 top-0 flex items-center gap-3 bg-gradient-to-b from-black/80 to-transparent p-4 transition-opacity duration-300 ${controlsVisible ? "opacity-100" : "opacity-0"}`}
+          className={cn(
+            "lg:grid lg:items-start lg:gap-6",
+            showRail && !isTheater
+              ? "lg:grid-cols-[minmax(0,1fr)_21rem] xl:grid-cols-[minmax(0,1fr)_23rem]"
+              : "lg:grid-cols-1",
+          )}
         >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white hover:bg-white/10 hover:text-white"
-            render={<Link href={movie.seriesId ? `/series/${movie.seriesId}` : `/movie/${movie.id}`} />}
-            nativeButton={false}
-          >
-            <ArrowLeft className="size-5" />
-          </Button>
-          <p className="truncate text-sm font-medium text-white">{movie.title}</p>
-        </div>
-
-        {hasStarted && <NetworkStatusIcon quality={networkQuality} />}
-
-        {hasAccess ? (
-          isStreamLoading ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Loader2 className="size-8 animate-spin text-white/80" />
-            </div>
-          ) : notReadyYet ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 p-4 text-center">
-              <div className="flex size-14 items-center justify-center rounded-full bg-white/10 text-white">
-                <Loader2 className="size-6 animate-spin" />
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-white">Still processing</p>
-                <p className="mt-1 text-sm text-white/70">
-                  This movie is still being prepared for streaming. Check back shortly.
-                </p>
-              </div>
-            </div>
-          ) : streamError ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 p-4 text-center">
-              <div className="flex size-14 items-center justify-center rounded-full bg-destructive/20 text-destructive">
-                <AlertTriangle className="size-6" />
-              </div>
-              <p className="text-sm text-white/70">
-                {streamError instanceof ApiError ? streamError.message : "Couldn't load this video."}
-              </p>
-            </div>
-          ) : (
-            <>
-              {!isPlaying && !isBuffering && (
-                <button
-                  type="button"
-                  onClick={handleVideoClick}
-                  onDoubleClick={handleVideoDoubleClick}
-                  className="absolute inset-0 flex items-center justify-center"
-                  aria-label="Play"
-                >
-                  <span className="flex size-16 items-center justify-center rounded-full bg-primary/90 text-primary-foreground shadow-2xl transition-transform hover:scale-105">
-                    <Play className="size-7 fill-current" />
-                  </span>
-                </button>
+          <div className="flex min-w-0 flex-col gap-5">
+            <div
+              ref={containerRef}
+              onMouseMove={resetHideTimer}
+              className={cn(
+                "relative aspect-video w-full shrink-0 overflow-hidden bg-black",
+                "lg:rounded-3xl lg:shadow-[0_32px_90px_-24px_rgba(0,0,0,0.95)] lg:ring-1 lg:ring-white/10 lg:ring-inset",
+                // A cursor hovering over a playing film is just clutter.
+                !showControls && isPlaying && "cursor-none",
               )}
-              {isBuffering && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="size-10 animate-spin text-white/80" />
-                </div>
+            >
+              {!hasStarted && (
+                <Image
+                  src={posterUrl}
+                  alt={movie.title}
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 70vw"
+                  className="object-cover opacity-45"
+                />
               )}
+
+              <video
+                ref={videoRef}
+                className={cn(
+                  "absolute inset-0 size-full object-contain transition-opacity duration-500",
+                  hasStarted ? "opacity-100" : "opacity-0",
+                  hasAccess && "cursor-pointer",
+                )}
+                playsInline
+                onClick={hasAccess ? handleVideoClick : undefined}
+                onDoubleClick={hasAccess ? handleVideoDoubleClick : undefined}
+                onPlay={() => {
+                  setIsPlaying(true);
+                  setHasStarted(true);
+                  setUpNextSeconds(null);
+                }}
+                onPause={() => setIsPlaying(false)}
+                onWaiting={() => setIsBuffering(true)}
+                onPlaying={() => setIsBuffering(false)}
+                onCanPlay={() => setIsBuffering(false)}
+                onTimeUpdate={(e) => {
+                  currentTimeRef.current = e.currentTarget.currentTime;
+                  setCurrentTime(e.currentTarget.currentTime);
+                }}
+                onLoadedMetadata={(e) => setDurationSeconds(e.currentTarget.duration)}
+                onEnded={() => {
+                  saveProgress(true);
+                  if (nextEpisode) setUpNextSeconds(UP_NEXT_COUNTDOWN_SECONDS);
+                }}
+              />
 
               <div
-                className={`absolute inset-x-0 bottom-0 transition-opacity duration-300 ${controlsVisible || !isPlaying ? "opacity-100" : "opacity-0"}`}
+                className={cn(
+                  "absolute inset-x-0 top-0 z-10 flex items-center gap-3 bg-gradient-to-b from-black/85 via-black/35 to-transparent p-3 pr-14 pb-14 transition-opacity duration-300 ease-out sm:p-4 sm:pr-16 sm:pb-16",
+                  showControls ? "opacity-100" : "pointer-events-none opacity-0",
+                )}
               >
-                <PlayerControls
-                  isPlaying={isPlaying}
-                  onTogglePlay={togglePlay}
-                  progress={progress}
-                  onSeek={handleSeek}
-                  onSkip={handleSkip}
-                  currentTime={formatClock(currentTime)}
-                  duration={formatClock(durationSeconds)}
-                  durationSeconds={durationSeconds}
-                  bufferedRanges={bufferedRanges}
-                  prefetchStatus={prefetchStatus}
-                  volume={volume}
-                  onVolumeChange={setVolume}
-                  isMuted={isMuted}
-                  onToggleMute={() => setIsMuted((m) => !m)}
-                  isFullscreen={isFullscreen}
-                  onToggleFullscreen={toggleFullscreen}
-                  speed={speed}
-                  onSpeedChange={setSpeed}
-                  qualityOptions={qualityLevels.map((l) => l.label)}
-                  quality={quality}
-                  onQualityChange={handleQualityChange}
-                  subtitle={subtitle}
-                  onSubtitleChange={setSubtitle}
-                  audio={audio}
-                  onAudioChange={setAudio}
-                  fullscreenContainerRef={containerRef}
-                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-10 shrink-0 rounded-full bg-black/40 text-white ring-1 ring-white/12 backdrop-blur-xl ring-inset hover:bg-white/20 hover:text-white"
+                  render={<Link href={backHref} />}
+                  nativeButton={false}
+                  onClick={() => {
+                    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+                  }}
+                  aria-label={t.common.back}
+                >
+                  <ArrowLeft className="size-5" />
+                </Button>
+                <div className="min-w-0 flex-1">
+                  {movie.seriesId && parentSeries && (
+                    <p className="truncate text-[10px] leading-none font-semibold tracking-[0.18em] text-white/55 uppercase">
+                      {parentSeries.title}
+                    </p>
+                  )}
+                  <p className="mt-1 truncate font-heading text-sm font-semibold tracking-tight text-white sm:text-base">
+                    {movie.title}
+                  </p>
+                </div>
               </div>
-            </>
-          )
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/70 p-4 text-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-white/10 text-white">
-              <Lock className="size-6" />
-            </div>
-            <div>
-              <p className="text-lg font-semibold text-white">Subscribe to watch</p>
-              <p className="mt-1 text-sm text-white/70">
-                {movie.seriesId
-                  ? "Episodes are unlocked by an active subscription — one plan covers every episode."
-                  : `${movie.title} requires an active subscription to stream.`}
-              </p>
-            </div>
-            <Button onClick={() => setSubscribeOpen(true)}>
-              <Play className="size-4 fill-current" />
-              Subscribe
-            </Button>
-          </div>
-        )}
-      </div>
 
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <div>
-          <h1 className="text-xl font-bold sm:text-2xl">{movie.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {movie.releaseYear} &middot; {formatDuration(movie.duration)}
-          </p>
-          <p className="mt-3 max-w-2xl text-sm text-muted-foreground">{movie.description}</p>
+              {hasStarted && <NetworkStatusIcon quality={networkQuality} />}
+
+              <PlayerHud message={hud} />
+
+              {hasAccess ? (
+                isStreamLoading ? (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="size-9 animate-spin text-white/80" />
+                  </div>
+                ) : notReadyYet ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/70 p-6 text-center backdrop-blur-md">
+                    <div className="flex size-14 items-center justify-center rounded-full bg-white/8 text-white ring-1 ring-white/12 ring-inset">
+                      <Loader2 className="size-6 animate-spin" />
+                    </div>
+                    <div>
+                      <p className="font-heading text-lg font-semibold tracking-tight text-white">
+                        {t.player.state.processingTitle}
+                      </p>
+                      <p className="mt-1.5 max-w-sm text-sm text-white/70">{t.player.state.processingBody}</p>
+                    </div>
+                  </div>
+                ) : streamError ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/70 p-6 text-center backdrop-blur-md">
+                    <div className="flex size-14 items-center justify-center rounded-full bg-destructive/15 text-destructive ring-1 ring-destructive/25 ring-inset">
+                      <AlertTriangle className="size-6" />
+                    </div>
+                    <p className="max-w-sm text-sm text-white/70">
+                      {streamError instanceof ApiError ? streamError.message : t.player.state.playbackError}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {!isPlaying && !isBuffering && upNextSeconds === null && (
+                      <button
+                        type="button"
+                        onClick={togglePlay}
+                        className="group absolute inset-0 flex items-center justify-center outline-none"
+                        aria-label={t.player.meta.play}
+                      >
+                        <span className="flex size-16 items-center justify-center rounded-full bg-primary/95 text-primary-foreground shadow-[0_10px_45px_rgba(0,0,0,0.55)] ring-4 ring-white/10 transition-[transform,background-color] duration-200 ease-out group-hover:scale-105 group-hover:bg-primary group-focus-visible:scale-105 group-active:scale-95 sm:size-20">
+                          <Play className="size-7 translate-x-0.5 fill-current sm:size-9" />
+                        </span>
+                      </button>
+                    )}
+
+                    {isBuffering && (
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                        <Loader2 className="size-10 animate-spin text-white/85" />
+                      </div>
+                    )}
+
+                    {upNextSeconds !== null && nextEpisode && (
+                      <UpNextOverlay
+                        episode={nextEpisode}
+                        secondsRemaining={upNextSeconds}
+                        totalSeconds={UP_NEXT_COUNTDOWN_SECONDS}
+                        onPlayNow={() => goToEpisode(nextEpisode.id)}
+                        onCancel={() => setUpNextSeconds(null)}
+                      />
+                    )}
+
+                    <div
+                      className={cn(
+                        "absolute inset-x-0 bottom-0 z-10 transition-opacity duration-300",
+                        showControls ? "opacity-100" : "pointer-events-none opacity-0",
+                      )}
+                    >
+                      <PlayerControls
+                        isPlaying={isPlaying}
+                        onTogglePlay={togglePlay}
+                        currentTimeSeconds={currentTime}
+                        durationSeconds={durationSeconds}
+                        onSeek={applySeek}
+                        onSkip={handleSkip}
+                        onScrubbingChange={setIsScrubbing}
+                        bufferedRanges={bufferedRanges}
+                        prefetchStatus={prefetchStatus}
+                        volume={volume}
+                        onVolumeChange={setVolume}
+                        isMuted={isMuted}
+                        onToggleMute={() => setIsMuted((m) => !m)}
+                        isFullscreen={isFullscreen}
+                        onToggleFullscreen={toggleFullscreen}
+                        isTheater={isTheater}
+                        onToggleTheater={() => setIsTheater((theater) => !theater)}
+                        speed={speed}
+                        onSpeedChange={setSpeed}
+                        qualityOptions={qualityLevels.map((l) => l.label)}
+                        quality={quality}
+                        onQualityChange={handleQualityChange}
+                        subtitle={subtitle}
+                        onSubtitleChange={setSubtitle}
+                        audio={audio}
+                        onAudioChange={setAudio}
+                        fullscreenContainerRef={containerRef}
+                        onNextEpisode={nextEpisode ? () => goToEpisode(nextEpisode.id) : undefined}
+                        onMenuOpenChange={setIsMenuOpen}
+                      />
+                    </div>
+                  </>
+                )
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/70 p-6 text-center backdrop-blur-md">
+                  <div className="flex size-14 items-center justify-center rounded-full bg-premium/15 text-premium ring-1 ring-premium/30 ring-inset">
+                    <Lock className="size-6" />
+                  </div>
+                  <div>
+                    <p className="font-heading text-lg font-semibold tracking-tight text-white">
+                      {t.player.state.lockedTitle}
+                    </p>
+                    <p className="mt-1.5 max-w-sm text-sm text-white/70">
+                      {movie.seriesId
+                        ? t.player.state.lockedEpisodeBody
+                        : t.player.state.lockedMovieBody(movie.title)}
+                    </p>
+                  </div>
+                  <Button className="h-11 rounded-full px-5" onClick={() => setSubscribeOpen(true)}>
+                    <Sparkles className="size-4" />
+                    {t.player.state.subscribe}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-4 px-4 sm:px-6 lg:px-0">
+              <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+                <div className="min-w-0">
+                  {movie.seriesId && parentSeries ? (
+                    <Link
+                      href={`/series/${movie.seriesId}`}
+                      className="focus-ring rounded-sm text-[11px] font-semibold tracking-[0.18em] text-primary uppercase transition-colors duration-150 ease-out hover:text-primary/80"
+                    >
+                      {parentSeries.title}
+                    </Link>
+                  ) : (
+                    <Kicker>{t.nav.movies}</Kicker>
+                  )}
+                  <h1 className="mt-1.5 text-title">{movie.title}</h1>
+                  {hasEpisodeNumbers && (
+                    <p className="mt-1.5 text-sm text-muted-foreground nums">
+                      {t.player.meta.seasonEpisode(movie.seasonNumber!, movie.episodeNumber!)}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleWatchlist(movie.id)}
+                    aria-pressed={inWatchlist}
+                    className={cn(
+                      "focus-ring flex h-11 items-center gap-2 rounded-full px-5 text-sm font-medium ring-1 backdrop-blur-md transition-colors duration-150 ease-out ring-inset",
+                      inWatchlist
+                        ? "bg-primary/20 text-foreground ring-primary/50"
+                        : "bg-white/8 text-white ring-white/20 hover:bg-white/15",
+                    )}
+                  >
+                    {inWatchlist ? <Check className="size-4" /> : <Plus className="size-4" />}
+                    {inWatchlist ? t.player.meta.inWatchlist : t.player.meta.addToWatchlist}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShareOpen(true)}
+                    aria-label={t.player.meta.share}
+                    className="focus-ring flex size-11 items-center justify-center rounded-full bg-white/8 text-white ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 ease-out ring-inset hover:bg-white/15"
+                  >
+                    <Share2 className="size-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {accessType && <AccessBadge accessType={accessType} />}
+                {movie.rating > 0 && (
+                  <Chip tone="premium" size="sm" className="font-semibold">
+                    <Star className="fill-current" />
+                    <span className="nums">{movie.rating.toFixed(1)}</span>
+                  </Chip>
+                )}
+                <Chip tone="neutral" size="sm" variant="outline">
+                  <Calendar />
+                  <span className="nums">{movie.releaseYear}</span>
+                </Chip>
+                <Chip tone="neutral" size="sm" variant="outline">
+                  <Clock />
+                  <span className="nums">{formatDuration(movie.duration)}</span>
+                </Chip>
+                <Chip tone="neutral" size="sm" variant="outline">
+                  {movie.genre}
+                </Chip>
+                {movie.categories.map((category) => (
+                  <Chip key={category.id} tone="neutral" size="sm" variant="outline">
+                    {category.name}
+                  </Chip>
+                ))}
+              </div>
+
+              <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{movie.description}</p>
+
+              <p className="hidden text-xs text-muted-foreground/60 lg:block">{t.player.meta.shortcutsHint}</p>
+            </div>
+          </div>
+
+          {showRail && (
+            // top-[4.5rem] clears the sticky h-14 context bar above the player.
+            <div className={cn("px-4 sm:px-6 lg:px-0", isTheater ? "mt-6" : "lg:sticky lg:top-[4.5rem]")}>
+              <EpisodeRail
+                seriesId={movie.seriesId!}
+                currentEpisodeId={movie.id}
+                variant={isTheater ? "inline" : "sidebar"}
+              />
+            </div>
+          )}
         </div>
 
-        {movie.seriesId && <EpisodesSection seriesId={movie.seriesId} currentEpisodeId={movie.id} />}
-      </div>
-
-      <MovieRow title="Recommended Movies" movies={similarMovies ?? []} />
+        {similarItems.length > 0 || isSimilarLoading ? (
+          // -mx-8 cancels main's lg:px-8 so the rail's own px-8 lines its
+          // heading up with the player content while the scroller still
+          // bleeds to the container edge, matching the movies page.
+          <div className="mt-8 lg:-mx-8">
+            <PosterRail title={t.player.meta.recommended} items={similarItems} isLoading={isSimilarLoading} />
+          </div>
+        ) : null}
+      </main>
 
       <SubscribeDialog open={subscribeOpen} onOpenChange={setSubscribeOpen} />
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title={movie.title}
+        url={typeof window !== "undefined" ? window.location.href : ""}
+      />
     </div>
   );
 }

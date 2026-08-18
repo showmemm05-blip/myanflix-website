@@ -4,8 +4,8 @@ export type UserStatus = "ACTIVE" | "SUSPENDED" | "BANNED";
 export interface AppUser {
   id: string;
   name: string;
-  email: string;
-  avatarUrl: string;
+  phone: string | null;
+  avatarUrl: string | null;
   role: UserRole;
   status: UserStatus;
   walletBalance: number;

@@ -28,6 +28,8 @@ interface AuthContextValue {
   verifyOtp: (phone: string, code: string, password?: string) => Promise<void>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
+  /** Replace the in-memory user (e.g. after an avatar change) so every consumer — navbar included — updates instantly. */
+  updateUser: (user: AppUser) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -115,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         verifyOtp,
         logout,
         refreshProfile: loadProfile,
+        updateUser: setUser,
       }}
     >
       {children}

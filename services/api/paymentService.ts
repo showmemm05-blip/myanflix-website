@@ -68,12 +68,19 @@ export const paymentService = {
    * balance does not move until an admin approves it (see the wallet page's
    * realtime handling for the approval/rejection update).
    */
-  requestDeposit(amount: number, method: string, reference: string, accountName?: string): Promise<Deposit> {
+  requestDeposit(
+    amount: number,
+    method: string,
+    reference: string,
+    accountName?: string,
+    paymentAccountId?: string,
+  ): Promise<Deposit> {
     return apiClient.post<Deposit>("/deposits", {
       amount,
       paymentMethod: method,
       accountName,
       reference,
+      paymentAccountId,
     });
   },
 
@@ -91,12 +98,15 @@ export const paymentService = {
     accountType: string,
     accountName: string,
     accountNumber: string,
+    /** Only sent for bank-transfer account types; omitted entirely otherwise. */
+    bankName?: string,
   ): Promise<Withdrawal> {
     return apiClient.post<Withdrawal>("/withdrawals", {
       amount,
       accountType,
       accountName,
       accountNumber,
+      ...(bankName ? { bankName } : {}),
     });
   },
 

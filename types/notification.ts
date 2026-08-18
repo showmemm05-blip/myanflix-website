@@ -8,7 +8,8 @@ export type NotificationType =
   | "DEPOSIT_APPROVED"
   | "DEPOSIT_REJECTED"
   | "WITHDRAWAL_APPROVED"
-  | "WITHDRAWAL_REJECTED";
+  | "WITHDRAWAL_REJECTED"
+  | "BALANCE_ADJUSTED";
 
 export interface AppNotification {
   id: string;

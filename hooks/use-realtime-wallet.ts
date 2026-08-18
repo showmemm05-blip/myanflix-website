@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getSocket } from "@/lib/socket";
-import { formatKyat } from "@/lib/currency";
+import { useLanguage } from "@/lib/context/language-context";
 import type { WalletSummary } from "@/services/api/paymentService";
 import type { DepositStatus, WithdrawalStatus } from "@/types/transaction";
 
@@ -40,6 +40,7 @@ interface WalletBalanceUpdatedPayload {
  */
 export function useRealtimeWallet() {
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
 
   useEffect(() => {
     const socket = getSocket();
@@ -56,12 +57,12 @@ export function useRealtimeWallet() {
       queryClient.invalidateQueries({ queryKey: ["deposits"] });
 
       if (payload.status === "APPROVED") {
-        toast.success("Deposit approved", {
-          description: "Your deposit has been approved and your balance has been updated.",
+        toast.success(t.wallet.toastDepositApproved, {
+          description: t.wallet.toastDepositApprovedBody,
         });
       } else if (payload.status === "REJECTED") {
-        toast.error("Deposit rejected", {
-          description: payload.rejectionReason ?? `Your deposit of ${formatKyat(payload.amount)} was rejected.`,
+        toast.error(t.wallet.toastDepositRejected, {
+          description: payload.rejectionReason ?? undefined,
         });
       }
     };
@@ -71,12 +72,12 @@ export function useRealtimeWallet() {
       queryClient.invalidateQueries({ queryKey: ["withdrawals"] });
 
       if (payload.status === "APPROVED") {
-        toast.success("Withdrawal approved", {
-          description: `Your withdrawal of ${formatKyat(payload.amount)} has been approved and deducted from your balance.`,
+        toast.success(t.wallet.toastWithdrawalApproved, {
+          description: t.wallet.toastWithdrawalApprovedBody,
         });
       } else if (payload.status === "REJECTED") {
-        toast.error("Withdrawal rejected", {
-          description: payload.rejectionReason ?? `Your withdrawal of ${formatKyat(payload.amount)} was rejected.`,
+        toast.error(t.wallet.toastWithdrawalRejected, {
+          description: payload.rejectionReason ?? undefined,
         });
       }
     };
@@ -97,5 +98,5 @@ export function useRealtimeWallet() {
       socket.off("withdrawal.updated", handleWithdrawalUpdated);
       socket.off("notification.created", handleNotificationCreated);
     };
-  }, [queryClient]);
+  }, [queryClient, t]);
 }

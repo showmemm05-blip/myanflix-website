@@ -1,5 +1,18 @@
-export type TransactionType = "PURCHASE" | "SUBSCRIPTION" | "DEPOSIT" | "REFUND" | "WITHDRAWAL";
+export type TransactionType =
+  | "PURCHASE"
+  | "SUBSCRIPTION"
+  | "DEPOSIT"
+  | "REFUND"
+  | "WITHDRAWAL"
+  | "ADJUSTMENT_CREDIT"
+  | "ADJUSTMENT_DEBIT";
 export type TransactionStatus = "COMPLETED" | "PENDING" | "FAILED";
+
+/**
+ * Transaction-list filter chips. "ADJUSTMENTS" is a combined chip covering
+ * both adjustment directions — one concept to the user, two ledger types.
+ */
+export type TransactionTypeFilter = TransactionType | "all" | "ADJUSTMENTS";
 
 export interface Transaction {
   id: string;
@@ -33,6 +46,8 @@ export interface Withdrawal {
   accountType: string;
   accountName: string;
   accountNumber: string;
+  /** Only captured for bank-transfer account types — a snapshot of this request, not the profile. */
+  bankName: string | null;
   status: WithdrawalStatus;
   rejectionReason: string | null;
   approvedAt: string | null;
