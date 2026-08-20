@@ -9,6 +9,8 @@ import type {
 interface BackendUser {
   id: string;
   username: string;
+  /** Cosmetic name the profile modal edits; null until the user sets one. */
+  displayName?: string | null;
   phone: string | null;
   /** Absolute URL computed by the backend per-request; null when no photo is set. */
   avatarUrl: string | null;
@@ -24,9 +26,14 @@ interface BackendUser {
 }
 
 function mapUser(u: BackendUser): AppUser {
+  const displayName = u.displayName?.trim() ? u.displayName : null;
   return {
     id: u.id,
-    name: u.username,
+    // The display name wins wherever a human name is shown; the username is
+    // the fallback because every account has one and most have no display name.
+    name: displayName ?? u.username,
+    username: u.username,
+    displayName,
     phone: u.phone ?? null,
     avatarUrl: u.avatarUrl ?? null,
     role: u.role,
@@ -68,12 +75,26 @@ export const profileService = {
     return mapUser(user);
   },
 
-  changePassword(
-    _currentPassword: string,
-    _newPassword: string,
-  ): Promise<void> {
-    // No backend endpoint yet for self-service password change.
-    return Promise.resolve();
+  /**
+   * Updates the cosmetic display name — `null` clears it and falls the UI back
+   * to the username. Returns the refreshed user (same shape as GET /users/me),
+   * so callers can hand it straight to the auth context.
+   */
+  async updateProfile(displayName: string | null): Promise<AppUser> {
+    const user = await apiClient.patch<BackendUser>("/users/me", { displayName });
+    return mapUser(user);
+  },
+
+  /**
+   * Real self-service password change. A wrong current password comes back as
+   * a 400 ApiError carrying the backend's message, which the caller surfaces on
+   * the current-password field. Existing sessions stay signed in by design.
+   */
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await apiClient.patch<{ changed: boolean }>("/users/me/password", {
+      currentPassword,
+      newPassword,
+    });
   },
 
   getNotificationPreferences(): Promise<NotificationPreferences> {

@@ -1,4 +1,4 @@
-import { apiClient } from "./apiClient";
+import { apiClient, type RequestSignalOptions } from "./apiClient";
 import { mapMovie, type BackendMovie } from "./movieService";
 import type { PaginatedResponse, PaginationParams } from "@/types/api";
 import type { Movie } from "@/types/movie";
@@ -11,8 +11,12 @@ import type {
 } from "@/types/series";
 
 export const seriesService = {
-  getSeries(pagination: PaginationParams = {}) {
-    return apiClient.get<PaginatedResponse<SeriesListItem>>("/series", { params: pagination });
+  /** `options` (optional, last) carries React Query's AbortSignal down to axios. */
+  getSeries(pagination: PaginationParams = {}, options: RequestSignalOptions = {}) {
+    return apiClient.get<PaginatedResponse<SeriesListItem>>("/series", {
+      ...options,
+      params: pagination,
+    });
   },
 
   async getSeriesById(id: string): Promise<Series | null> {

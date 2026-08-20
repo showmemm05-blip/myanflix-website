@@ -8,3 +8,6 @@ export { searchService } from "./searchService";
 export { historyService } from "./historyService";
 export { watchlistService } from "./watchlistService";
 export { notificationService } from "./notificationService";
+export { peakUsersService } from "./peakUsersService";
+export { commentService } from "./commentService";
+export { feedbackService } from "./feedbackService";

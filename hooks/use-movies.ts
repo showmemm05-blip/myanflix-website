@@ -1,16 +1,43 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { movieService } from "@/services/api/movieService";
 import { searchService } from "@/services/api/searchService";
 import { historyService } from "@/services/api/historyService";
+import { SEARCH_STALE_TIME_MS } from "@/hooks/use-search-term";
 import type { MovieQuery } from "@/types/movie";
 
 const CONTINUE_WATCHING_MIN_PERCENT = 1;
 const CONTINUE_WATCHING_MAX_PERCENT = 95;
 
+/**
+ * The catalogue query. It is also the search query — searching is this same
+ * list with a `search` param, not a separate stack.
+ *
+ * WHY A LATE RESPONSE CAN'T OVERWRITE A NEWER ONE — two mechanisms, belt and
+ * braces, and deliberately no third:
+ *
+ * 1. **Cancellation.** `queryFn` consumes React Query's `signal` and forwards
+ *    it into axios. Consuming it is also what gives React Query permission to
+ *    abort on unsubscribe, so the moment the key changes ("avengers" → "avatar")
+ *    the superseded request is aborted mid-flight and never resolves at all.
+ * 2. **Keying.** Every result is cached under its own `["movies", query]` key.
+ *    So even a response that outruns the abort resolves into the "avengers"
+ *    cache entry — never into the "avatar" entry the screen is rendering.
+ *
+ * That is why there is no request-id / sequence guard here: keying already
+ * makes a stale write impossible, and a hand-rolled guard would be a third
+ * mechanism with nothing left to catch.
+ *
+ * `staleTime` (with React Query's dedupe of identical in-flight keys) keeps a
+ * just-searched term from being asked twice, and `keepPreviousData` holds the
+ * previous results on screen while the next ones load, so the grid never
+ * flashes empty between terms.
+ */
 export function useMovies(query: MovieQuery = {}) {
   return useQuery({
     queryKey: ["movies", query],
-    queryFn: () => movieService.getMovies(query),
+    queryFn: ({ signal }) => movieService.getMovies(query, { signal }),
+    placeholderData: keepPreviousData,
+    staleTime: SEARCH_STALE_TIME_MS,
   });
 }
 

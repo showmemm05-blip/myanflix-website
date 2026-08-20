@@ -30,16 +30,32 @@ const DENSITY_SIZES: Record<GridDensity, string> = {
 export function PosterGrid({
   items,
   isLoading,
+  isStale = false,
   density = "comfortable",
   skeletonCount = 18,
 }: {
   items: BrowseItem[];
   isLoading?: boolean;
+  /**
+   * These cards answer a question the page is no longer asking — the query is
+   * fetching a new key and these are the previous one's results, held over so
+   * the grid doesn't flash empty. They stay readable and clickable (they were
+   * true a moment ago) but visibly recede, so the heading above them isn't
+   * read as a label for what's on screen.
+   */
+  isStale?: boolean;
   density?: GridDensity;
   skeletonCount?: number;
 }) {
   return (
-    <div className={cn("grid", DENSITY_CLASS[density])}>
+    <div
+      aria-busy={isLoading || isStale}
+      className={cn(
+        "grid transition-opacity duration-200 ease-out",
+        DENSITY_CLASS[density],
+        isStale && "opacity-45",
+      )}
+    >
       {isLoading
         ? Array.from({ length: skeletonCount }).map((_, i) => <MediaCardSkeleton key={i} />)
         : items.map((item) => <MediaCard key={item.id} item={item} sizes={DENSITY_SIZES[density]} />)}

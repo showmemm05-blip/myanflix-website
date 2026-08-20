@@ -274,7 +274,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
         )}
       </section>
 
-      <CommentsSection titleId={series.id} />
+      <CommentsSection seriesId={series.id} />
 
       <div className="h-16" />
 

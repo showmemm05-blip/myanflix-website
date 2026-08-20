@@ -1,4 +1,4 @@
-import { apiClient } from "./apiClient";
+import { apiClient, type RequestSignalOptions } from "./apiClient";
 import type { PaginatedResponse, PaginationParams } from "@/types/api";
 import type { Category } from "@/types/category";
 import type { Movie, MovieQuery } from "@/types/movie";
@@ -96,11 +96,21 @@ function applyClientFilters(movies: Movie[], query: MovieQuery): Movie[] {
 }
 
 export const movieService = {
-  async getMovies(query: MovieQuery = {}): Promise<PaginatedResponse<Movie>> {
+  /**
+   * The catalogue read — and the app's one search request.
+   *
+   * `options` is last and optional so every existing caller is untouched; it
+   * carries React Query's `AbortSignal` through to axios so a search the user
+   * has already typed past is cancelled rather than finished.
+   */
+  async getMovies(
+    query: MovieQuery = {},
+    options: RequestSignalOptions = {},
+  ): Promise<PaginatedResponse<Movie>> {
     const { sort, language, minRating, releaseYear, ...backendParams } = query;
     const res = await apiClient.get<{ items: BackendMovie[]; total: number; page: number; limit: number }>(
       "/movies",
-      { params: backendParams },
+      { ...options, params: backendParams },
     );
     const filtered = applyClientFilters(res.items.map(mapMovie), { language, minRating, releaseYear });
     return { ...res, items: applyClientSort(filtered, sort), total: filtered.length };

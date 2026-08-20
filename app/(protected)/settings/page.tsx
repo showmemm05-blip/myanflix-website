@@ -62,8 +62,6 @@ export default function SettingsPage() {
       prefsError={isError}
       onRetryPrefs={() => refetch()}
       onUpdatePref={updatePref}
-      onSaveProfile={() => toast.info(t.settings.stubNotice)}
-      onUpdatePassword={() => toast.info(t.settings.stubNotice)}
       deleteOpen={deleteOpen}
       onDeleteOpenChange={setDeleteOpen}
       isDeleting={isDeleting}

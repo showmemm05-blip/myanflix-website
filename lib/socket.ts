@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import { API_ORIGIN } from "@/services/api/apiClient";
+import { API_ORIGIN, CLIENT_PLATFORM } from "@/services/api/apiClient";
 
 /**
  * Singleton Socket.IO client shared across the app. Connected on
@@ -15,7 +15,11 @@ export function connectSocket(token: string): Socket {
   socket?.disconnect();
   socketToken = token;
   socket = io(API_ORIGIN, {
-    auth: { token },
+    // `platform` rides along in the handshake because a live socket is what
+    // makes a user "online" in the admin's presence view — without it the
+    // gateway can see that someone is connected but not from where, and one
+    // person on the site and the app would collapse into one anonymous dot.
+    auth: { token, platform: CLIENT_PLATFORM },
     transports: ["websocket"],
   });
   return socket;

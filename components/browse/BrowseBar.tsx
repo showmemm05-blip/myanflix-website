@@ -1,15 +1,25 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ArrowDownWideNarrow, LayoutGrid, Rows3, Search, SlidersHorizontal, X } from "lucide-react";
+import { useId, useRef, useState } from "react";
+import {
+  ArrowDownWideNarrow,
+  LayoutGrid,
+  LoaderCircle,
+  Rows3,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SEARCH_MIN_LENGTH } from "@/hooks/use-search-term";
 import { useLanguage } from "@/lib/context/language-context";
 import { cn } from "@/lib/utils";
 import { BROWSE_GENRES } from "./genres";
@@ -57,6 +67,8 @@ export function BrowseBar({
   onOpenFilters,
   activeFilterCount,
   searchAlwaysOpen = false,
+  isSearching = false,
+  isTooShort = false,
 }: {
   tab: BrowseTab;
   onTabChange: (tab: BrowseTab) => void;
@@ -73,9 +85,18 @@ export function BrowseBar({
   activeFilterCount: number;
   /** The Search destination keeps the field unfolded even when it's empty. */
   searchAlwaysOpen?: boolean;
+  /**
+   * A search is on its way — INCLUDING the debounce window, which is most of
+   * the wait and the part the user would otherwise experience as the page
+   * quietly ignoring them.
+   */
+  isSearching?: boolean;
+  /** The term is 1 character: nothing was sent, and the field says why. */
+  isTooShort?: boolean;
 }) {
   const { t } = useLanguage();
   const searchable = tab === "movies" || tab === "series";
+  const hintId = useId();
 
   // UI-only state: whether the user unfolded the field. The field also counts
   // as open whenever a query is active (e.g. restored from the URL), so what
@@ -158,7 +179,8 @@ export function BrowseBar({
                 <SelectTrigger
                   className={cn(
                     "hidden h-9 w-auto gap-1.5 rounded-full px-3.5 text-sm hover:bg-white/10 sm:flex",
-                    genre && "bg-primary/15 text-foreground ring-primary/40",
+                    genre &&
+                      "border-primary/40 bg-primary/15 text-foreground hover:border-primary/60 hover:bg-primary/25",
                   )}
                   aria-label={t.filters.genre}
                 >
@@ -166,8 +188,9 @@ export function BrowseBar({
                     {(value) => (String(value) === ALL_GENRES ? t.browse.allGenres : String(value))}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent align="end">
                   <SelectItem value={ALL_GENRES}>{t.browse.allGenres}</SelectItem>
+                  <SelectSeparator />
                   {BROWSE_GENRES.map((option) => (
                     <SelectItem key={option} value={option}>
                       {option}
@@ -190,7 +213,7 @@ export function BrowseBar({
                     </SelectValue>
                   </span>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent align="end">
                   {sortOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
@@ -229,7 +252,18 @@ export function BrowseBar({
           {searchable && open && (
             <div className="absolute inset-0 z-10 flex items-center gap-1.5 bg-background sm:static sm:z-auto sm:order-last sm:ml-1.5 sm:w-64 sm:bg-transparent">
               <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                {/* The field's own glyph doubles as its progress indicator —
+                    the search icon spins in place. Nothing moves, nothing is
+                    added to the row, and the signal is where the user is
+                    already looking. */}
+                {isSearching ? (
+                  <LoaderCircle
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 animate-spin text-primary"
+                  />
+                ) : (
+                  <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                )}
                 <Input
                   ref={inputRef}
                   value={search}
@@ -242,8 +276,22 @@ export function BrowseBar({
                     if (search.trim().length === 0) setSearchOpen(false);
                   }}
                   placeholder={placeholder}
+                  aria-busy={isSearching}
+                  aria-describedby={isTooShort ? hintId : undefined}
                   className="h-9 rounded-full pr-3 pl-10"
                 />
+                {/* Why nothing happened, said quietly and next to the cause.
+                    It hangs below the bar rather than widening it, so a stray
+                    keystroke never reflows the whole strip. */}
+                {isTooShort && (
+                  <p
+                    id={hintId}
+                    role="status"
+                    className="pointer-events-none absolute top-full left-2 z-10 mt-1.5 rounded-full bg-background/95 px-2.5 py-1 text-[11px] whitespace-nowrap text-muted-foreground ring-1 ring-white/10 ring-inset backdrop-blur-md"
+                  >
+                    {t.browse.searchMinLength(SEARCH_MIN_LENGTH)}
+                  </p>
+                )}
               </div>
               <button
                 type="button"

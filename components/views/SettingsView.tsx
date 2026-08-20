@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Pencil, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { ConfirmDialog } from "@/components/modals/ConfirmDialog";
 import { ErrorState } from "@/components/empty/ErrorState";
 import { SectionHeader, Surface } from "@/components/system";
 import { AccountShell } from "@/components/views/AccountShell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -29,16 +29,13 @@ export interface SettingsViewProps {
   onRetryPrefs: () => void;
   onUpdatePref: (key: keyof NotificationPreferences, value: boolean) => void;
   /** Stub — the page fires the localized "not connected" toast. */
-  onSaveProfile: () => void;
   /** Stub — the page fires the localized "not connected" toast. */
-  onUpdatePassword: () => void;
   deleteOpen: boolean;
   onDeleteOpenChange: (open: boolean) => void;
   isDeleting: boolean;
   onConfirmDelete: () => void;
 }
 
-const inputClass = "h-11 rounded-xl border-white/10 bg-white/[0.04] px-3.5 dark:bg-white/[0.04]";
 const selectTriggerClass =
   "h-11 w-full rounded-xl border-white/10 bg-white/[0.04] px-3.5 data-[size=default]:h-11 sm:w-64 dark:bg-white/[0.04] dark:hover:bg-white/8";
 
@@ -89,15 +86,13 @@ export function SettingsView({
   prefsError,
   onRetryPrefs,
   onUpdatePref,
-  onSaveProfile,
-  onUpdatePassword,
   deleteOpen,
   onDeleteOpenChange,
   isDeleting,
   onConfirmDelete,
 }: SettingsViewProps) {
   const { t, language, setLanguage } = useLanguage();
-  const [name, setName] = useState(user.name);
+  const [editOpen, setEditOpen] = useState(false);
 
   const prefItems: {
     key: keyof NotificationPreferences;
@@ -128,38 +123,30 @@ export function SettingsView({
 
   return (
     <AccountShell>
+      <ProfileEditDialog open={editOpen} onOpenChange={setEditOpen} user={user} />
       <PageHeader eyebrow={t.settings.eyebrow} title={t.settings.title} subtitle={t.settings.subtitle} />
 
       <div className="flex flex-col gap-5">
-        <SettingsPanel title={t.settings.profileSection} description={t.settings.profileDescription}>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="settings-name">{t.profile.fullNameLabel}</Label>
-            <Input
-              id="settings-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={inputClass}
-            />
+        {/* One surface for account edits. These panels used to hold their own
+            name field and password inputs whose buttons only toasted "not
+            connected to the backend yet" — two fake copies of what the profile
+            modal now does for real. */}
+        <SettingsPanel
+          title={t.settings.profileSection}
+          description={t.settings.profileDescription}
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              className="h-11 w-fit rounded-full px-6"
+              onClick={() => setEditOpen(true)}
+            >
+              <Pencil className="size-4" />
+              {t.profile.editProfile}
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              {t.settings.editProfileHint}
+            </p>
           </div>
-          <Button className="h-11 w-fit rounded-full px-6" onClick={onSaveProfile}>
-            {t.common.save}
-          </Button>
-        </SettingsPanel>
-
-        <SettingsPanel title={t.settings.passwordSection} description={t.settings.passwordDescription}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="current-password">{t.profile.currentPasswordLabel}</Label>
-              <Input id="current-password" type="password" className={inputClass} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="new-password">{t.profile.newPasswordLabel}</Label>
-              <Input id="new-password" type="password" className={inputClass} />
-            </div>
-          </div>
-          <Button variant="outline" className="h-11 w-fit rounded-full px-6" onClick={onUpdatePassword}>
-            {t.profile.changePassword}
-          </Button>
         </SettingsPanel>
 
         <SettingsPanel

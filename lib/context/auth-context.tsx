@@ -64,11 +64,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       onUnauthorized(() => {
         setUser(null);
         disconnectSocket();
-        // Wipes every cached query (wallet balance, subscription plans,
+        // Wipes cached PER-USER queries (wallet balance, subscription plans,
         // notifications, ...) — without this, stale per-user data from the
         // now-expired session lingers and can bleed into whoever logs in
         // next on this browser.
-        queryClient.clear();
+        //
+        // Deliberately NOT queryClient.clear(): site-wide public data must
+        // survive. An anonymous visitor browsing /movies fires auth-gated
+        // queries that 401 and land here — a blanket clear() kept wiping the
+        // public peak-users stat off the chrome every time that happened.
+        queryClient.removeQueries({
+          predicate: (query) => query.queryKey[0] !== "peak-users",
+        });
       }),
     [queryClient],
   );

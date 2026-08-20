@@ -2,6 +2,7 @@ import { Quote } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useLanguage } from "@/lib/context/language-context";
+import { PeakViewersChip } from "./PeakViewersChip";
 import { RevealSection } from "./RevealSection";
 import { SectionHeading } from "./SectionHeading";
 
@@ -16,6 +17,7 @@ export function CommunityTestimonials() {
         eyebrow={t.home.testimonials.eyebrow}
         title={t.home.testimonials.title}
         subtitle={t.home.testimonials.subtitle}
+        action={<PeakViewersChip />}
       />
       <div className="grid grid-cols-1 gap-3 px-4 sm:grid-cols-2 sm:px-6 lg:px-8">
         {items.map((item, i) => (

@@ -4,13 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Bell, Bookmark, Clapperboard, Home, LogIn, Menu, Search, Wallet } from "lucide-react";
+import { Bell, Bookmark, Clapperboard, Home, LogIn, Menu, Search } from "lucide-react";
 
 import { Brand } from "@/components/shared/Brand";
 import { Footer } from "@/components/footer/Footer";
 import { MobileMenu } from "@/components/navbar/MobileMenu";
 import { AccountMenu } from "@/components/navbar/AccountMenu";
-import { WalletBalance, WalletBalanceTile } from "@/components/navbar/WalletBalance";
+import { PeakUsersPill, PeakUsersTile } from "@/components/navbar/PeakUsersTile";
 import { SideRail } from "@/components/system/SideRail";
 import { TabBar, type TabBarItem } from "@/components/system/TabBar";
 import { TopBar } from "@/components/system/TopBar";
@@ -28,7 +28,7 @@ import { notificationService } from "@/services/api/notificationService";
  * and the account menu, and the content column gets a slim context bar — so
  * the top of the screen belongs to artwork, not to a menu.
  * Mobile: a safe-area-aware bottom tab bar carries the four destinations a
- * thumb wants, a compact top bar carries brand + live wallet + notifications,
+ * thumb wants, a compact top bar carries brand + peak viewers + notifications,
  * and the "More" sheet carries everything else.
  *
  * Nothing that existed before became unreachable: watchlist, wallet,
@@ -50,17 +50,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     enabled: Boolean(user),
   });
 
-  // Watchlist and wallet only exist for signed-in users, so they only appear
-  // for them — same gating as before.
+  // Watchlist only exists for signed-in users, so it only appears for them.
+  // Wallet moved off the chrome entirely — it lives in the account menu and
+  // the More sheet.
   const railItems: NavDestination[] = [
     { key: "home", href: "/", label: t.nav.home, icon: Home },
     { key: "media", href: "/movies", label: t.nav.media, icon: Clapperboard },
     { key: "search", href: "/search", label: t.nav.search, icon: Search },
     ...(user
-      ? [
-          { key: "watchlist", href: "/watchlist", label: t.nav.watchlist, icon: Bookmark },
-          { key: "wallet", href: "/wallet", label: t.nav.wallet, icon: Wallet },
-        ]
+      ? [{ key: "watchlist", href: "/watchlist", label: t.nav.watchlist, icon: Bookmark }]
       : []),
   ];
 
@@ -98,15 +96,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         footer={
           user ? (
             <>
-              {/* The balance lives with your account, in the corner, on the
-                  same column as the wallet it opens — not on the content bar. */}
-              <WalletBalanceTile />
+              {/* Site-wide social proof: the rail is the one element on every
+                  desktop page, so the peak-viewers figure rides here. */}
+              <PeakUsersTile />
               {notificationsButton}
               <AccountMenu side="right" align="end" />
             </>
           ) : (
-            <Tooltip>
-              <TooltipTrigger
+            <>
+              <PeakUsersTile />
+              <Tooltip>
+                <TooltipTrigger
                 render={
                   <Link
                     href="/login"
@@ -117,10 +117,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <LogIn className="size-5" />
               </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={10}>
-                {t.nav.signIn}
-              </TooltipContent>
-            </Tooltip>
+                <TooltipContent side="right" sideOffset={10}>
+                  {t.nav.signIn}
+                </TooltipContent>
+              </Tooltip>
+            </>
           )
         }
       />
@@ -140,9 +141,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           actions={
             user ? (
               <>
-                {/* Phones have no rail — there the account corner IS the top
-                    bar, so the balance sits beside the avatar instead. */}
-                <WalletBalance />
+                {/* Phones have no rail, so the rail's peak tile becomes a
+                    compact pill here. */}
+                <PeakUsersPill />
                 {/* Notifications and the account menu live on the rail from lg
                     up — repeating them here would give the same destination two
                     buttons on one screen. */}
@@ -152,13 +153,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </span>
               </>
             ) : (
-              <Button
-                className="h-9 rounded-full px-4"
-                render={<Link href="/login" />}
-                nativeButton={false}
-              >
-                {t.nav.signIn}
-              </Button>
+              <>
+                <PeakUsersPill />
+                <Button
+                  className="h-9 rounded-full px-4"
+                  render={<Link href="/login" />}
+                  nativeButton={false}
+                >
+                  {t.nav.signIn}
+                </Button>
+              </>
             )
           }
         />

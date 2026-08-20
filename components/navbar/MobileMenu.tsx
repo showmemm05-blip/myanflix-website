@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
@@ -10,6 +11,7 @@ import {
   History,
   Home,
   LogOut,
+  MessageSquarePlus,
   Receipt,
   Search,
   Settings,
@@ -18,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { Brand } from "@/components/shared/Brand";
+import { FeedbackDialog } from "@/components/dialogs/FeedbackDialog";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { chipClass } from "@/components/system/Chip";
@@ -41,6 +44,7 @@ export function MobileMenu({ open, onOpenChange }: { open: boolean; onOpenChange
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { t, language, setLanguage } = useLanguage();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   // Movies, Series and Categories were all folded into the one /movies page
   // (its own tab strip), so browsing needs a single "Media" entry.
@@ -84,77 +88,100 @@ export function MobileMenu({ open, onOpenChange }: { open: boolean; onOpenChange
   const sectionLabel = "px-3.5 pt-4 pb-1 text-kicker";
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="flex w-[86%] max-w-sm flex-col gap-0 border-white/[0.08] bg-background p-0"
-      >
-        <SheetTitle className="sr-only">{t.nav.openNavigation}</SheetTitle>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="right"
+          className="flex w-[86%] max-w-sm flex-col gap-0 border-white/[0.08] bg-background p-0"
+        >
+          <SheetTitle className="sr-only">{t.nav.openNavigation}</SheetTitle>
 
-        <div className="relative flex h-16 shrink-0 items-center overflow-hidden border-b border-white/[0.06] px-5">
-          <div aria-hidden className="aurora-wash-soft pointer-events-none absolute inset-0 opacity-50 blur-2xl" />
-          <span className="relative">
-            <Brand href={null} />
-          </span>
-        </div>
-
-        <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3 pb-safe scrollbar-thin">
-          <nav className="flex flex-col gap-1">{mainLinks.map(renderLink)}</nav>
-
-          {user && (
-            <>
-              <p className={sectionLabel}>{t.footer.account}</p>
-              <nav className="flex flex-col gap-1">{accountLinks.map(renderLink)}</nav>
-            </>
-          )}
-
-          {/* Language options stay in their own script on purpose — you find
-              your language by recognising it, not by having it translated. */}
-          <p className={sectionLabel}>{t.language.switcherLabel}</p>
-          <div className="flex gap-2 px-3.5 pt-1">
-            <button
-              type="button"
-              onClick={() => setLanguage("mm")}
-              aria-pressed={language === "mm"}
-              className={chipClass({ tone: "mono", size: "lg", selected: language === "mm", variant: "outline" })}
-            >
-              မြန်မာ
-            </button>
-            <button
-              type="button"
-              onClick={() => setLanguage("en")}
-              aria-pressed={language === "en"}
-              className={chipClass({ tone: "mono", size: "lg", selected: language === "en", variant: "outline" })}
-            >
-              English
-            </button>
+          <div className="relative flex h-16 shrink-0 items-center overflow-hidden border-b border-white/[0.06] px-5">
+            <div aria-hidden className="aurora-wash-soft pointer-events-none absolute inset-0 opacity-50 blur-2xl" />
+            <span className="relative">
+              <Brand href={null} />
+            </span>
           </div>
 
-          <div className="mt-4 border-t border-white/[0.06] p-1 pt-4">
-            {user ? (
-              <Button
-                variant="ghost"
-                className="h-11 w-full justify-start gap-3 rounded-xl px-3.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => {
-                  onOpenChange(false);
-                  logout();
-                }}
-              >
-                <LogOut className="size-4.5" />
-                {t.nav.logOut}
-              </Button>
-            ) : (
-              <Button
-                className="h-11 w-full rounded-full active:scale-[0.98]"
-                render={<Link href="/login" onClick={() => onOpenChange(false)} />}
-                nativeButton={false}
-              >
-                {t.nav.signIn}
-              </Button>
+          <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3 pb-safe scrollbar-thin">
+            <nav className="flex flex-col gap-1">{mainLinks.map(renderLink)}</nav>
+
+            {user && (
+              <>
+                <p className={sectionLabel}>{t.footer.account}</p>
+                <nav className="flex flex-col gap-1">{accountLinks.map(renderLink)}</nav>
+
+                {/* Outside the <nav>, because every row in it navigates and this
+                    one opens a dialog — but styled as one of them, so this sheet
+                    stays the mirror of the desktop account menu it is documented
+                    to be. The sheet closes first: the dialog cannot open
+                    underneath a panel that is still on top of it. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenChange(false);
+                    setFeedbackOpen(true);
+                  }}
+                  className="flex min-h-11 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-muted-foreground transition-colors duration-150 ease-out hover:bg-white/6 hover:text-foreground"
+                >
+                  <MessageSquarePlus className="size-4.5" />
+                  {t.feedback.trigger}
+                </button>
+              </>
             )}
+
+            {/* Language options stay in their own script on purpose — you find
+                your language by recognising it, not by having it translated. */}
+            <p className={sectionLabel}>{t.language.switcherLabel}</p>
+            <div className="flex gap-2 px-3.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setLanguage("mm")}
+                aria-pressed={language === "mm"}
+                className={chipClass({ tone: "mono", size: "lg", selected: language === "mm", variant: "outline" })}
+              >
+                မြန်မာ
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage("en")}
+                aria-pressed={language === "en"}
+                className={chipClass({ tone: "mono", size: "lg", selected: language === "en", variant: "outline" })}
+              >
+                English
+              </button>
+            </div>
+
+            <div className="mt-4 border-t border-white/[0.06] p-1 pt-4">
+              {user ? (
+                <Button
+                  variant="ghost"
+                  className="h-11 w-full justify-start gap-3 rounded-xl px-3.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => {
+                    onOpenChange(false);
+                    logout();
+                  }}
+                >
+                  <LogOut className="size-4.5" />
+                  {t.nav.logOut}
+                </Button>
+              ) : (
+                <Button
+                  className="h-11 w-full rounded-full active:scale-[0.98]"
+                  render={<Link href="/login" onClick={() => onOpenChange(false)} />}
+                  nativeButton={false}
+                >
+                  {t.nav.signIn}
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+        </SheetContent>
+      </Sheet>
+
+      {/* Sibling of the sheet: the sheet unmounts its panel when it
+          closes, and a dialog rendered inside would close with it. */}
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+    </>
   );
 }

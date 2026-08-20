@@ -258,7 +258,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       ) : null}
 
-      <CommentsSection titleId={movie.id} />
+      <CommentsSection movieId={movie.id} />
 
       <div className="h-16" />
 

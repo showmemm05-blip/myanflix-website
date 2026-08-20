@@ -7,7 +7,6 @@ import {
   Bookmark,
   ChevronRight,
   History,
-  KeyRound,
   LogOut,
   Pencil,
   Settings,
@@ -15,20 +14,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { Kicker, StatTile } from "@/components/system";
 import { AccountShell } from "@/components/views/AccountShell";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/lib/context/language-context";
 import { formatKyat } from "@/lib/currency";
@@ -36,16 +26,8 @@ import type { AppUser } from "@/types/user";
 
 export interface ProfileViewProps {
   user: AppUser;
-  /** Stub — the page fires the localized "not connected" toast. */
-  onSaveProfile: () => void;
-  /** Stub — the page fires the localized "not connected" toast. */
-  onChangePassword: () => void;
   onLogout: () => void;
 }
-
-const dialogContentClass = "gap-5 rounded-3xl p-5 ring-white/10 sm:max-w-md sm:p-6";
-const dialogInputClass = "h-11 rounded-xl border-white/10 bg-white/[0.04] px-3.5 dark:bg-white/[0.04]";
-const dialogFooterClass = "mx-0 mb-0 border-0 bg-transparent p-0 pt-1";
 
 /** A destination the account owner reaches often enough to deserve a tile. */
 function ShortcutTile({ href, icon: Icon, label }: { href: string; icon: LucideIcon; label: string }) {
@@ -63,21 +45,9 @@ function ShortcutTile({ href, icon: Icon, label }: { href: string; icon: LucideI
   );
 }
 
-export function ProfileView({ user, onSaveProfile, onChangePassword, onLogout }: ProfileViewProps) {
+export function ProfileView({ user, onLogout }: ProfileViewProps) {
   const { t } = useLanguage();
   const [editOpen, setEditOpen] = useState(false);
-  const [passwordOpen, setPasswordOpen] = useState(false);
-  const [name, setName] = useState(user.name);
-
-  const handleSave = () => {
-    setEditOpen(false);
-    onSaveProfile();
-  };
-
-  const handlePassword = () => {
-    setPasswordOpen(false);
-    onChangePassword();
-  };
 
   return (
     <AccountShell>
@@ -116,14 +86,6 @@ export function ProfileView({ user, onSaveProfile, onChangePassword, onLogout }:
           {t.profile.editProfile}
         </Button>
         <Button
-          variant="outline"
-          className="h-11 rounded-full px-5"
-          onClick={() => setPasswordOpen(true)}
-        >
-          <KeyRound className="size-4" />
-          {t.profile.changePassword}
-        </Button>
-        <Button
           variant="ghost"
           className="h-11 rounded-full px-5 text-destructive hover:bg-destructive/10 hover:text-destructive"
           onClick={onLogout}
@@ -133,61 +95,7 @@ export function ProfileView({ user, onSaveProfile, onChangePassword, onLogout }:
         </Button>
       </div>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className={dialogContentClass}>
-          <DialogHeader>
-            <DialogTitle className="text-section-title">{t.profile.editProfile}</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="name">{t.profile.fullNameLabel}</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={dialogInputClass}
-            />
-          </div>
-          <DialogFooter className={dialogFooterClass}>
-            <Button variant="ghost" className="h-11 rounded-full px-5" onClick={() => setEditOpen(false)}>
-              {t.common.cancel}
-            </Button>
-            <Button className="h-11 rounded-full px-5" onClick={handleSave}>
-              {t.common.save}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
-        <DialogContent className={dialogContentClass}>
-          <DialogHeader>
-            <DialogTitle className="text-section-title">{t.profile.changePassword}</DialogTitle>
-            <DialogDescription>{t.settings.passwordDescription}</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="current-password">{t.profile.currentPasswordLabel}</Label>
-              <Input id="current-password" type="password" className={dialogInputClass} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="new-password">{t.profile.newPasswordLabel}</Label>
-              <Input id="new-password" type="password" className={dialogInputClass} />
-            </div>
-          </div>
-          <DialogFooter className={dialogFooterClass}>
-            <Button
-              variant="ghost"
-              className="h-11 rounded-full px-5"
-              onClick={() => setPasswordOpen(false)}
-            >
-              {t.common.cancel}
-            </Button>
-            <Button className="h-11 rounded-full px-5" onClick={handlePassword}>
-              {t.profile.changePassword}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ProfileEditDialog user={user} open={editOpen} onOpenChange={setEditOpen} />
     </AccountShell>
   );
 }
@@ -211,7 +119,6 @@ export function ProfileViewSkeleton() {
       </div>
       <div className="flex flex-wrap gap-3">
         <Skeleton className="h-11 w-36 rounded-full" />
-        <Skeleton className="h-11 w-44 rounded-full" />
         <Skeleton className="h-11 w-28 rounded-full" />
       </div>
     </AccountShell>

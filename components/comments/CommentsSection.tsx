@@ -1,16 +1,24 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, MessageCircle, MessageSquare } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, Loader2, MessageCircle, MessageSquare } from "lucide-react";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Chip, SectionHeader, Surface } from "@/components/system";
 import { EmptyState } from "@/components/empty/EmptyState";
+import { ErrorState } from "@/components/empty/ErrorState";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { cn } from "@/lib/utils";
+import { commentService } from "@/services/api/commentService";
+import { ApiError } from "@/services/api/apiClient";
+import { COMMENT_BODY_MAX, type Comment, type CommentTarget } from "@/types/comment";
+import type { TranslationShape } from "@/lib/i18n/translations";
 
 /**
  * Comment thread for a movie or series.
@@ -19,60 +27,101 @@ import { cn } from "@/lib/utils";
  * are deliberately no reactions — a like button turns a conversation into a
  * scoreboard, and this section exists to hold conversation.
  *
- * UI ONLY — there is no comments API yet, so everything lives in component
- * state and is gone on reload. It deliberately starts empty rather than seeded
- * with sample comments: this renders on the live site, and invented opinions
- * attributed to invented people would read as real user content to a visitor.
- * When the endpoint exists, replace the `useState` below with the query and the
- * two handlers with mutations — the markup shouldn't need to change.
+ * Backed by `/comments`: the thread is a query, posting and replying are
+ * mutations, and everything a comment records about the person posting it
+ * (author, timestamp, platform, IP) is decided server-side. The empty state is
+ * still genuinely empty — a title nobody has commented on says so rather than
+ * being padded with invented opinions.
+ *
+ * Signed-out visitors read the thread but get the sign-in prompt instead of a
+ * composer, so nothing here can be typed into and then rejected.
  */
-export interface DraftComment {
-  id: string;
-  authorName: string;
-  authorAvatar: string | null;
-  body: string;
-  createdAt: number;
-  replies: DraftComment[];
+
+/** How close to the backend's ceiling the draft gets before the count appears. */
+const COUNTER_VISIBLE_FROM = 100;
+
+/** The author's name as the thread shows it — the display name, else the handle. */
+function authorName(comment: Comment): string {
+  return comment.user.displayName?.trim() || comment.user.username;
 }
 
-export function CommentsSection({ titleId }: { titleId: string }) {
+/**
+ * Comment ages, in the active language.
+ *
+ * Relative up to a week — a conversation is read in terms of how long ago
+ * things were said — and an absolute date past that, where "43d ago" stops
+ * meaning anything.
+ */
+function relativeTime(iso: string, t: TranslationShape): string {
+  const date = new Date(iso);
+  const minutes = Math.floor((Date.now() - date.getTime()) / 60_000);
+  if (minutes < 1) return t.comments.justNow;
+  if (minutes < 60) return t.comments.minutesAgo(minutes);
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t.comments.hoursAgo(hours);
+  const days = Math.floor(hours / 24);
+  if (days < 7) return t.comments.daysAgo(days);
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function CommentsSection(target: CommentTarget) {
   const { t } = useLanguage();
   const { user, isAuthenticated } = useAuth();
-  const [comments, setComments] = useState<DraftComment[]>([]);
+  const queryClient = useQueryClient();
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [openReplies, setOpenReplies] = useState<Record<string, boolean>>({});
 
-  const total = useMemo(
-    () => comments.reduce((sum, comment) => sum + 1 + comment.replies.length, 0),
-    [comments],
-  );
+  // Both ids are in the key: a movie and a series are different threads even
+  // in the impossible case that they ever shared an id.
+  const queryKey = ["comments", target.movieId ?? null, target.seriesId ?? null];
 
-  const newComment = (body: string): DraftComment => ({
-    // Not crypto-strength on purpose — these ids never leave the component.
-    id: `${titleId}-${comments.length}-${body.length}-${performance.now()}`,
-    authorName: user?.name ?? t.comments.you,
-    authorAvatar: user?.avatarUrl ?? null,
-    body,
-    createdAt: Date.now(),
-    replies: [],
+  const {
+    data: comments,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey,
+    queryFn: () => commentService.list(target),
   });
 
-  const submit = (body: string) => {
-    setComments((prev) => [newComment(body), ...prev]);
+  const total = (comments ?? []).reduce(
+    (sum, comment) => sum + 1 + comment.replies.length,
+    0,
+  );
+
+  // A failed post keeps its draft (see Composer), so the toast is the whole
+  // report. A 4xx is passed through because it says something the reader can
+  // act on ("A comment cannot be empty", an expired session); a 5xx or a
+  // dropped connection is not — "Internal server error" in English is strictly
+  // worse than the translated sentence.
+  const reportFailure = (error: unknown) => {
+    const actionable =
+      error instanceof ApiError && error.status >= 400 && error.status < 500 && error.message;
+    toast.error(actionable || t.comments.postFailed);
   };
 
-  const submitReply = (parentId: string, body: string) => {
-    setComments((prev) =>
-      prev.map((comment) =>
-        comment.id === parentId
-          ? { ...comment, replies: [...comment.replies, newComment(body)] }
-          : comment,
-      ),
-    );
-    setReplyingTo(null);
-    // A thread you just replied to should never sit collapsed under its toggle.
-    setOpenReplies((prev) => ({ ...prev, [parentId]: true }));
-  };
+  const postComment = useMutation({
+    mutationFn: (body: string) => commentService.create({ ...target, body }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+    onError: reportFailure,
+  });
+
+  const postReply = useMutation({
+    mutationFn: ({ parentId, body }: { parentId: string; body: string }) =>
+      commentService.create({ ...target, parentId, body }),
+    onSuccess: (_reply, { parentId }) => {
+      setReplyingTo(null);
+      // A thread you just replied to should never sit collapsed under its toggle.
+      setOpenReplies((prev) => ({ ...prev, [parentId]: true }));
+      return queryClient.invalidateQueries({ queryKey });
+    },
+    onError: reportFailure,
+  });
 
   return (
     <section className="mx-auto w-full max-w-[1600px] px-4 pt-14 sm:px-6 lg:px-8">
@@ -92,7 +141,8 @@ export function CommentsSection({ titleId }: { titleId: string }) {
             <Composer
               avatarUrl={user?.avatarUrl ?? null}
               name={user?.name ?? t.comments.you}
-              onSubmit={submit}
+              isPending={postComment.isPending}
+              onSubmit={(body) => postComment.mutateAsync(body)}
             />
           ) : (
             <Surface
@@ -116,7 +166,15 @@ export function CommentsSection({ titleId }: { titleId: string }) {
         </div>
 
         <div className="mt-8">
-          {comments.length === 0 ? (
+          {isLoading ? (
+            <ThreadSkeleton />
+          ) : isError ? (
+            <ErrorState
+              description={t.comments.loadFailed}
+              onRetry={() => void refetch()}
+              className="py-12"
+            />
+          ) : !comments || comments.length === 0 ? (
             <EmptyState
               icon={MessageSquare}
               title={t.comments.emptyTitle}
@@ -140,8 +198,11 @@ export function CommentsSection({ titleId }: { titleId: string }) {
                     <ReplyComposer
                       avatarUrl={user?.avatarUrl ?? null}
                       name={user?.name ?? t.comments.you}
+                      isPending={postReply.isPending}
                       onCancel={() => setReplyingTo(null)}
-                      onSubmit={(body) => submitReply(comment.id, body)}
+                      onSubmit={(body) =>
+                        postReply.mutateAsync({ parentId: comment.id, body })
+                      }
                     />
                   )}
 
@@ -188,6 +249,24 @@ export function CommentsSection({ titleId }: { titleId: string }) {
   );
 }
 
+/** The thread's own shape while it loads — avatar disc, name line, two text lines. */
+function ThreadSkeleton() {
+  return (
+    <ul className="flex flex-col gap-7" aria-hidden>
+      {[0, 1, 2].map((row) => (
+        <li key={row} className="flex gap-3">
+          <Skeleton className="size-9 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-4 w-32 rounded-full" />
+            <Skeleton className="mt-2.5 h-3.5 w-full rounded-full" />
+            <Skeleton className="mt-1.5 h-3.5 w-3/5 rounded-full" />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
  * Collapsed to a single quiet pill until it's focused — the invitation to
  * comment shouldn't weigh more than the comments themselves.
@@ -195,22 +274,31 @@ export function CommentsSection({ titleId }: { titleId: string }) {
 function Composer({
   avatarUrl,
   name,
+  isPending,
   onSubmit,
 }: {
   avatarUrl: string | null;
   name: string;
-  onSubmit: (body: string) => void;
+  isPending: boolean;
+  onSubmit: (body: string) => Promise<unknown>;
 }) {
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState("");
 
-  const post = () => {
+  const remaining = COMMENT_BODY_MAX - draft.length;
+
+  const post = async () => {
     const body = draft.trim();
     if (!body) return;
-    onSubmit(body);
-    setDraft("");
-    setExpanded(false);
+    try {
+      await onSubmit(body);
+      setDraft("");
+      setExpanded(false);
+    } catch {
+      // The mutation already reported it. The draft deliberately survives —
+      // a failed request is not a reason to lose what someone wrote.
+    }
   };
 
   return (
@@ -227,15 +315,22 @@ function Composer({
             onChange={(e) => setDraft(e.target.value)}
             placeholder={t.comments.placeholder}
             rows={3}
+            maxLength={COMMENT_BODY_MAX}
             autoFocus
+            disabled={isPending}
             className="resize-none rounded-2xl border-white/10 bg-secondary/40 backdrop-blur-md"
           />
           <div className="mt-2.5 flex flex-wrap items-center justify-between gap-3">
-            <span className="text-[11px] text-muted-foreground">{t.comments.notWiredUp}</span>
+            {/* Silent until the ceiling is actually in reach — a counter on an
+                empty box is noise. */}
+            <span className="text-[11px] text-muted-foreground nums">
+              {remaining <= COUNTER_VISIBLE_FROM ? t.comments.charactersLeft(remaining) : ""}
+            </span>
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 className="h-10 rounded-full px-4"
+                disabled={isPending}
                 onClick={() => {
                   setDraft("");
                   setExpanded(false);
@@ -243,8 +338,13 @@ function Composer({
               >
                 {t.comments.cancel}
               </Button>
-              <Button onClick={post} disabled={!draft.trim()} className="h-10 rounded-full px-5">
-                {t.comments.post}
+              <Button
+                onClick={post}
+                disabled={!draft.trim() || isPending}
+                className="h-10 rounded-full px-5"
+              >
+                {isPending && <Loader2 className="size-4 animate-spin" />}
+                {isPending ? t.comments.posting : t.comments.post}
               </Button>
             </div>
           </div>
@@ -267,25 +367,26 @@ function CommentRow({
   onReplyClick,
   compact = false,
 }: {
-  comment: DraftComment;
+  comment: Comment;
   onReplyClick?: () => void;
   compact?: boolean;
 }) {
   const { t } = useLanguage();
+  const name = authorName(comment);
 
   return (
     <article className="flex gap-3">
       <Avatar className={cn("mt-0.5 shrink-0 ring-1 ring-white/10 ring-inset", compact ? "size-8" : "size-9")}>
-        <AvatarImage src={comment.authorAvatar || undefined} alt="" />
-        <AvatarFallback>{comment.authorName.slice(0, 2).toUpperCase()}</AvatarFallback>
+        <AvatarImage src={comment.user.avatarUrl || undefined} alt="" />
+        <AvatarFallback>{name.slice(0, 2).toUpperCase()}</AvatarFallback>
       </Avatar>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-heading text-sm font-semibold tracking-tight">{comment.authorName}</span>
-          {/* Everything here was written this session, so the timestamp is
-              always "just now" — no need to format an absolute date yet. */}
-          <span className="text-xs text-muted-foreground">{t.comments.justNow}</span>
+          <span className="font-heading text-sm font-semibold tracking-tight">{name}</span>
+          <time dateTime={comment.createdAt} className="text-xs text-muted-foreground">
+            {relativeTime(comment.createdAt, t)}
+          </time>
         </div>
 
         <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">{comment.body}</p>
@@ -308,21 +409,27 @@ function CommentRow({
 function ReplyComposer({
   avatarUrl,
   name,
+  isPending,
   onCancel,
   onSubmit,
 }: {
   avatarUrl: string | null;
   name: string;
+  isPending: boolean;
   onCancel: () => void;
-  onSubmit: (body: string) => void;
+  onSubmit: (body: string) => Promise<unknown>;
 }) {
   const { t } = useLanguage();
   const [body, setBody] = useState("");
 
-  const post = () => {
+  const post = async () => {
     const trimmed = body.trim();
     if (!trimmed) return;
-    onSubmit(trimmed);
+    try {
+      await onSubmit(trimmed);
+    } catch {
+      // Same as the composer above: reported by the mutation, draft kept.
+    }
   };
 
   return (
@@ -337,14 +444,28 @@ function ReplyComposer({
           onChange={(e) => setBody(e.target.value)}
           placeholder={t.comments.replyPlaceholder}
           rows={2}
+          maxLength={COMMENT_BODY_MAX}
           autoFocus
+          disabled={isPending}
           className="resize-none rounded-2xl border-white/10 bg-secondary/40 backdrop-blur-md"
         />
         <div className="mt-2.5 flex items-center gap-2">
-          <Button size="sm" className="h-10 rounded-full px-4" disabled={!body.trim()} onClick={post}>
-            {t.comments.reply}
+          <Button
+            size="sm"
+            className="h-10 rounded-full px-4"
+            disabled={!body.trim() || isPending}
+            onClick={post}
+          >
+            {isPending && <Loader2 className="size-4 animate-spin" />}
+            {isPending ? t.comments.posting : t.comments.reply}
           </Button>
-          <Button size="sm" variant="ghost" className="h-10 rounded-full px-3" onClick={onCancel}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-10 rounded-full px-3"
+            disabled={isPending}
+            onClick={onCancel}
+          >
             {t.comments.cancel}
           </Button>
         </div>

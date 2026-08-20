@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -47,8 +48,15 @@ import { AccessBadge } from "./AccessBadge";
  * controls above it at z-[2] — never a button inside an anchor. Behaviour is
  * unchanged from the card it replaces: same BrowseItem shape, same watchlist
  * toggle, same play gating, same hrefs.
+ *
+ * MEMOISED, and not as a reflex: a keystroke in the browse bar re-renders the
+ * whole surface, and the grid below it holds up to sixty of these. The card's
+ * props are a memoised `item` object plus two strings, so every one of those
+ * sixty bails out on a search keystroke instead of re-running an <Image>, two
+ * contexts and a router hook apiece. (Context updates still get through — memo
+ * only skips re-renders caused by an unchanged parent.)
  */
-export function MediaCard({
+function MediaCardImpl({
   item,
   className,
   sizes = "(max-width: 640px) 92vw, (max-width: 1280px) 46vw, 380px",
@@ -188,6 +196,8 @@ export function MediaCard({
     </article>
   );
 }
+
+export const MediaCard = memo(MediaCardImpl);
 
 export function MediaCardSkeleton({ className }: { className?: string }) {
   return (

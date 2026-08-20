@@ -20,7 +20,7 @@ import type {
 import { EmptyState } from "@/components/empty/EmptyState";
 import { useMovies, useHomeRows } from "@/hooks/use-movies";
 import { useSeriesList } from "@/hooks/use-series";
-import { useDebounce } from "@/hooks/use-debounce";
+import { useSearchTerm } from "@/hooks/use-search-term";
 import { useLanguage } from "@/lib/context/language-context";
 import { formatDuration } from "@/lib/format";
 import type { Movie, MovieSortOption } from "@/types/movie";
@@ -61,14 +61,26 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
     genre: searchParams.get("genre") ?? undefined,
   }));
   const [seriesFilters, setSeriesFilters] = useState<SeriesFilterState>(DEFAULT_SERIES_FILTERS);
-  const [search, setSearch] = useState(searchParams.get("q") ?? "");
+  /**
+   * All of the search's timing lives in one hook (see `use-search-term`):
+   * `search` follows the keyboard so the field never lags, `effectiveTerm` is
+   * what the app actually searches for — debounced, trimmed, and empty until
+   * it's long enough to be worth a request — and clearing resets in the same
+   * tick rather than a debounce window later.
+   */
+  const {
+    term: search,
+    setTerm: setSearch,
+    effectiveTerm,
+    isDebouncing,
+    isTooShort,
+    clear: clearSearch,
+  } = useSearchTerm(searchParams.get("q") ?? "");
   const [density, setDensity] = useState<GridDensity>("comfortable");
   /** Picked from the Categories tab; behaves like any other movie filter once set. */
   const [category, setCategory] = useState<{ id: string; name: string } | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
-  const debouncedSearch = useDebounce(search, 300);
-  const trimmedSearch = debouncedSearch.trim();
 
   // Restore the user's last filters/search once on mount — an explicit URL
   // param (e.g. a shared /movies?genre=Action link) still wins over storage.
@@ -101,10 +113,16 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keyed on the SETTLED term, never the raw field: keying this on `search`
+  // ran a JSON.stringify and a synchronous localStorage write on every single
+  // keystroke, and persisted half-typed words as the query to restore.
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({ filters, search, density }));
-  }, [hydrated, filters, search, density]);
+    localStorage.setItem(
+      PREFS_STORAGE_KEY,
+      JSON.stringify({ filters, search: effectiveTerm, density }),
+    );
+  }, [hydrated, filters, effectiveTerm, density]);
 
   // Keep the URL in sync with the active tab and search so /movies?tab=series
   // stays shareable and /series can redirect into the right mode. It writes
@@ -113,10 +131,12 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
   useEffect(() => {
     const params = new URLSearchParams();
     params.set("tab", tab);
-    if (trimmedSearch) params.set("q", trimmedSearch);
+    // Keyed on the settled term, not the raw one: the URL is rewritten once
+    // per search, not once per keystroke.
+    if (effectiveTerm) params.set("q", effectiveTerm);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, trimmedSearch, pathname]);
+  }, [tab, effectiveTerm, pathname]);
 
   const movieFilterCount = [
     category?.id,
@@ -137,16 +157,41 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
   const isMoviesTab = tab === "movies";
   const activeFilterCount = isMoviesTab ? movieFilterCount : seriesFilterCount;
   /** Rails are the idle state; the moment the user narrows anything, the page becomes a result list. */
-  const isNarrowed = Boolean(trimmedSearch) || activeFilterCount > 0;
+  const isNarrowed = Boolean(effectiveTerm) || activeFilterCount > 0;
 
   const homeRows = useHomeRows();
   const seriesQuery = useSeriesList({ limit: 100 });
   const moviesQuery = useMovies({
     ...filters,
     categoryId: category?.id,
-    search: trimmedSearch || undefined,
+    // No `search` key at all below the minimum length — the query stays the
+    // plain catalogue read rather than being disabled, so a half-typed word
+    // leaves the grid showing titles instead of an empty state.
+    //
+    // And no `search` at all while the Series tab is showing: nothing on that
+    // tab renders this query (series are filtered from `seriesQuery` in
+    // memory, below), so sending the term here would put a request on the wire
+    // whose response is thrown away.
+    search: isMoviesTab ? effectiveTerm || undefined : undefined,
     limit: 60,
   });
+
+  /**
+   * One "we're working on it" signal covering BOTH halves of the wait: the
+   * debounce window (during which nothing is in flight and React Query has
+   * nothing to report) and the request itself — of whichever query the visible
+   * tab is actually rendering, so the Series tab doesn't spin on a movies
+   * request it ignores.
+   */
+  const resultsQuery = tab === "series" ? seriesQuery : moviesQuery;
+  const isSearching = isDebouncing || resultsQuery.isFetching;
+  /**
+   * The grid is showing the PREVIOUS key's results while this one loads (see
+   * `keepPreviousData` in use-movies). The heading and the count chip read
+   * from the already-updated term, so while this is true they'd be captioning
+   * the wrong pictures — the count is withheld and the grid recedes instead.
+   */
+  const moviesAreStale = moviesQuery.isPlaceholderData;
 
   const toMovieItems = useCallback(
     (movies: Movie[] | undefined) =>
@@ -161,8 +206,13 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
 
   const filteredSeries = useMemo(() => {
     let items = seriesQuery.data?.items ?? [];
-    if (trimmedSearch) {
-      const q = trimmedSearch.toLowerCase();
+    // SERIES SEARCH IS CLIENT-SIDE ON PURPOSE — not an oversight. `GET /series`
+    // accepts no `search` param at all, so there is nothing to send; the page
+    // of series is already in memory and gets filtered here. It reads the very
+    // same `effectiveTerm` the movies request uses, so both tabs narrow on the
+    // same keystroke rather than drifting apart.
+    if (effectiveTerm) {
+      const q = effectiveTerm.toLowerCase();
       items = items.filter((s) => s.title.toLowerCase().includes(q));
     }
     if (seriesFilters.genre) items = items.filter((s) => s.genre === seriesFilters.genre);
@@ -177,7 +227,9 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
       sorted.sort((a, b) => b.releaseYear - a.releaseYear);
     }
     return sorted;
-  }, [seriesQuery.data, trimmedSearch, seriesFilters]);
+    // Keyed on `effectiveTerm`, never the raw field: a keystroke must not
+    // re-filter and re-sort the whole list a debounce window early.
+  }, [seriesQuery.data, effectiveTerm, seriesFilters]);
 
   const movieItems = useMemo(() => toMovieItems(moviesQuery.data?.items), [toMovieItems, moviesQuery.data]);
   const seriesItems = useMemo(() => toSeriesItems(filteredSeries), [toSeriesItems, filteredSeries]);
@@ -296,6 +348,8 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
         // On the Search destination the field is the reason for the page — it
         // never collapses back down to an icon.
         searchAlwaysOpen={isSearchSurface}
+        isSearching={isSearching}
+        isTooShort={isTooShort}
       />
 
       <div className="mx-auto w-full max-w-[1600px] flex-1 pt-4 pb-20">
@@ -354,7 +408,7 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
                 title={t.browse.everything}
                 action={
                   <>
-                    {!moviesQuery.isLoading && (
+                    {!moviesQuery.isLoading && !moviesAreStale && (
                       <Chip tone="neutral" variant="outline" size="sm" className="nums">
                         {t.browse.titleCount(movieItems.length)}
                       </Chip>
@@ -363,7 +417,12 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
                   </>
                 }
               />
-              <PosterGrid items={movieItems} isLoading={moviesQuery.isLoading} density={density} />
+              <PosterGrid
+                items={movieItems}
+                isLoading={moviesQuery.isLoading}
+                isStale={moviesAreStale}
+                density={density}
+              />
             </section>
           </div>
         )}
@@ -373,19 +432,19 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
             <SectionHeader
               as="h1"
               size="page"
-              kicker={trimmedSearch || isSearchSurface ? t.nav.search : t.nav.media}
-              title={trimmedSearch ? t.browse.resultsFor(trimmedSearch) : t.search.movies}
+              kicker={effectiveTerm || isSearchSurface ? t.nav.search : t.nav.media}
+              title={effectiveTerm ? t.browse.resultsFor(effectiveTerm) : t.search.movies}
               action={
                 <>
-                  {!moviesQuery.isLoading && (
+                  {!moviesQuery.isLoading && !moviesAreStale && (
                     <Chip tone="neutral" variant="outline" size="sm" className="nums">
                       {t.browse.titleCount(movieItems.length)}
                     </Chip>
                   )}
-                  {trimmedSearch && (
+                  {effectiveTerm && (
                     <button
                       type="button"
-                      onClick={() => setSearch("")}
+                      onClick={clearSearch}
                       className={chipClass({ tone: "primary", variant: "outline", size: "sm" })}
                     >
                       {t.browse.clearSearch}
@@ -399,7 +458,12 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
             {!moviesQuery.isLoading && movieItems.length === 0 ? (
               <EmptyState icon={Film} title={t.browse.noMoviesTitle} description={t.browse.noMoviesBody} />
             ) : (
-              <PosterGrid items={movieItems} isLoading={moviesQuery.isLoading} density={density} />
+              <PosterGrid
+                items={movieItems}
+                isLoading={moviesQuery.isLoading}
+                isStale={moviesAreStale}
+                density={density}
+              />
             )}
           </section>
         )}
@@ -409,8 +473,8 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
             <SectionHeader
               as="h1"
               size="page"
-              kicker={trimmedSearch ? t.nav.search : t.nav.series}
-              title={trimmedSearch ? t.browse.resultsFor(trimmedSearch) : t.browse.allSeries}
+              kicker={effectiveTerm ? t.nav.search : t.nav.series}
+              title={effectiveTerm ? t.browse.resultsFor(effectiveTerm) : t.browse.allSeries}
               action={
                 <>
                   {!seriesQuery.isLoading && (
@@ -418,10 +482,10 @@ export function BrowseSurface({ mode = "media" }: { mode?: "media" | "search" })
                       {t.browse.titleCount(seriesItems.length)}
                     </Chip>
                   )}
-                  {trimmedSearch && (
+                  {effectiveTerm && (
                     <button
                       type="button"
-                      onClick={() => setSearch("")}
+                      onClick={clearSearch}
                       className={chipClass({ tone: "primary", variant: "outline", size: "sm" })}
                     >
                       {t.browse.clearSearch}

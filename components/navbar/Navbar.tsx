@@ -8,7 +8,6 @@ import { Bell, Menu } from "lucide-react";
 
 import { MobileMenu } from "./MobileMenu";
 import { AccountMenu } from "./AccountMenu";
-import { WalletBalance } from "./WalletBalance";
 import { Brand } from "@/components/shared/Brand";
 import { TopBar } from "@/components/system/TopBar";
 import { isActiveHref } from "@/components/system/nav";
@@ -86,7 +85,6 @@ export function Navbar() {
         actions={
           user ? (
             <>
-              <WalletBalance />
               <Button
                 variant="ghost"
                 size="icon-lg"

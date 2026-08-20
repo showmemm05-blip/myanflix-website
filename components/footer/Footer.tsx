@@ -1,9 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Link2, AtSign, X as XIcon } from "lucide-react";
+import { Link2, AtSign, MessageSquarePlus, X as XIcon } from "lucide-react";
 
 import { Brand } from "@/components/shared/Brand";
+import { FeedbackDialog } from "@/components/dialogs/FeedbackDialog";
+import { PeakUsersFooterStat } from "@/components/navbar/PeakUsersTile";
+import { Button } from "@/components/ui/button";
 import { Kicker } from "@/components/system/Kicker";
 import { useLanguage } from "@/lib/context/language-context";
 
@@ -15,6 +19,7 @@ import { useLanguage } from "@/lib/context/language-context";
  */
 export function Footer() {
   const { t } = useLanguage();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const footerLinks = [
     {
@@ -62,6 +67,22 @@ export function Footer() {
           <div className="col-span-2 flex flex-col gap-4 sm:col-span-1">
             <Brand />
             <p className="max-w-xs text-sm text-muted-foreground">{t.footer.tagline}</p>
+
+            {/* The one control in a wall of links, so it reads as an action
+                rather than another destination — and it sits in the brand
+                column where it is visible from every page rather than buried
+                in the Support list. The tinted icon is what catches the eye;
+                the glass pill keeps it from shouting over the footer. */}
+            <Button
+              variant="outline"
+              size="pill-sm"
+              className="w-fit"
+              onClick={() => setFeedbackOpen(true)}
+            >
+              <MessageSquarePlus className="size-4 text-primary" />
+              {t.feedback.trigger}
+            </Button>
+
             <div className="flex items-center gap-2.5 pt-1">
               {socials.map((social) => (
                 <a
@@ -95,10 +116,15 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-10 border-t border-white/[0.06] pt-6 text-center text-xs text-muted-foreground">
-          {t.footer.allRightsReserved(new Date().getFullYear())}
+        <div className="mt-10 flex flex-col items-center gap-3 border-t border-white/[0.06] pt-6 text-center text-xs text-muted-foreground">
+          {/* On every page at every breakpoint — the mobile counterpart of the
+              desktop rail tile. */}
+          <PeakUsersFooterStat />
+          <span>{t.footer.allRightsReserved(new Date().getFullYear())}</span>
         </div>
       </div>
+
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </footer>
   );
 }

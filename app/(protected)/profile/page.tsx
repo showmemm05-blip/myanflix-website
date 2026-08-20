@@ -3,21 +3,19 @@
 import { useRouter } from "next/navigation";
 import { ProfileView, ProfileViewSkeleton } from "@/components/views/ProfileView";
 import { useAuth } from "@/lib/context/auth-context";
-import { useLanguage } from "@/lib/context/language-context";
-import { toast } from "sonner";
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
-  const { t } = useLanguage();
   const router = useRouter();
 
   if (!user) return <ProfileViewSkeleton />;
 
+  // Profile edits live inside ProfileEditDialog, which owns its own service
+  // calls and pushes the refreshed user into the auth context — the page has
+  // nothing left to hand down.
   return (
     <ProfileView
       user={user}
-      onSaveProfile={() => toast.info(t.profile.stubNotice)}
-      onChangePassword={() => toast.info(t.profile.stubNotice)}
       onLogout={() => {
         logout();
         router.push("/login");
