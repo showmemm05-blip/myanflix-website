@@ -28,7 +28,13 @@ import {
   VolumeX,
   type LucideIcon,
 } from "lucide-react";
-import { PlayerControls } from "@/components/player/PlayerControls";
+import { PlayerControls, SUBTITLES_OFF } from "@/components/player/PlayerControls";
+import {
+  SubtitleOverlay,
+  loadSubtitleStyle,
+  saveSubtitleStyle,
+  type SubtitleStyleSettings,
+} from "@/components/player/SubtitleOverlay";
 import { AmbientBackdrop } from "@/components/player/AmbientBackdrop";
 import { PlayerHud, type HudMessage } from "@/components/player/PlayerHud";
 import { EpisodeRail } from "@/components/player/EpisodeRail";
@@ -53,7 +59,7 @@ import { ApiError } from "@/services/api/apiClient";
 import { createPrefetchSystem, type PrefetchHandle } from "@/lib/streaming/PrefetchController";
 import { useNetworkQuality } from "@/lib/hooks/use-network-quality";
 import { usePlayerHotkeys } from "@/lib/hooks/use-player-hotkeys";
-import type { PrefetchStatusDisplay } from "@/components/player/PlayerControls";
+import type { PrefetchStatusDisplay, SubtitleTrackOption } from "@/components/player/PlayerControls";
 import { formatDuration, formatTimecode } from "@/lib/format";
 import { FALLBACK_COVER_URL } from "@/lib/placeholder";
 import { cn } from "@/lib/utils";
@@ -69,6 +75,51 @@ const PREFETCH_AFTER_SECONDS = 10;
 interface QualityLevel {
   label: string;
   index: number; // -1 for Auto
+}
+
+/**
+ * A subtitle rendition as the engine reports it, before the menu label is
+ * resolved. The name is kept raw so switching UI language relabels the menu
+ * without having to tear down and rebuild the playback engine.
+ */
+interface SubtitleTrackInfo {
+  index: number;
+  name: string;
+}
+
+/**
+ * Safari's native HLS engine surfaces the manifest's subtitle renditions as
+ * TextTracks on the element itself. Metadata and chapter tracks ride the same
+ * list and are not viewer-facing, so only these two kinds make the menu.
+ */
+function subtitleTextTracks(textTracks: TextTrackList): TextTrack[] {
+  return Array.from(textTracks).filter((track) => track.kind === "subtitles" || track.kind === "captions");
+}
+
+/**
+ * The active cue text, ready for the custom overlay — the browser's own
+ * renderer is deliberately bypassed (see SubtitleOverlay) because it cannot
+ * wrap to a chosen width, resize per-user, or clear our control bar. WebVTT
+ * cue text can carry inline markup (`<i>`, `<b>`, timestamp tags); the overlay
+ * renders plain text, so those are stripped rather than shown raw.
+ */
+function activeCueLines(track: TextTrack | undefined | null): string[] {
+  const cues = track?.activeCues;
+  if (!cues) return [];
+  return Array.from(cues)
+    .map((cue) => (cue instanceof VTTCue ? cue.text.replace(/<[^>]+>/g, "").trim() : ""))
+    .filter((text) => text.length > 0);
+}
+
+/**
+ * The subtitle TextTrack the given engine index refers to, or null. hls.js and
+ * Safari both create one native TextTrack per manifest subtitle rendition, in
+ * manifest order, so the engine's track index is the index into the
+ * subtitle-kind tracks.
+ */
+function subtitleTrackAt(video: HTMLVideoElement, index: number): TextTrack | null {
+  if (index < 0) return null;
+  return subtitleTextTracks(video.textTracks)[index] ?? null;
 }
 
 export default function PlayerPage({ params }: { params: Promise<{ movieId: string }> }) {
@@ -136,7 +187,14 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const [speed, setSpeed] = useState(1);
   const [qualityLevels, setQualityLevels] = useState<QualityLevel[]>([{ label: "Auto", index: -1 }]);
   const [quality, setQuality] = useState("Auto");
-  const [subtitle, setSubtitle] = useState("Off");
+  const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrackInfo[]>([]);
+  const [subtitleTrack, setSubtitleTrack] = useState<number>(SUBTITLES_OFF);
+  const [subtitleLines, setSubtitleLines] = useState<string[]>([]);
+  // Lazy initializer, not an effect: loadSubtitleStyle() already returns the
+  // defaults when there's no window, and the overlay renders nothing until a
+  // cue is active — so the restored value can never differ from what the
+  // server rendered (which is nothing at all).
+  const [subtitleStyle, setSubtitleStyle] = useState<SubtitleStyleSettings>(loadSubtitleStyle);
   const [audio, setAudio] = useState("Original");
   const [controlsVisible, setControlsVisible] = useState(true);
   const [subscribeOpen, setSubscribeOpen] = useState(false);
@@ -179,6 +237,35 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
     };
   }, [scheduleHide]);
 
+  const updateSubtitleStyle = useCallback((next: SubtitleStyleSettings) => {
+    setSubtitleStyle(next);
+    saveSubtitleStyle(next);
+  }, []);
+
+  // Mirror the active track's cues into React state. `cuechange` is the only
+  // signal for this — it fires on the TextTrack itself regardless of whether
+  // the browser is painting the cues, which is exactly the mode we put it in.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const track = subtitleTrackAt(video, subtitleTrack);
+    if (!track) {
+      setSubtitleLines([]);
+      return;
+    }
+
+    // `hidden` keeps cue timing alive while suppressing the native renderer;
+    // `showing` would double-draw underneath our overlay.
+    track.mode = "hidden";
+    const sync = () => setSubtitleLines(activeCueLines(track));
+    sync();
+    track.addEventListener("cuechange", sync);
+    return () => {
+      track.removeEventListener("cuechange", sync);
+    };
+  }, [subtitleTrack, streamInfo?.playlistUrl]);
+
   // Keeps the fullscreen icon correct even when fullscreen is entered/exited by
   // something other than our own button — e.g. the browser's own Esc handling.
   useEffect(() => {
@@ -194,6 +281,10 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
     if (!video || !playlistUrl) return;
 
     loadedFragmentCountRef.current = 0;
+    // Whatever the previous source advertised is gone the moment the URL changes.
+    setSubtitleTracks([]);
+    setSubtitleTrack(SUBTITLES_OFF);
+    setSubtitleLines([]);
 
     if (Hls.isSupported()) {
       // Our own SegmentManager/CacheManager/DownloadManager/PrefetchManager stack owns the
@@ -229,6 +320,20 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
       hls.on(Hls.Events.FRAG_LOADED, () => {
         loadedFragmentCountRef.current += 1;
       });
+      // The subtitle renditions are declared by the master playlist, so they
+      // only exist once it has parsed — and hls.js re-emits this whenever the
+      // active variant's subtitle group changes.
+      hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (_event, data) => {
+        setSubtitleTracks(data.subtitleTracks.map((track, index) => ({ index, name: track.name })));
+        setSubtitleTrack(hls.subtitleTrack);
+      });
+      // hls.js honours DEFAULT=YES on its own, so the menu follows its choice
+      // rather than assuming Off and silently disagreeing with what's on screen.
+      hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_event, data) => setSubtitleTrack(data.id));
+      // Cues still load and fire `cuechange`; the browser just paints nothing,
+      // leaving SubtitleOverlay to render them as HTML it can actually wrap,
+      // size and position.
+      hls.subtitleDisplay = false;
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           switch (data.type) {
@@ -254,7 +359,28 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = playlistUrl;
-      return;
+
+      // No hls.js instance to ask on this path — the same manifest renditions
+      // arrive as TextTracks on the element, and Safari may enable the
+      // DEFAULT=YES one itself, so the menu mirrors the live track modes
+      // instead of holding its own idea of what is showing.
+      const textTracks = video.textTracks;
+      const syncTextTracks = () => {
+        const tracks = subtitleTextTracks(textTracks);
+        setSubtitleTracks(tracks.map((track, index) => ({ index, name: track.label || track.language })));
+        // findIndex returns -1 when nothing is showing — the same sentinel.
+        setSubtitleTrack(tracks.findIndex((track) => track.mode === "showing"));
+      };
+      syncTextTracks();
+      textTracks.addEventListener("addtrack", syncTextTracks);
+      textTracks.addEventListener("removetrack", syncTextTracks);
+      textTracks.addEventListener("change", syncTextTracks);
+
+      return () => {
+        textTracks.removeEventListener("addtrack", syncTextTracks);
+        textTracks.removeEventListener("removetrack", syncTextTracks);
+        textTracks.removeEventListener("change", syncTextTracks);
+      };
     }
   }, [streamInfo?.playlistUrl]);
 
@@ -407,6 +533,21 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
     }
   };
 
+  const handleSubtitleTrackChange = useCallback((trackId: number) => {
+    const hls = hlsRef.current;
+    if (hls) {
+      // hls.js parses the rendition and renders its cues itself; -1 is Off.
+      hls.subtitleTrack = trackId;
+    } else if (videoRef.current) {
+      // Native path: showing is a per-track mode, so exactly one goes on and
+      // every other one goes off. Off simply leaves none of them showing.
+      subtitleTextTracks(videoRef.current.textTracks).forEach((track, index) => {
+        track.mode = index === trackId ? "showing" : "disabled";
+      });
+    }
+    setSubtitleTrack(trackId);
+  }, []);
+
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
@@ -483,6 +624,12 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   // The bar has to survive a drag and an open menu, and there's no reason to hide
   // it from a paused picture — nobody is watching anything at that moment.
   const showControls = controlsVisible || !isPlaying || isScrubbing || isMenuOpen;
+  // Labelled here rather than where the tracks are read, so the menu follows a
+  // language switch without the playback engine being rebuilt for it.
+  const subtitleOptions: SubtitleTrackOption[] = subtitleTracks.map((track) => ({
+    id: track.index,
+    label: track.name || t.player.controls.subtitleTrackFallback(track.index + 1),
+  }));
 
   return (
     <div className="relative flex min-h-screen flex-col">
@@ -532,6 +679,13 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
                   hasAccess && "cursor-pointer",
                 )}
                 playsInline
+                // The cache server answers every stream URL with
+                // `Access-Control-Allow-Origin: *`, so this costs nothing on
+                // either path (hls.js feeds a same-origin MSE blob regardless)
+                // and is the precondition for a `<track>` element ever being
+                // side-loaded here — and for AmbientBackdrop's canvas to stop
+                // being tainted by Safari's native, cross-origin source.
+                crossOrigin="anonymous"
                 onClick={hasAccess ? handleVideoClick : undefined}
                 onDoubleClick={hasAccess ? handleVideoDoubleClick : undefined}
                 onPlay={() => {
@@ -552,6 +706,12 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
                   saveProgress(true);
                   if (nextEpisode) setUpNextSeconds(UP_NEXT_COUNTDOWN_SECONDS);
                 }}
+              />
+
+              <SubtitleOverlay
+                lines={subtitleLines}
+                style={subtitleStyle}
+                liftForControls={showControls}
               />
 
               <div
@@ -675,8 +835,11 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
                         qualityOptions={qualityLevels.map((l) => l.label)}
                         quality={quality}
                         onQualityChange={handleQualityChange}
-                        subtitle={subtitle}
-                        onSubtitleChange={setSubtitle}
+                        subtitleTracks={subtitleOptions}
+                        subtitleStyle={subtitleStyle}
+                        onSubtitleStyleChange={updateSubtitleStyle}
+                        subtitleTrack={subtitleTrack}
+                        onSubtitleTrackChange={handleSubtitleTrackChange}
                         audio={audio}
                         onAudioChange={setAudio}
                         fullscreenContainerRef={containerRef}

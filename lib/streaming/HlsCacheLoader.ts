@@ -25,6 +25,17 @@ function emptyStats(): LoaderStats {
 }
 
 /**
+ * `PlaylistLevelType.MAIN` as a literal. hls.js declares that enum as an
+ * ambient `const enum`, which TypeScript refuses to import under
+ * `isolatedModules` — and the value is part of the manifest format anyway.
+ */
+const MAIN_FRAGMENT_TYPE = "main";
+
+function isMainFragment(context: FragmentLoaderContext): boolean {
+  return (context.frag.type as string) === MAIN_FRAGMENT_TYPE;
+}
+
+/**
  * Bridges hls.js's own fragment-loading pipeline to our cache: hls.js still
  * decides *when* it needs a fragment (per its internal buffering logic), but
  * instead of hitting the network directly it asks this loader, which serves
@@ -32,6 +43,17 @@ function emptyStats(): LoaderStats {
  * falls back to a real (highest-priority) fetch through the same
  * DownloadManager otherwise. Either way the result lands in CacheManager, so
  * there's a single source of truth regardless of who asked for the segment.
+ *
+ * That applies to the MAIN video timeline only. hls.js routes *every*
+ * fragment through `config.fLoader`, subtitle renditions included, but the
+ * prefetch system models one timeline: SegmentManager enumerates
+ * `levels[currentLevel].details.fragments`, and PrefetchManager reconciles
+ * against exactly that set — `downloader.cancelExcept(keepUrls)` aborts
+ * anything else in flight. A subtitle fragment can never be in `keepUrls`, so
+ * routing it through DownloadManager means the next position tick (~1/s) or
+ * any seek kills its download mid-flight. Alt renditions therefore take a
+ * plain fetch, which also keeps them out of the single download slot that
+ * playback continuity depends on.
  *
  * hls.js wants a loader *class* (it constructs one per load), so this is a
  * factory that closes over the shared manager instances.
@@ -41,8 +63,10 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
     context: FragmentLoaderContext | null = null;
     stats: LoaderStats = emptyStats();
     private aborted = false;
+    private directFetch: AbortController | null = null;
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // hls.js constructs one loader per load and hands it the config; this
+    // implementation reads nothing from it.
     constructor(_config: HlsConfig) {}
 
     load(
@@ -52,6 +76,11 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
     ): void {
       this.context = context;
       this.aborted = false;
+
+      if (!isMainFragment(context)) {
+        this.loadDirect(context, callbacks);
+        return;
+      }
 
       const frag = context.frag;
       const segment: SegmentMeta = {
@@ -91,10 +120,49 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
         });
     }
 
+    /**
+     * The plain-fetch path for anything that isn't a main-timeline fragment
+     * (today: the WebVTT subtitle renditions). Bypasses CacheManager as well
+     * as DownloadManager — the cache is keyed and evicted by video-timeline
+     * position, which a whole-title subtitle "segment" has no place in.
+     */
+    private loadDirect(
+      context: FragmentLoaderContext,
+      callbacks: LoaderCallbacks<FragmentLoaderContext>,
+    ): void {
+      const controller = new AbortController();
+      this.directFetch = controller;
+      this.stats.loading.start = performance.now();
+
+      const headers: Record<string, string> = { ...context.headers };
+      if (context.rangeStart !== undefined && context.rangeEnd !== undefined) {
+        headers.Range = `bytes=${context.rangeStart}-${context.rangeEnd - 1}`;
+      }
+
+      fetch(context.url, { signal: controller.signal, headers })
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status} for ${context.url}`);
+          this.stats.loading.first = performance.now();
+          return response.arrayBuffer();
+        })
+        .then((data) => {
+          if (this.aborted) return;
+          this.stats.loaded = data.byteLength;
+          this.stats.total = data.byteLength;
+          this.stats.loading.end = performance.now();
+          callbacks.onSuccess({ url: context.url, data }, this.stats, context, null);
+        })
+        .catch((err: unknown) => {
+          if (this.aborted) return;
+          callbacks.onError({ code: 0, text: err instanceof Error ? err.message : String(err) }, context, null, this.stats);
+        });
+    }
+
     abort(): void {
       this.aborted = true;
       this.stats.aborted = true;
-      if (this.context) downloader.cancel(this.context.url);
+      this.directFetch?.abort();
+      if (this.context && isMainFragment(this.context)) downloader.cancel(this.context.url);
     }
 
     destroy(): void {

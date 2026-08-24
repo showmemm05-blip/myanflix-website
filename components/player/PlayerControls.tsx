@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode, type RefObject } from "react";
 import {
+  AudioLines,
   Download,
   FastForward,
   Maximize,
@@ -29,13 +30,25 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { SubtitleSize, SubtitleStyleSettings } from "@/components/player/SubtitleOverlay";
 import { useLanguage } from "@/lib/context/language-context";
 import { formatTimecode } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
-export const SUBTITLE_OPTIONS = ["Off", "English", "Burmese"] as const;
 export const AUDIO_OPTIONS = ["Original", "English", "Burmese"] as const;
+
+/** The "no subtitles" sentinel — the same value hls.js uses for `subtitleTrack`. */
+export const SUBTITLES_OFF = -1;
+
+/**
+ * One `#EXT-X-MEDIA:TYPE=SUBTITLES` rendition the manifest declared. The id is
+ * the index the playback engine addresses the track by, not a database id.
+ */
+export interface SubtitleTrackOption {
+  id: number;
+  label: string;
+}
 
 const SKIP_SECONDS = 10;
 
@@ -113,8 +126,18 @@ interface PlayerControlsProps {
   qualityOptions: string[];
   quality: string;
   onQualityChange: (value: string) => void;
-  subtitle: string;
-  onSubtitleChange: (value: string) => void;
+  /**
+   * The subtitle renditions the manifest actually carries. An empty list drops
+   * the subtitle section from the tray — a menu whose only entry is "Off" is a
+   * dead end that reads as a broken feature rather than an absent one. The
+   * audio section stays either way; it does not depend on the manifest.
+   */
+  subtitleTracks: SubtitleTrackOption[];
+  subtitleStyle: SubtitleStyleSettings;
+  onSubtitleStyleChange: (style: SubtitleStyleSettings) => void;
+  /** Id of the selected rendition, or `SUBTITLES_OFF`. */
+  subtitleTrack: number;
+  onSubtitleTrackChange: (trackId: number) => void;
   audio: string;
   onAudioChange: (value: string) => void;
   /**
@@ -153,8 +176,11 @@ export function PlayerControls({
   qualityOptions,
   quality,
   onQualityChange,
-  subtitle,
-  onSubtitleChange,
+  subtitleTracks,
+  subtitleStyle,
+  onSubtitleStyleChange,
+  subtitleTrack,
+  onSubtitleTrackChange,
   audio,
   onAudioChange,
   fullscreenContainerRef,
@@ -171,6 +197,7 @@ export function PlayerControls({
   const [subtitleMenuOpen, setSubtitleMenuOpen] = useState(false);
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
 
+  const hasSubtitleTracks = subtitleTracks.length > 0;
   const anyMenuOpen = subtitleMenuOpen || settingsMenuOpen;
   useEffect(() => {
     onMenuOpenChange?.(anyMenuOpen);
@@ -252,37 +279,84 @@ export function PlayerControls({
             </span>
           )}
 
+          {/* Subtitles and audio share one tray, but only the SUBTITLE half is
+              gated on the manifest: an empty subtitle menu would be a promise
+              the manifest can't keep, while the audio group has to stay
+              reachable either way. Gating the whole tray on `hasSubtitleTracks`
+              would take audio down with it on every title that has no
+              subtitles — which is most of them. The trigger renames itself so
+              the button never advertises a section it isn't showing. */}
           <DropdownMenu open={subtitleMenuOpen} onOpenChange={setSubtitleMenuOpen}>
             <DropdownMenuTrigger
               render={
                 <button
                   type="button"
-                  title={labels.subtitlesAndAudio}
-                  aria-label={labels.subtitlesAndAudio}
+                  title={hasSubtitleTracks ? labels.subtitlesAndAudio : labels.audio}
+                  aria-label={hasSubtitleTracks ? labels.subtitlesAndAudio : labels.audio}
                   className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-white/85 outline-none transition-[background-color,color,transform] duration-150 ease-out hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/80 active:scale-90 aria-expanded:bg-white/15 aria-expanded:text-white"
                 />
               }
             >
-              <Subtitles className="size-5" />
+              {hasSubtitleTracks ? <Subtitles className="size-5" /> : <AudioLines className="size-5" />}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" container={fullscreenContainerRef}>
               <DropdownMenuGroup>
-                <DropdownMenuLabel>{labels.subtitles}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuRadioGroup
-                  value={subtitle}
-                  onValueChange={(v) => {
-                    onSubtitleChange(v);
-                    setSubtitleMenuOpen(false);
-                  }}
-                >
-                  {SUBTITLE_OPTIONS.map((option) => (
-                    <DropdownMenuRadioItem key={option} value={option}>
-                      {option}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-                <DropdownMenuSeparator />
+                {hasSubtitleTracks && (
+                  <>
+                    <DropdownMenuLabel>{labels.subtitles}</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {/* Track ids are numbers; the radio group compares strings. */}
+                    <DropdownMenuRadioGroup
+                      value={subtitleTrack.toString()}
+                      onValueChange={(v) => {
+                        onSubtitleTrackChange(Number(v));
+                        setSubtitleMenuOpen(false);
+                      }}
+                    >
+                      <DropdownMenuRadioItem value={SUBTITLES_OFF.toString()}>
+                        {labels.subtitlesOff}
+                      </DropdownMenuRadioItem>
+                      {subtitleTracks.map((track) => (
+                        <DropdownMenuRadioItem key={track.id} value={track.id.toString()}>
+                          {track.label}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                    <DropdownMenuSeparator />
+                    {/* Appearance only matters while something is on screen —
+                        with subtitles Off these controls would adjust nothing
+                        the viewer can see. */}
+                    {subtitleTrack !== SUBTITLES_OFF && (
+                      <>
+                        <DropdownMenuLabel>{labels.subtitleSize}</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuRadioGroup
+                          value={subtitleStyle.size}
+                          onValueChange={(v) =>
+                            onSubtitleStyleChange({ ...subtitleStyle, size: v as SubtitleSize })
+                          }
+                        >
+                          <DropdownMenuRadioItem value="small">{labels.subtitleSizeSmall}</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="medium">{labels.subtitleSizeMedium}</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="large">{labels.subtitleSizeLarge}</DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>{labels.subtitleBackground}</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuRadioGroup
+                          value={subtitleStyle.background ? "on" : "off"}
+                          onValueChange={(v) =>
+                            onSubtitleStyleChange({ ...subtitleStyle, background: v === "on" })
+                          }
+                        >
+                          <DropdownMenuRadioItem value="on">{labels.subtitleBackgroundOn}</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="off">{labels.subtitleBackgroundOff}</DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                  </>
+                )}
                 <DropdownMenuLabel>{labels.audio}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuRadioGroup

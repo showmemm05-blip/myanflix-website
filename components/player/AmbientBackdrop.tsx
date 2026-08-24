@@ -23,11 +23,14 @@ interface AmbientBackdropProps {
  * 32×18 canvas a few times a second and blown up behind the stage, so the colour
  * tracks the film shot for shot instead of sitting on one static tint.
  *
- * Two things can stop that: Safari's native HLS path assigns a cross-origin URL
- * straight to the element (hls.js's MSE blob is same-origin and reads fine), and
- * a hidden tab has no frames worth reading. Both fall back to the blurred cover
- * art, which carries the same effect minus the frame-accuracy — so the design
- * never depends on the sampling succeeding.
+ * Two things can stop that. A hidden tab has no frames worth reading. And a
+ * cross-origin source can taint the canvas — the element now carries
+ * `crossOrigin="anonymous"` and the cache server answers with
+ * `Access-Control-Allow-Origin: *`, so Safari's native HLS path reads fine too
+ * (hls.js's MSE blob was always same-origin), but a deployment serving streams
+ * without those headers would land back in the catch below. Both fall back to
+ * the blurred cover art, which carries the same effect minus the
+ * frame-accuracy — so the design never depends on the sampling succeeding.
  */
 export function AmbientBackdrop({ videoRef, posterUrl, active }: AmbientBackdropProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);

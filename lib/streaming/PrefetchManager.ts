@@ -58,6 +58,12 @@ export class PrefetchManager {
     const segmentsInWindow = this.segmentManager.getSegmentsInRange(windowStart, windowEnd);
     const keepUrls = new Set(segmentsInWindow.map((segment) => segment.url));
 
+    // `keepUrls` is main-timeline only — SegmentManager enumerates the current
+    // video level's fragments and nothing else — so cancelExcept() would abort
+    // any alt-rendition download in flight (a subtitle VTT can never appear in
+    // this set). That is safe precisely because HlsCacheLoader keeps
+    // non-main fragments out of this DownloadManager entirely; if that ever
+    // changes, this line starts killing them on every tick and seek.
     this.cache.evictOutside(keepUrls);
     this.downloader.cancelExcept(keepUrls);
 
