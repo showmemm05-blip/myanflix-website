@@ -55,7 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // the More sheet.
   const railItems: NavDestination[] = [
     { key: "home", href: "/", label: t.nav.home, icon: Home },
-    { key: "media", href: "/movies", label: t.nav.media, icon: Clapperboard },
+    { key: "media", href: "/media", label: t.nav.media, icon: Clapperboard },
     { key: "search", href: "/search", label: t.nav.search, icon: Search },
     ...(user
       ? [{ key: "watchlist", href: "/watchlist", label: t.nav.watchlist, icon: Bookmark }]
@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const tabItems: TabBarItem[] = [
     { key: "home", href: "/", label: t.nav.home, icon: Home },
-    { key: "media", href: "/movies", label: t.nav.media, icon: Clapperboard },
+    { key: "media", href: "/media", label: t.nav.media, icon: Clapperboard },
     { key: "search", href: "/search", label: t.nav.search, icon: Search },
     user
       ? { key: "watchlist", href: "/watchlist", label: t.nav.watchlist, icon: Bookmark }
@@ -187,8 +187,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function pageTitle(pathname: string, t: ReturnType<typeof useLanguage>["t"]): string | undefined {
   const titles: Record<string, string> = {
     "/": t.nav.home,
-    "/movies": t.nav.media,
-    "/series": t.nav.series,
+    "/media": t.nav.media,
+    "/media/movies": t.search.movies,
+    "/media/books": t.search.books,
+    "/media/music": t.search.music,
     "/search": t.nav.search,
     "/watchlist": t.watchlist.title,
     "/watch-history": t.watchHistory.title,

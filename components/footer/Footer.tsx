@@ -25,8 +25,10 @@ export function Footer() {
     {
       heading: t.footer.browse,
       links: [
-        { href: "/movies?tab=movies", label: t.footer.allMovies },
-        { href: "/movies?tab=series", label: t.nav.series },
+        { href: "/media/movies", label: t.footer.allMovies },
+        { href: "/media/movies?type=series", label: t.nav.series },
+        { href: "/media/books", label: t.search.books },
+        { href: "/media/music", label: t.search.music },
       ],
     },
     {

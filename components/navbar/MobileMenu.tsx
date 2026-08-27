@@ -46,11 +46,11 @@ export function MobileMenu({ open, onOpenChange }: { open: boolean; onOpenChange
   const { t, language, setLanguage } = useLanguage();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
-  // Movies, Series and Categories were all folded into the one /movies page
-  // (its own tab strip), so browsing needs a single "Media" entry.
+  // Movies, Books and Music all live under the one /media section (its own
+  // All | Movies | Books | Music switch), so browsing needs a single entry.
   const mainLinks: MenuLink[] = [
     { href: "/", label: t.nav.home, icon: Home },
-    { href: "/movies", label: t.nav.media, icon: Clapperboard },
+    { href: "/media", label: t.nav.media, icon: Clapperboard },
     { href: "/search", label: t.nav.search, icon: Search },
   ];
 

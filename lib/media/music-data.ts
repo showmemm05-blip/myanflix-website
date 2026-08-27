@@ -1,0 +1,167 @@
+import type { MusicAlbum, MusicTrack } from "@/types/music";
+
+/**
+ * THE PREVIEW CRATE — companion to `lib/media/books-data.ts`, and under the
+ * same contract: original artists and titles only, labeled "coming soon" in
+ * the UI, shaped exactly like the future `GET /music/*` payloads so the swap
+ * to a real service is mechanical. Square artwork comes from the picsum host
+ * next.config already whitelists.
+ */
+export const ALBUMS: MusicAlbum[] = [
+  {
+    id: "album-golden-land",
+    title: "Golden Land Echoes",
+    artist: "Shwe Yamin",
+    artworkUrl: "https://picsum.photos/seed/mf-album-golden/600/600",
+    releaseYear: 2026,
+    trackCount: 11,
+    genre: "Indie folk",
+    featured: true,
+  },
+  {
+    id: "album-neon-yangon",
+    title: "Neon Yangon",
+    artist: "The Circular Line",
+    artworkUrl: "https://picsum.photos/seed/mf-album-neon/600/600",
+    releaseYear: 2025,
+    trackCount: 10,
+    genre: "Synth pop",
+  },
+  {
+    id: "album-thanaka-dreams",
+    title: "Thanaka Dreams",
+    artist: "Mi Cherry",
+    artworkUrl: "https://picsum.photos/seed/mf-album-thanaka/600/600",
+    releaseYear: 2025,
+    trackCount: 9,
+    genre: "R&B",
+  },
+  {
+    id: "album-strand-road",
+    title: "Rainfall on Strand Road",
+    artist: "Aung Naing Trio",
+    artworkUrl: "https://picsum.photos/seed/mf-album-strand/600/600",
+    releaseYear: 2024,
+    trackCount: 8,
+    genre: "Jazz",
+  },
+  {
+    id: "album-padauk",
+    title: "Padauk in Bloom",
+    artist: "Yuzana",
+    artworkUrl: "https://picsum.photos/seed/mf-album-padauk/600/600",
+    releaseYear: 2026,
+    trackCount: 12,
+    genre: "Pop",
+  },
+  {
+    id: "album-midnight-hlaing",
+    title: "Midnight Hlaing",
+    artist: "DJ Bo Bo",
+    artworkUrl: "https://picsum.photos/seed/mf-album-hlaing/600/600",
+    releaseYear: 2025,
+    trackCount: 14,
+    genre: "Electronic",
+  },
+  {
+    id: "album-analog-hearts",
+    title: "Analog Hearts",
+    artist: "The Mandalay Wires",
+    artworkUrl: "https://picsum.photos/seed/mf-album-analog/600/600",
+    releaseYear: 2024,
+    trackCount: 10,
+    genre: "Rock",
+  },
+  {
+    id: "album-ferry-home",
+    title: "Songs for the Ferry Home",
+    artist: "Nilar Win",
+    artworkUrl: "https://picsum.photos/seed/mf-album-ferry/600/600",
+    releaseYear: 2023,
+    trackCount: 9,
+    genre: "Acoustic",
+  },
+];
+
+export const TRACKS: MusicTrack[] = [
+  {
+    id: "track-city-of-gold",
+    title: "City of Gold",
+    artist: "The Circular Line",
+    album: "Neon Yangon",
+    artworkUrl: "https://picsum.photos/seed/mf-album-neon/600/600",
+    durationSeconds: 222,
+  },
+  {
+    id: "track-monsoon-girl",
+    title: "Monsoon Girl",
+    artist: "Shwe Yamin",
+    album: "Golden Land Echoes",
+    artworkUrl: "https://picsum.photos/seed/mf-album-golden/600/600",
+    durationSeconds: 245,
+  },
+  {
+    id: "track-downtown-glow",
+    title: "Downtown Glow",
+    artist: "DJ Bo Bo",
+    album: "Midnight Hlaing",
+    artworkUrl: "https://picsum.photos/seed/mf-album-hlaing/600/600",
+    durationSeconds: 198,
+  },
+  {
+    id: "track-padauk-morning",
+    title: "Padauk Morning",
+    artist: "Yuzana",
+    album: "Padauk in Bloom",
+    artworkUrl: "https://picsum.photos/seed/mf-album-padauk/600/600",
+    durationSeconds: 236,
+  },
+  {
+    id: "track-ferry-home",
+    title: "Ferry Home",
+    artist: "Nilar Win",
+    album: "Songs for the Ferry Home",
+    artworkUrl: "https://picsum.photos/seed/mf-album-ferry/600/600",
+    durationSeconds: 262,
+  },
+  {
+    id: "track-static-love",
+    title: "Static Love",
+    artist: "The Mandalay Wires",
+    album: "Analog Hearts",
+    artworkUrl: "https://picsum.photos/seed/mf-album-analog/600/600",
+    durationSeconds: 211,
+  },
+  {
+    id: "track-strand-road-rain",
+    title: "Strand Road Rain",
+    artist: "Aung Naing Trio",
+    album: "Rainfall on Strand Road",
+    artworkUrl: "https://picsum.photos/seed/mf-album-strand/600/600",
+    durationSeconds: 304,
+  },
+  {
+    id: "track-thanaka-dreams",
+    title: "Thanaka Dreams",
+    artist: "Mi Cherry",
+    album: "Thanaka Dreams",
+    artworkUrl: "https://picsum.photos/seed/mf-album-thanaka/600/600",
+    durationSeconds: 227,
+  },
+  {
+    id: "track-night-market",
+    title: "Night Market",
+    artist: "The Circular Line",
+    album: "Neon Yangon",
+    artworkUrl: "https://picsum.photos/seed/mf-album-neon/600/600",
+    durationSeconds: 189,
+  },
+  {
+    id: "track-golden-hour",
+    title: "Golden Hour",
+    artist: "Shwe Yamin",
+    album: "Golden Land Echoes",
+    artworkUrl: "https://picsum.photos/seed/mf-album-golden/600/600",
+    durationSeconds: 254,
+  },
+];

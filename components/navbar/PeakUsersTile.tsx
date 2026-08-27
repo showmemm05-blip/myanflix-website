@@ -9,9 +9,9 @@ import { compactCount, usePeakUsers } from "@/lib/hooks/use-peak-users";
 /**
  * The peak-viewers stat as a rail tile — the rail is the one piece of chrome
  * on screen on every desktop page, which is what makes this the site-wide
- * home for the figure. Mirrors WalletBalanceTile's shape (56px column,
- * icon + compact number, full sentence in the tooltip), but in the success
- * tone and NOT a link: it is a fact, not a destination.
+ * home for the figure. A 56px column of icon + compact number with the
+ * full sentence in the tooltip, in the success tone and NOT a link: it is
+ * a fact, not a destination.
  *
  * Renders nothing until a positive number is known — an empty slot reads
  * better in the rail than a dash.
