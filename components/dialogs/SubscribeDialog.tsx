@@ -140,7 +140,7 @@ export function SubscribeDialog({
                   <div className="min-w-0">
                     <p className="truncate font-heading text-sm font-semibold tracking-tight">{plan.name}</p>
                     <Chip tone="neutral" size="sm" className="mt-1 nums">
-                      {t.dialogs.days30}
+                      {t.dialogs.planDuration(plan.durationDays)}
                     </Chip>
                     <p className="mt-1.5 font-heading text-lg font-bold text-premium nums">
                       {formatKyat(plan.price)}

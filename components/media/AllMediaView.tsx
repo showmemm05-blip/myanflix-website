@@ -9,10 +9,10 @@ import { BookCard } from "./BookCard";
 import { MusicCard } from "./MusicCard";
 import { movieToBrowseItem } from "@/components/browse/browse-item";
 import { useLanguage } from "@/lib/context/language-context";
-import { BOOKS } from "@/lib/media/books-data";
 import { ALBUMS } from "@/lib/media/music-data";
 import { formatDuration } from "@/lib/format";
 import { movieService } from "@/services/api/movieService";
+import { useBooks } from "@/hooks/use-books";
 
 /**
  * ALL MEDIA — the organized overview, not a mixed grid.
@@ -44,7 +44,11 @@ export function AllMediaView() {
     .slice(0, 14)
     .map((movie) => movieToBrowseItem(movie, formatDuration(movie.duration)));
 
-  const featuredBook = BOOKS.find((b) => b.featured) ?? BOOKS[0];
+  // Newest-first is what the library returns, so the first row is both the
+  // shelf's lead and the mosaic's book pick.
+  const booksQuery = useBooks({ limit: 14 });
+  const books = booksQuery.data?.items ?? [];
+  const featuredBook = books[0] ?? null;
   const featuredAlbum = ALBUMS.find((a) => a.featured) ?? ALBUMS[0];
 
   return (
@@ -80,11 +84,13 @@ export function AllMediaView() {
           </MediaRail>
         )}
 
-        <MediaRail kicker={t.search.books} title={t.media.newBooks} viewAllHref="/media/books">
-          {BOOKS.map((book) => (
-            <BookCard key={book.id} book={book} className="w-32 shrink-0 snap-start sm:w-36" />
-          ))}
-        </MediaRail>
+        {books.length > 0 && (
+          <MediaRail kicker={t.search.books} title={t.media.newBooks} viewAllHref="/media/books">
+            {books.map((book) => (
+              <BookCard key={book.id} book={book} className="w-32 shrink-0 snap-start sm:w-36" />
+            ))}
+          </MediaRail>
+        )}
 
         <MediaRail kicker={t.search.music} title={t.media.freshMusic} viewAllHref="/media/music">
           {ALBUMS.map((album) => (

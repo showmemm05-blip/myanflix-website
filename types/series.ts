@@ -1,4 +1,36 @@
-import type { AccessType } from "./movie";
+import type { AccessType, FacetValue } from "./movie";
+
+/**
+ * The series subset of the canonical sort vocabulary — no rating / mostViewed
+ * / mostPurchased in v1: series carry no rating column and no per-series watch
+ * aggregate, so the UI simply doesn't offer them.
+ */
+export type SeriesSortOption =
+  | "relevance"
+  | "recentlyAdded"
+  | "newest"
+  | "oldest"
+  | "title";
+
+/** Same wire format as MovieQuery: OR within a facet, AND across facets, arrays as CSV. */
+export interface SeriesQuery {
+  search?: string;
+  genres?: string[];
+  languages?: string[];
+  yearFrom?: number;
+  yearTo?: number;
+  accessType?: AccessType;
+  sort?: SeriesSortOption;
+  page?: number;
+  limit?: number;
+}
+
+/** GET /series/facets — the series columns that exist: genre, language, year. */
+export interface SeriesFacets {
+  genres: FacetValue[];
+  languages: FacetValue[];
+  years: { min: number; max: number } | null;
+}
 
 export interface Series {
   id: string;

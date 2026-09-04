@@ -63,7 +63,7 @@ const en = {
     series: "Series",
     books: "Books",
     music: "Music",
-    booksComingSoon: "Books aren't available yet.",
+    booksNoResults: "No books match that search.",
     musicComingSoon: "Music isn't available yet.",
     accessAll: "All",
     accessFree: "Free",
@@ -134,10 +134,200 @@ const en = {
     searchMusic: "Search songs or artists…",
     comingSoon: "Coming soon",
     previewNote: "A first look at the collection — these titles aren't available yet.",
+    allBookTypes: "All books",
+    noBooksBody: "Try a different search or category.",
+    emptyLibraryTitle: "The shelf is still being stocked",
+    emptyLibraryBody: "New books land here as they're published.",
     bookCount: (count: number) => (count === 1 ? "1 book" : `${count} books`),
     trackCount: (count: number) => (count === 1 ? "1 track" : `${count} tracks`),
     noBooksTitle: "No books match that",
     noMusicTitle: "No music matches that",
+  },
+  /** The book detail page and the two readers. */
+  book: {
+    author: "Author",
+    byAuthor: (author: string) => `by ${author}`,
+    read: "Read",
+    continueReading: "Continue reading",
+    startReading: "Start reading",
+    about: "About this book",
+    details: "Details",
+    format: "Format",
+    formatEditor: "Text",
+    formatPdf: "Scanned pages",
+    chapters: "Chapters",
+    pages: "Pages",
+    published: "Published",
+    categories: "Categories",
+    notFoundTitle: "We couldn't find that book",
+    notFoundBody: "It may have been unpublished or removed.",
+    backToLibrary: "Back to the library",
+    chapterCount: (count: number) => (count === 1 ? "1 chapter" : `${count} chapters`),
+    pageCount: (count: number) => (count === 1 ? "1 page" : `${count} pages`),
+    summary: "Summary",
+    availableLanguages: "Available languages",
+    chapterList: "Chapter list",
+    chapterOf: (n: number) => `Chapter ${n}`,
+    chapterPages: (count: number) =>
+      count === 1 ? "1 page" : `${count} pages`,
+    chapterNumber: (n: number) => `#${String(n).padStart(3, "0")}`,
+    sortOrder: "Reverse the order",
+    noChapters: "No chapters yet.",
+    pagePreview: "Preview",
+    readingIn: (language: string) => `Reading in ${language}`,
+    // ── Hierarchy: optional parts above chapters, sections inside them ──
+    part: (n: number) => `Part ${n}`,
+    parts: "Parts",
+    sections: "Sections",
+    section: (n: string) => `Section ${n}`,
+    sectionCount: (count: number) =>
+      count === 1 ? "1 section" : `${count} sections`,
+    pageRange: (from: number, to: number) => `p. ${from}–${to}`,
+    reader: {
+      contents: "Contents",
+      previousChapter: "Previous chapter",
+      nextChapter: "Next chapter",
+      previousPage: "Previous page",
+      nextPage: "Next page",
+      chapterOf: (current: number, total: number) => `Chapter ${current} of ${total}`,
+      pageOf: (current: number, total: number) => `Page ${current} of ${total}`,
+      loadError: "We couldn't load this part of the book.",
+      emptyChapter: "This chapter is empty.",
+      emptyBook: "This book has nothing to read yet.",
+      resumed: "Picked up where you left off",
+      jumpToPage: "Go to page",
+      backToBook: "Book details",
+      finished: "You've reached the end.",
+      textSize: "Text size",
+      fitWidth: "Fit width",
+      fitPage: "Fit page",
+      chapterLabel: (n: number) => `Chapter ${n}`,
+      partLabel: (n: number) => `Part ${n}`,
+      sectionLabel: (n: string) => `Section ${n}`,
+      jumpToSection: "Go to section",
+      display: "Display",
+      paper: "Paper",
+      smaller: "Smaller text",
+      larger: "Larger text",
+      close: "Close the book",
+      themes: {
+        paper: "Paper",
+        sepia: "Sepia",
+        night: "Night",
+        amoled: "AMOLED",
+      },
+      // ── Reader suite v2 — settings panel ──────────────────────────────
+      settingsTitle: "Reading settings",
+      settings: "Settings",
+      sectionAppearance: "Appearance",
+      sectionLayout: "Layout",
+      sectionPage: "Page",
+      sectionBehavior: "Behavior",
+      fontFamily: "Font",
+      fontSerif: "Serif",
+      fontSans: "Sans",
+      fontDyslexic: "Easy read",
+      sizeSmall: "Small",
+      sizeMedium: "Medium",
+      sizeLarge: "Large",
+      sizeXL: "Extra large",
+      sizeCustom: "Custom",
+      lineSpacing: "Line spacing",
+      lineCompact: "Compact",
+      lineNormal: "Normal",
+      lineRelaxed: "Relaxed",
+      readingWidth: "Reading width",
+      widthNarrow: "Narrow",
+      widthMedium: "Medium",
+      widthWide: "Wide",
+      widthFull: "Full",
+      margins: "Margins",
+      marginSmall: "Small",
+      marginMedium: "Medium",
+      marginLarge: "Large",
+      brightness: "Brightness",
+      keepAwake: "Keep screen on",
+      autoHideControls: "Auto-hide controls",
+      fullscreen: "Fullscreen",
+      exitFullscreen: "Exit fullscreen",
+      alignment: "Alignment",
+      alignJustify: "Justified",
+      alignLeft: "Left",
+      chapterTitleToggle: "Show chapter title",
+      readingMode: "Reading mode",
+      modeScroll: "Continuous",
+      modePaginated: "Pages",
+      percentRead: (p: number) => `${p}% read`,
+      estMinutes: (n: number) => `~${n} min`,
+      estMinutesLeft: (n: number) => `~${n} min left`,
+      pageOfShort: (c: number, t: number) => `${c} / ${t}`,
+      // ── Bookmarks, highlights, notes ──────────────────────────────────
+      bookmark: "Bookmark",
+      bookmarks: "Bookmarks",
+      addBookmark: "Add bookmark",
+      removeBookmark: "Remove bookmark",
+      noBookmarks: "No bookmarks yet.",
+      notesTab: "Notes",
+      highlight: "Highlight",
+      removeHighlight: "Remove highlight",
+      noAnnotations: "Nothing saved in this book yet.",
+      annotationsLocal: "Saved on this device",
+      annotationLimit: "Limit reached — delete a few first.",
+      hlYellow: "Yellow",
+      hlGreen: "Green",
+      hlBlue: "Blue",
+      hlPink: "Pink",
+      note: "Note",
+      addNote: "Add note",
+      editNote: "Edit note",
+      deleteNote: "Delete",
+      notePlaceholder: "Write a note…",
+      saveNote: "Save",
+      copyAction: "Copy",
+      copied: "Copied",
+      // ── In-book search ────────────────────────────────────────────────
+      searchBook: "Search",
+      searchInBook: "Search in book",
+      searchPlaceholder: "Search this book…",
+      searchTooShort: "Type at least 2 characters.",
+      searching: "Searching…",
+      searchCount: (n: number) => (n === 1 ? "1 result" : `${n} results`),
+      searchNoResults: "No results found.",
+      // ── Page reader view modes ────────────────────────────────────────
+      pageLayout: "Page layout",
+      layoutSingle: "Single",
+      layoutDouble: "Spread",
+      layoutScroll: "Scroll",
+      fitHeight: "Fit height",
+      fitScreen: "Fit screen",
+      zoom: "Zoom",
+      zoomIn: "Zoom in",
+      zoomOut: "Zoom out",
+      zoomReset: "Actual size",
+      rotate: "Rotate",
+      thumbnails: "Pages",
+      firstPage: "First page",
+      lastPage: "Last page",
+      background: "Background",
+      bgTheme: "Theme",
+      bgBlack: "Black",
+      bgGray: "Gray",
+      bgWhite: "White",
+      direction: "Direction",
+      dirLtr: "Left to right",
+      dirRtl: "Right to left",
+      // ── Keyboard shortcuts ────────────────────────────────────────────
+      shortcuts: "Keyboard shortcuts",
+      shortcutGroupNav: "Navigation",
+      shortcutGroupPanels: "Panels",
+      shortcutGroupView: "View",
+      shortcutTurnPage: "Turn page",
+      shortcutChapters: "Change chapter",
+      shortcutScrollScreen: "Scroll a screen",
+      shortcutFirstLast: "First / last page",
+      shortcutClose: "Close / exit",
+      shortcutHelp: "Show this help",
+    },
   },
   /** The filter sheet shared by the Movies and Series tabs. */
   filters: {
@@ -161,6 +351,32 @@ const en = {
       count === 1 ? "Show 1 result" : `Show ${count} results`,
     activeCount: (count: number) => (count === 1 ? "1 filter applied" : `${count} filters applied`),
     noneApplied: "Nothing applied yet",
+    actor: "Cast",
+    actorSearchPlaceholder: "Search actors…",
+    director: "Director",
+    country: "Country",
+    ageRating: "Age rating",
+    duration: "Duration",
+    durationShort: "Under 90 min",
+    durationMedium: "90–120 min",
+    durationLong: "Over 120 min",
+    durationCustom: "Custom",
+    yearPresetThis: "This year",
+    yearPresetLast5: "Last 5 years",
+    yearPresetOlder: "1999 & older",
+    /** The results header count — always the backend's total for the filtered query, never a page length. */
+    matchCount: (count: number) => (count === 1 ? "1 match" : `${count} matches`),
+    noOptions: "No matches",
+    sortRelevance: "Relevance",
+    sortRecentlyAdded: "Recently added",
+    sortNewest: "Newest releases",
+    sortOldest: "Oldest releases",
+    sortRating: "Top rated",
+    sortTitle: "Title A–Z",
+    sortMostViewed: "Most viewed",
+    sortMostPurchased: "Most purchased",
+    /** Honesty hint: this sort ranks by the frozen pre-subscription purchase table. */
+    sortMostPurchasedHint: "Based on purchases from the early-access era",
   },
   /** The /movie/[id] detail page. */
   movieDetail: {
@@ -181,6 +397,9 @@ const en = {
     releaseYear: "Release year",
     genre: "Genre",
     categories: "Categories",
+    cast: "Cast",
+    castCount: (count: number) =>
+      count === 1 ? "1 actor" : `${count} actors`,
     similar: "More like this",
     freeToWatch: "Free to watch",
     premiumTitle: "Premium title",
@@ -271,98 +490,167 @@ const en = {
     privacyPolicy: "Privacy Policy",
     allRightsReserved: (year: number) => `© ${year} MyanFlix. All rights reserved.`,
   },
+  /**
+   * THE FRONT PAGE — the games storefront (The Arcade). Keys are grouped by
+   * what a string IS — a lane word, a verb, a badge, a game's description —
+   * not by which section reads it, so the same sentence is never minted twice
+   * for two surfaces that happen to sit in different components.
+   *
+   * Two rules run through the whole subtree.
+   *
+   * EVERY SENTENCE IS ONE STRING. Nothing below is assembled from clauses in a
+   * component: Burmese is SOV and `mm` is this app's DEFAULT language, so a
+   * clause order that reads in English arrives backwards for most users.
+   * `store.hero.slideLabel` is therefore a whole phrase in each language, not
+   * an "of" wedged between two numerals, and every `store.gameCopy` entry is a
+   * complete description rather than a template.
+   *
+   * MONO CARRIES NO TRANSLATED WORD. Geist Mono has no Myanmar glyphs, so the
+   * storefront's mono runs are prices ("12,800 Ks"), counts, years, ratings
+   * and Latin platform tags only — none of which live here as words. Every
+   * badge label, state word and "playing" below is sans, sitting beside its
+   * mono numeral rather than inside it.
+   */
   home: {
-    banner: {
-      title: "MyanFlix",
-      subtitle: "Entertainment, stories, and everything our company is building — all in one place.",
+    /**
+     * The lane words, and the compile-time contract with lib/home/lanes.ts:
+     * `nameKey` is typed `keyof TranslationShape["home"]["lanes"]`, so a ninth
+     * lane cannot ship until both languages name it — the build fails rather
+     * than a reviewer noticing.
+     *
+     * Singular: the word is a category name on a Discover teaser or an
+     * Explore More row, never a count.
+     */
+    lanes: {
+      film: "Film",
+      series: "Series",
+      book: "Book",
+      music: "Music",
+      game: "Game",
+      anime: "Anime",
+      podcast: "Podcast",
+      live: "Live",
     },
-    announcements: {
-      eyebrow: "What's New",
-      title: "Announcements & Offers",
-      // Controls for the auto-scrolling marquee — it must be stoppable by
-      // anyone who needs the motion to stop (WCAG 2.2.2).
-      pause: "Pause announcements",
-      resume: "Resume announcements",
-      items: [
-        { badge: "Update", title: "4K HDR streaming is here", text: "Selected new releases now stream in 4K HDR on supported devices — no extra charge." },
-        { badge: "New", title: "Myanmar Originals launching", text: "Our first slate of locally produced Originals starts rolling out this quarter." },
-        { badge: "Offer", title: "Refer a friend, earn credit", text: "Invite a friend to MyanFlix and you both get wallet credit once they make their first purchase." },
-        { badge: "Product", title: "MyanFlix is coming to TV", text: "A dedicated smart-TV app is in testing now, built for the big screen." },
-      ],
+    /** The label on a lane's primary action — one per lane, via the registry's `verbKey`. */
+    verbs: {
+      watch: "Watch",
+      read: "Read",
+      listen: "Listen",
+      play: "Play",
+      join: "Join",
     },
-    behindTheScenes: {
-      eyebrow: "Behind the Scenes",
-      title: "Craft Behind the Screen",
-      subtitle: "A peek into the sets, studios, and people shaping what you watch.",
-      items: [
-        { caption: "On set in Yangon", description: "Our production crew filming an upcoming Myanmar Original at first light." },
-        { caption: "Color grading suite", description: "Every title passes through color grading before it's cleared for release." },
-        { caption: "Subtitle & dub studio", description: "Where our localization team turns every film into a two-language experience." },
-        { caption: "Encoding farm", description: "The pipeline that turns a single master file into every quality tier you stream." },
-      ],
+    /** Lane states as words: sans, sitting where a live lane shows a mono count. */
+    state: {
+      preview: "Preview",
+      soon: "Soon",
     },
-    team: {
-      eyebrow: "The People",
-      title: "Meet the Team",
-      subtitle: "The creators and crew building MyanFlix, on and off screen.",
-      members: [
-        { name: "Aye Aye Mon", role: "Head of Content", bio: "Curates every title that makes it to the front page." },
-        { name: "Kyaw Zin Htet", role: "Lead Engineer", bio: "Keeps the streaming pipeline fast, wherever you're watching from." },
-        { name: "Su Su Hlaing", role: "Creative Director", bio: "Shapes the look and feel of every MyanFlix Original." },
-        { name: "Min Thu Aung", role: "Community Lead", bio: "Runs the events and creator partnerships you'll see below." },
-      ],
-    },
-    partners: {
-      eyebrow: "Collaborations",
-      title: "Our Partners",
-      subtitle: "Studios and organizations we make things with.",
-      items: [
-        { name: "Golden Reel Studios", description: "Production partner for our Myanmar Originals slate." },
-        { name: "SEA Film Collective", description: "A regional network championing Southeast Asian cinema." },
-        { name: "Yangon Sound Works", description: "Our audio mixing and mastering partner." },
-        { name: "FrameWorks Post", description: "Color grading and visual effects studio." },
-        { name: "Stagelight Distribution", description: "Brings international titles to MyanFlix first." },
-      ],
-    },
-    testimonials: {
-      eyebrow: "Community",
-      title: "Community Voices",
-      subtitle: "Stories from viewers and members of the MyanFlix community.",
-      // Social-proof chip beside the heading — `count` arrives pre-formatted ("1,037").
-      items: [
-        { quote: "Finally a place where Myanmar films get the same spotlight as international ones.", name: "Thiri Kyaw", role: "Member since 2024" },
-        { quote: "The watch party I hosted for our film club sold out our whole group in a day.", name: "Nay Lin Zaw", role: "Community organizer" },
-        { quote: "I discovered three of my favorite directors through the recommendations here.", name: "Hnin Wai Yan", role: "Member since 2023" },
-        { quote: "Subtitles in both languages made it easy to introduce my parents to the app.", name: "Zaw Min Oo", role: "Member since 2025" },
-      ],
-    },
-    news: {
-      eyebrow: "Stories",
-      title: "MyanFlix Stories",
-      subtitle: "News, interviews, and features from around MyanFlix.",
-      items: [
-        { tag: "Interview", title: "Inside the making of our first Original series", excerpt: "We sat down with the crew behind our upcoming drama to talk process, challenges, and what's next.", date: "This month" },
-        { tag: "Community", title: "How local film clubs are using Watch Parties", excerpt: "A look at how communities across the country are gathering around shared screenings.", date: "Recently" },
-        { tag: "Product", title: "A look inside our streaming pipeline", excerpt: "From upload to playback — the engineering behind getting a film to your screen in minutes.", date: "This month" },
-      ],
-    },
-    roadmap: {
-      eyebrow: "What's Next",
-      title: "The Road Ahead",
-      subtitle: "Where MyanFlix is headed — shipped, in progress, and upcoming.",
-      items: [
-        { period: "Shipped", title: "Series & seasons", description: "Full series support with one purchase unlocking every season and episode.", status: "shipped" },
-        { period: "Shipped", title: "Phone sign-in", description: "Sign up and sign in with just a phone number and a one-time code.", status: "shipped" },
-        { period: "In progress", title: "Smart-TV app", description: "A dedicated app built for the living room, currently in testing.", status: "inProgress" },
-        { period: "Upcoming", title: "Offline downloads", description: "Download a title on Wi-Fi, watch it anywhere without a connection.", status: "upcoming" },
-        { period: "Upcoming", title: "Watch parties", description: "Synced group viewing with friends, wherever they are.", status: "upcoming" },
-      ],
-    },
-    cta: {
-      title: "There's more to explore",
-      subtitle: "Dive into the full catalog of movies and series, or browse by category.",
-      browseMedia: "Browse Media",
-      exploreCategories: "Explore Categories",
+    /** THE STOREFRONT'S OWN COPY — everything below is read only by Store* sections. */
+    store: {
+      hero: {
+        /** Accessible name of the whole carousel region, read before any slide. */
+        regionLabel: "Featured games",
+        kicker: "Featured game",
+        /**
+         * The only credit line the storefront needs: every hero subject is a
+         * game, so the one verb is "made". The name arrives untranslated —
+         * studios are proper nouns.
+         */
+        byStudio: (name: string) => `Made by ${name}`,
+        explore: "Explore game",
+        allGames: "All games",
+        prev: "Previous game",
+        next: "Next game",
+        /** Accessible name on a hero dot — `title` is the game's Latin title. */
+        goTo: (title: string) => `Show ${title}`,
+        /** Position readout for assistive tech — a whole phrase per language, never a bare "x of y" template. */
+        slideLabel: (n: number, total: number) => `${n} of ${total}`,
+      },
+      /**
+       * The status vocabulary — one word per GameBadge in types/game.ts, plus
+       * the hero's `online` chip. Sans, always: a badge is a translated word
+       * even when it sits beside a mono figure.
+       */
+      badge: {
+        live: "Live",
+        new: "New",
+        trending: "Trending",
+        limited: "Limited",
+        comingSoon: "Coming soon",
+        online: "Online",
+      },
+      price: {
+        /** Rendered where a mono kyat figure would sit, which is why it is its own key: "Free" is a word, so it is sans and translated. */
+        free: "Free",
+      },
+      featured: {
+        kicker: "The shelf",
+        title: "Featured games",
+      },
+      promos: {
+        kicker: "Spotlights",
+        title: "Happening on MyanFlix",
+        newRelease: "New release",
+        comingSoon: "Coming soon",
+        freeToPlay: "Free to play",
+        limitedEvent: "Limited-time event",
+        /** The year renders as digits in both languages — the sentence around it is what translates. */
+        expected: (year: number) => `Expected ${year}`,
+      },
+      /** Live-ops event names — one per GameEventKey; the closed set IS this object's keys. */
+      events: {
+        seasonUpdate: "Season update",
+        multiplayerEvent: "Multiplayer event",
+      },
+      live: {
+        kicker: "On right now",
+        title: "Live and busy",
+        /** The sans word beside a mono player count ("12.4K playing") — the figure never lives in this string. */
+        playing: "playing",
+        eventLive: "Event live",
+      },
+      discover: {
+        kicker: "Discover",
+        title: "Discover something new",
+      },
+      explore: {
+        kicker: "Beyond games",
+        title: "Explore more",
+        /** The hint on a gated row when signed out — the row itself links to /login?next=…. */
+        locked: "Sign in to browse",
+      },
+      /**
+       * ONE DESCRIPTION PER GAME, keyed by game id. Game.descriptionKey is
+       * typed against this object, so a game cannot ship until BOTH languages
+       * describe it — the same compile-time contract lanes.ts uses for its
+       * names. Titles, studios and genres stay Latin; only the description
+       * translates.
+       */
+      gameCopy: {
+        "game-lacquer-city":
+          "A rain-slicked open city where every alley remembers you. Trade, climb, and uncover the old quarter's secrets.",
+        "game-monsoon-run":
+          "Sprint the flooded streets with three friends before the storm closes in.",
+        "game-the-long-quiet":
+          "A signal is coming from an empty apartment block. Nobody should be answering.",
+        "game-teahouse-letters":
+          "Pour tea, read letters, and mend the lives that pass your counter.",
+        "game-orbital-ferry":
+          "Pilot the last ferry between failing stations — and decide who gets to board.",
+        "game-the-ninth-floor":
+          "Every night the hotel rearranges itself. Find the room that does not exist.",
+        "game-shwe-market-tycoon":
+          "Build the busiest stall in the market — haggle, stock up, and celebrate.",
+        "game-emberfall":
+          "Raise a fading ember-kingdom and lead its clans through the long dark.",
+        "game-delta-drift":
+          "Outrun the river patrol through delta backwaters in unsanctioned night races.",
+        "game-paper-tigers":
+          "Command paper armies across a folding board where the terrain is yours to crease.",
+        "game-starlit-bazaar":
+          "A night market strung between constellations. Set up shop when the stars open.",
+        "game-signal-thirty":
+          "Thirty minutes of tape. One frequency. Untangle the broadcast before it loops.",
+      },
     },
   },
   player: {
@@ -473,6 +761,10 @@ const en = {
     haveAccount: "Already have an account?",
     signInLink: "Sign in",
     genericError: "Something went wrong. Please try again.",
+    continueWithGoogle: "Continue with Google",
+    or: "or",
+    googleFailed: "Google sign-in didn't go through. Please try again.",
+    googleNotConfigured: "Google sign-in isn't available right now. Please use your phone number.",
   },
   wallet: {
     eyebrow: "Finance",
@@ -677,9 +969,9 @@ const en = {
   },
   dialogs: {
     subscribeTitle: "Choose a plan",
-    subscribeDescription: "Unlimited streaming for 30 days per plan.",
+    subscribeDescription: "Unlimited streaming for the length of the plan you pick.",
     walletBalance: "Wallet balance",
-    days30: "30 days",
+    planDuration: (days: number) => (days === 1 ? "1 day" : `${days} days`),
     subscribe: "Subscribe",
     subscribing: "Subscribing…",
     noPlans: "No subscription plans are available right now.",
@@ -763,7 +1055,7 @@ const mm = {
     series: "ဇာတ်လမ်းတွဲများ",
     books: "စာအုပ်များ",
     music: "ဂီတ",
-    booksComingSoon: "စာအုပ်များကို လောလောဆယ် မရရှိနိုင်သေးပါ။",
+    booksNoResults: "ကိုက်ညီသော စာအုပ် မတွေ့ပါ။",
     musicComingSoon: "ဂီတများကို လောလောဆယ် မရရှိနိုင်သေးပါ။",
     accessAll: "အားလုံး",
     accessFree: "အခမဲ့",
@@ -831,10 +1123,197 @@ const mm = {
     searchMusic: "သီချင်း သို့မဟုတ် အဆိုတော် ရှာဖွေရန်…",
     comingSoon: "မကြာမီ ရရှိမည်",
     previewNote: "စုစည်းမှုကို ကြိုတင်ကြည့်ရှုခြင်းသာဖြစ်ပြီး ဤစာအုပ်နှင့် သီချင်းများကို မကြာမီ ရရှိနိုင်ပါမည်။",
+    allBookTypes: "စာအုပ်အားလုံး",
+    noBooksBody: "အခြား ရှာဖွေမှု သို့မဟုတ် ကဏ္ဍ တစ်ခု စမ်းကြည့်ပါ။",
+    emptyLibraryTitle: "စာအုပ်စင် ပြင်ဆင်နေဆဲ ဖြစ်ပါသည်",
+    emptyLibraryBody: "စာအုပ်အသစ်များ ထုတ်ပြန်သည်နှင့် ဤနေရာတွင် ပေါ်လာပါမည်။",
     bookCount: (count: number) => `စာအုပ် ${count} အုပ်`,
     trackCount: (count: number) => `သီချင်း ${count} ပုဒ်`,
     noBooksTitle: "ကိုက်ညီသော စာအုပ် မတွေ့ပါ",
     noMusicTitle: "ကိုက်ညီသော ဂီတ မတွေ့ပါ",
+  },
+  book: {
+    author: "စာရေးဆရာ",
+    byAuthor: (author: string) => `${author} ရေးသားသည်`,
+    read: "ဖတ်မည်",
+    continueReading: "ဆက်ဖတ်မည်",
+    startReading: "စတင်ဖတ်မည်",
+    about: "ဤစာအုပ်အကြောင်း",
+    details: "အသေးစိတ်",
+    format: "ပုံစံ",
+    formatEditor: "စာသား",
+    formatPdf: "စကင်ဖတ် စာမျက်နှာများ",
+    chapters: "အခန်းများ",
+    pages: "စာမျက်နှာများ",
+    published: "ထုတ်ပြန်ချိန်",
+    categories: "ကဏ္ဍများ",
+    notFoundTitle: "ထိုစာအုပ်ကို ရှာမတွေ့ပါ",
+    notFoundBody: "ထုတ်ပြန်မှု ရုပ်သိမ်းထားခြင်း သို့မဟုတ် ဖယ်ရှားထားခြင်း ဖြစ်နိုင်ပါသည်။",
+    backToLibrary: "စာကြည့်တိုက်သို့ ပြန်သွားမည်",
+    chapterCount: (count: number) => `အခန်း ${count} ခန်း`,
+    pageCount: (count: number) => `စာမျက်နှာ ${count} မျက်နှာ`,
+    summary: "အကျဉ်းချုပ်",
+    availableLanguages: "ရရှိနိုင်သော ဘာသာစကားများ",
+    chapterList: "အခန်းစာရင်း",
+    chapterOf: (n: number) => `အခန်း ${n}`,
+    chapterPages: (count: number) => `စာမျက်နှာ ${count} ခု`,
+    chapterNumber: (n: number) => `#${String(n).padStart(3, "0")}`,
+    sortOrder: "အစီအစဉ် ပြောင်းရန်",
+    noChapters: "အခန်း မရှိသေးပါ။",
+    pagePreview: "အစမ်းကြည့်ရန်",
+    readingIn: (language: string) => `${language} ဖြင့် ဖတ်နေသည်`,
+    // ── Hierarchy: optional parts above chapters, sections inside them ──
+    part: (n: number) => `အပိုင်း ${n}`,
+    parts: "အပိုင်းများ",
+    sections: "အခန်းခွဲများ",
+    section: (n: string) => `အခန်းခွဲ ${n}`,
+    sectionCount: (count: number) => `အခန်းခွဲ ${count} ခု`,
+    pageRange: (from: number, to: number) => `စာမျက်နှာ ${from}–${to}`,
+    reader: {
+      contents: "မာတိကာ",
+      previousChapter: "ယခင် အခန်း",
+      nextChapter: "နောက် အခန်း",
+      previousPage: "ယခင် စာမျက်နှာ",
+      nextPage: "နောက် စာမျက်နှာ",
+      chapterOf: (current: number, total: number) => `အခန်း ${total} ခန်းအနက် ${current}`,
+      pageOf: (current: number, total: number) => `စာမျက်နှာ ${total} အနက် ${current}`,
+      loadError: "စာအုပ်၏ ဤအပိုင်းကို ဖွင့်၍မရပါ။",
+      emptyChapter: "ဤအခန်းတွင် အကြောင်းအရာ မရှိပါ။",
+      emptyBook: "ဤစာအုပ်တွင် ဖတ်ရန် အကြောင်းအရာ မရှိသေးပါ။",
+      resumed: "ရပ်ထားခဲ့သည့်နေရာမှ ဆက်လက် ဖတ်ရှုနိုင်ပါပြီ",
+      jumpToPage: "စာမျက်နှာသို့ သွားမည်",
+      backToBook: "စာအုပ် အသေးစိတ်",
+      finished: "အဆုံးသို့ ရောက်ပါပြီ။",
+      textSize: "စာလုံး အရွယ်အစား",
+      fitWidth: "အကျယ်နှင့် ကိုက်ညီစေရန်",
+      fitPage: "စာမျက်နှာနှင့် ကိုက်ညီစေရန်",
+      chapterLabel: (n: number) => `အခန်း ${n}`,
+      partLabel: (n: number) => `အပိုင်း ${n}`,
+      sectionLabel: (n: string) => `အခန်းခွဲ ${n}`,
+      jumpToSection: "အခန်းခွဲသို့ သွားမည်",
+      display: "အပြင်အဆင်",
+      paper: "စာရွက် အရောင်",
+      smaller: "စာလုံး သေးရန်",
+      larger: "စာလုံး ကြီးရန်",
+      close: "စာအုပ် ပိတ်မည်",
+      themes: {
+        paper: "ဖြူ",
+        sepia: "အညို",
+        night: "ည",
+        amoled: "AMOLED",
+      },
+      // ── Reader suite v2 — settings panel ──────────────────────────────
+      settingsTitle: "စာဖတ် ဆက်တင်များ",
+      settings: "ဆက်တင်များ",
+      sectionAppearance: "အသွင်အပြင်",
+      sectionLayout: "စာမျက်နှာ အပြင်အဆင်",
+      sectionPage: "စာမျက်နှာ",
+      sectionBehavior: "လုပ်ဆောင်ပုံ",
+      fontFamily: "ဖောင့်",
+      fontSerif: "Serif",
+      fontSans: "Sans",
+      fontDyslexic: "ဖတ်ရလွယ်",
+      sizeSmall: "အသေး",
+      sizeMedium: "အလယ်အလတ်",
+      sizeLarge: "အကြီး",
+      sizeXL: "အကြီးဆုံး",
+      sizeCustom: "စိတ်ကြိုက်",
+      lineSpacing: "စာကြောင်း အကွာအဝေး",
+      lineCompact: "ကျစ်လစ်",
+      lineNormal: "ပုံမှန်",
+      lineRelaxed: "ကျယ်",
+      readingWidth: "စာသား အကျယ်",
+      widthNarrow: "ကျဉ်း",
+      widthMedium: "အလယ်အလတ်",
+      widthWide: "ကျယ်",
+      widthFull: "အပြည့်",
+      margins: "ဘေးအနားလွတ်",
+      marginSmall: "ကျဉ်း",
+      marginMedium: "ပုံမှန်",
+      marginLarge: "ကျယ်",
+      brightness: "အလင်းအား",
+      keepAwake: "ဖန်သားပြင် ပွင့်မြဲထားရန်",
+      autoHideControls: "ခလုတ်များ အလိုအလျောက် ဖျောက်ရန်",
+      fullscreen: "မျက်နှာပြင် အပြည့်",
+      exitFullscreen: "မျက်နှာပြင် အပြည့်မှ ထွက်ရန်",
+      alignment: "စာသား ညှိခြင်း",
+      alignJustify: "ညီညာ",
+      alignLeft: "ဘယ်ညှိ",
+      chapterTitleToggle: "အခန်း ခေါင်းစဉ် ပြရန်",
+      readingMode: "ဖတ်ရှုပုံစံ",
+      modeScroll: "အဆက်မပြတ်",
+      modePaginated: "စာမျက်နှာလိုက်",
+      percentRead: (p: number) => `${p}% ဖတ်ပြီး`,
+      estMinutes: (n: number) => `~${n} မိနစ်`,
+      estMinutesLeft: (n: number) => `ကျန် ~${n} မိနစ်`,
+      pageOfShort: (c: number, t: number) => `${c} / ${t}`,
+      // ── Bookmarks, highlights, notes ──────────────────────────────────
+      bookmark: "စာမှတ်",
+      bookmarks: "စာမှတ်များ",
+      addBookmark: "စာမှတ် ထည့်ရန်",
+      removeBookmark: "စာမှတ် ဖယ်ရန်",
+      noBookmarks: "စာမှတ် မရှိသေးပါ။",
+      notesTab: "မှတ်စုများ",
+      highlight: "အရောင်ခြယ်ရန်",
+      removeHighlight: "အရောင် ဖယ်ရန်",
+      noAnnotations: "ဤစာအုပ်တွင် သိမ်းထားသည်များ မရှိသေးပါ။",
+      annotationsLocal: "ဤစက်ထဲတွင်သာ သိမ်းထားသည်",
+      annotationLimit: "အရေအတွက် ပြည့်နေပါပြီ — အချို့ကို အရင် ဖျက်ပါ။",
+      hlYellow: "အဝါ",
+      hlGreen: "အစိမ်း",
+      hlBlue: "အပြာ",
+      hlPink: "ပန်းရောင်",
+      note: "မှတ်စု",
+      addNote: "မှတ်စု ထည့်ရန်",
+      editNote: "မှတ်စု ပြင်ရန်",
+      deleteNote: "ဖျက်ရန်",
+      notePlaceholder: "မှတ်စု ရေးပါ…",
+      saveNote: "သိမ်းရန်",
+      copyAction: "ကူးယူရန်",
+      copied: "ကူးယူပြီးပါပြီ",
+      // ── In-book search ────────────────────────────────────────────────
+      searchBook: "ရှာဖွေရန်",
+      searchInBook: "စာအုပ်ထဲတွင် ရှာရန်",
+      searchPlaceholder: "ဤစာအုပ်ထဲတွင် ရှာရန်…",
+      searchTooShort: "အနည်းဆုံး စာလုံး 2 လုံး ရိုက်ပါ။",
+      searching: "ရှာနေသည်…",
+      searchCount: (n: number) => `ရလဒ် ${n} ခု`,
+      searchNoResults: "ရလဒ် မတွေ့ပါ။",
+      // ── Page reader view modes ────────────────────────────────────────
+      pageLayout: "စာမျက်နှာ အပြင်အဆင်",
+      layoutSingle: "တစ်မျက်နှာ",
+      layoutDouble: "နှစ်မျက်နှာတွဲ",
+      layoutScroll: "အဆက်မပြတ်",
+      fitHeight: "အမြင့်နှင့် ကိုက်ညီစေရန်",
+      fitScreen: "မျက်နှာပြင်နှင့် ကိုက်ညီစေရန်",
+      zoom: "ချဲ့/ချုံ့",
+      zoomIn: "ချဲ့ရန်",
+      zoomOut: "ချုံ့ရန်",
+      zoomReset: "မူလ အရွယ်",
+      rotate: "လှည့်ရန်",
+      thumbnails: "စာမျက်နှာများ",
+      firstPage: "ပထမ စာမျက်နှာ",
+      lastPage: "နောက်ဆုံး စာမျက်နှာ",
+      background: "နောက်ခံ",
+      bgTheme: "အပြင်အဆင်အတိုင်း",
+      bgBlack: "အနက်",
+      bgGray: "မီးခိုး",
+      bgWhite: "အဖြူ",
+      direction: "ဖတ်ရှုရာ လားရာ",
+      dirLtr: "ဘယ်မှ ညာ",
+      dirRtl: "ညာမှ ဘယ်",
+      // ── Keyboard shortcuts ────────────────────────────────────────────
+      shortcuts: "ကီးဘုတ် ဖြတ်လမ်းများ",
+      shortcutGroupNav: "သွားလာရန်",
+      shortcutGroupPanels: "အကန့်များ",
+      shortcutGroupView: "မြင်ကွင်း",
+      shortcutTurnPage: "စာမျက်နှာ လှန်ရန်",
+      shortcutChapters: "အခန်း ပြောင်းရန်",
+      shortcutScrollScreen: "တစ်မျက်နှာစာ ရွှေ့ရန်",
+      shortcutFirstLast: "ပထမ / နောက်ဆုံး စာမျက်နှာ",
+      shortcutClose: "ပိတ်ရန် / ထွက်ရန်",
+      shortcutHelp: "ဤအကူအညီ ပြရန်",
+    },
   },
   filters: {
     title: "စစ်ထုတ်မှုများ",
@@ -856,6 +1335,30 @@ const mm = {
     showResults: (count: number) => `ရလဒ် ${count} ခု ကြည့်ရန်`,
     activeCount: (count: number) => `စစ်ထုတ်မှု ${count} ခု အသုံးပြုထားသည်`,
     noneApplied: "မည်သည့်စစ်ထုတ်မှုမျှ မရှိသေးပါ",
+    actor: "သရုပ်ဆောင်",
+    actorSearchPlaceholder: "သရုပ်ဆောင် ရှာရန်…",
+    director: "ဒါရိုက်တာ",
+    country: "နိုင်ငံ",
+    ageRating: "အသက်အရွယ် ကန့်သတ်ချက်",
+    duration: "ကြာချိန်",
+    durationShort: "မိနစ် ၉၀ အောက်",
+    durationMedium: "မိနစ် ၉၀–၁၂၀",
+    durationLong: "မိနစ် ၁၂၀ အထက်",
+    durationCustom: "စိတ်ကြိုက်",
+    yearPresetThis: "ယခုနှစ်",
+    yearPresetLast5: "နောက်ဆုံး ၅ နှစ်",
+    yearPresetOlder: "၁၉၉၉ နှင့် အရင်",
+    matchCount: (count: number) => `ကိုက်ညီမှု ${count} ခု`,
+    noOptions: "ကိုက်ညီမှု မတွေ့ပါ",
+    sortRelevance: "ကိုက်ညီမှုအလိုက်",
+    sortRecentlyAdded: "မကြာသေးမီက ထည့်ထားသော",
+    sortNewest: "အသစ်ဆုံး",
+    sortOldest: "အဟောင်းဆုံး",
+    sortRating: "အဆင့်အမြင့်ဆုံး",
+    sortTitle: "ခေါင်းစဉ်အလိုက်",
+    sortMostViewed: "အကြည့်အများဆုံး",
+    sortMostPurchased: "အဝယ်အများဆုံး",
+    sortMostPurchasedHint: "စာရင်းသွင်းစနစ် မတိုင်မီ ဝယ်ယူမှုများအပေါ် အခြေခံသည်",
   },
   movieDetail: {
     notFoundTitle: "ထိုဇာတ်ကားကို ရှာမတွေ့ပါ",
@@ -875,6 +1378,8 @@ const mm = {
     releaseYear: "ထုတ်လုပ်သည့်နှစ်",
     genre: "အမျိုးအစား",
     categories: "ကဏ္ဍများ",
+    cast: "သရုပ်ဆောင်များ",
+    castCount: (count: number) => `သရုပ်ဆောင် ${count} ဦး`,
     similar: "ဆင်တူဇာတ်ကားများ",
     freeToWatch: "အခမဲ့ကြည့်ရှုနိုင်",
     premiumTitle: "ပရီမီယမ် ဇာတ်ကား",
@@ -959,94 +1464,113 @@ const mm = {
     allRightsReserved: (year: number) => `© ${year} MyanFlix။ မူပိုင်ခွင့်အားလုံးကို ထိန်းသိမ်းထားသည်။`,
   },
   home: {
-    banner: {
-      title: "MyanFlix",
-      subtitle: "ကျွန်ုပ်တို့ကုမ္ပဏီ တည်ဆောက်နေသော ဖျော်ဖြေရေး၊ ဇာတ်လမ်းများနှင့် အရာအားလုံး — တစ်နေရာတည်းတွင်။",
+    lanes: {
+      film: "ရုပ်ရှင်",
+      series: "ဇာတ်လမ်းတွဲ",
+      book: "စာအုပ်",
+      music: "ဂီတ",
+      game: "ဂိမ်း",
+      anime: "အန်နီမေး",
+      podcast: "ပို့တ်ကာစ့်",
+      live: "တိုက်ရိုက်",
     },
-    announcements: {
-      eyebrow: "အသစ်များ",
-      title: "ကြေညာချက်များနှင့် ပရိုမိုးရှင်းများ",
-      pause: "ကြေညာချက်များ ခဏရပ်ရန်",
-      resume: "ကြေညာချက်များ ဆက်လက်ပြရန်",
-      items: [
-        { badge: "အပ်ဒိတ်", title: "4K HDR streaming စတင်ပါပြီ", text: "ရုပ်ရှင်အသစ်အချို့ကို ထောက်ခံသည့်စက်ပစ္စည်းများတွင် အခမဲ့ 4K HDR ဖြင့် ကြည့်ရှုနိုင်ပါပြီ။" },
-        { badge: "အသစ်", title: "မြန်မာ Originals များ မကြာမီစတင်", text: "ကျွန်ုပ်တို့ ကိုယ်ပိုင်ထုတ်လုပ်သည့် Original ပထမဆုံးစီးရီးများကို ဤသုံးလပတ်တွင် စတင်ပြသမည်။" },
-        { badge: "ပရိုမိုးရှင်း", title: "မိတ်ဆွေကိုမိတ်ဆက်ပြီး အကျိုးအမြတ်ရယူပါ", text: "မိတ်ဆွေတစ်ဦးကို MyanFlix သို့ ဖိတ်ခေါ်ပြီး ၎င်းတို့၏ ပထမဆုံးဝယ်ယူမှုပြီးလျှင် နှစ်ဦးစလုံး ပိုက်ဆံအိတ်ခရက်ဒစ် ရရှိမည်။" },
-        { badge: "ထုတ်ကုန်", title: "MyanFlix TV အက်ပ် မကြာမီရောက်ရှိ", text: "စမတ်တီဗီအတွက် အထူးဒီဇိုင်းထုတ်ထားသည့် အက်ပ်ကို ယခုစမ်းသပ်နေဆဲဖြစ်သည်။" },
-      ],
+    verbs: {
+      watch: "ကြည့်ရန်",
+      read: "ဖတ်ရန်",
+      listen: "နားဆင်ရန်",
+      play: "ကစားရန်",
+      join: "ပါဝင်ရန်",
     },
-    behindTheScenes: {
-      eyebrow: "ရုပ်ရှင်နောက်ကွယ်",
-      title: "ဖန်တီးမှုနောက်ကွယ်က အလုပ်",
-      subtitle: "သင်ကြည့်ရှုနေသည့်အရာများကို ပုံဖော်ပေးသော ဖလင်ရိုက်ကွင်း၊ စတူဒီယိုနှင့် လူများအကြောင်း တစ်စိတ်တစ်ပိုင်း။",
-      items: [
-        { caption: "ရန်ကုန်တွင် ဖလင်ရိုက်ခြင်း", description: "မကြာမီထွက်ရှိမည့် မြန်မာ Original တစ်ခုကို နံနက်စောစော ရိုက်ကူးနေသည့် ကျွန်ုပ်တို့၏ ထုတ်လုပ်ရေးအဖွဲ့။" },
-        { caption: "အရောင်ညှိစတူဒီယို", description: "ရုပ်ရှင်တိုင်းသည် ထုတ်လွှင့်ခွင့်မပြုမီ အရောင်ညှိခြင်းအဆင့်ကို ဖြတ်သန်းရသည်။" },
-        { caption: "စာတန်းထိုးနှင့် အသံသွင်းစတူဒီယို", description: "ကျွန်ုပ်တို့၏ ဘာသာပြန်အဖွဲ့က ရုပ်ရှင်တိုင်းကို ဘာသာစကားနှစ်မျိုးဖြင့် ခံစားနိုင်အောင် ပြင်ဆင်ပေးသည့်နေရာ။" },
-        { caption: "အင်ကုတ်ဒင်းလုပ်ငန်းစဉ်", description: "မာစတာဖိုင်တစ်ခုတည်းမှ သင်ကြည့်ရှုနေသည့် အရည်အသွေးအဆင့်တိုင်းအဖြစ် ပြောင်းလဲပေးသည့် လုပ်ငန်းစဉ်။" },
-      ],
+    state: {
+      preview: "အစမ်း",
+      soon: "မကြာမီ",
     },
-    team: {
-      eyebrow: "လူများ",
-      title: "အဖွဲ့ဝင်များနှင့် တွေ့ဆုံပါ",
-      subtitle: "ကျွန်ုပ်တို့၏ MyanFlix ကို တည်ဆောက်နေသော ဖန်တီးသူများနှင့် ဝန်ထမ်းများ။",
-      members: [
-        { name: "အေးအေးမွန်", role: "အကြောင်းအရာဌာနတာဝန်ခံ", bio: "ပင်မစာမျက်နှာသို့ရောက်လာသော ဇာတ်လမ်းတိုင်းကို ရွေးချယ်ပေးသူ။" },
-        { name: "ကျော်ဇင်ထက်", role: "ဦးဆောင်အင်ဂျင်နီယာ", bio: "သင်ဘယ်နေရာကနေကြည့်နေသည်ဖြစ်စေ streaming pipeline ကို မြန်ဆန်စွာထိန်းသိမ်းပေးသူ။" },
-        { name: "စုစုလှိုင်", role: "ဖန်တီးမှုညွှန်ကြားရေးမှူး", bio: "MyanFlix Original တိုင်း၏ အသွင်အပြင်ကို ပုံဖော်ပေးသူ။" },
-        { name: "မင်းသူအောင်", role: "အသိုင်းအဝိုင်းတာဝန်ခံ", bio: "အောက်တွင်တွေ့ရမည့် ပွဲများနှင့် ဖန်တီးသူများနှင့် ပူးပေါင်းဆောင်ရွက်မှုများကို ဦးဆောင်သူ။" },
-      ],
-    },
-    partners: {
-      eyebrow: "ပူးပေါင်းဆောင်ရွက်မှုများ",
-      title: "ကျွန်ုပ်တို့၏ မိတ်ဖက်များ",
-      subtitle: "ကျွန်ုပ်တို့ ပူးပေါင်းလုပ်ဆောင်နေသော စတူဒီယိုများနှင့် အဖွဲ့အစည်းများ။",
-      items: [
-        { name: "Golden Reel Studios", description: "ကျွန်ုပ်တို့၏ မြန်မာ Originals များအတွက် ထုတ်လုပ်ရေးမိတ်ဖက်။" },
-        { name: "SEA Film Collective", description: "အရှေ့တောင်အာရှ ရုပ်ရှင်များကို မြှင့်တင်ပေးသည့် ဒေသဆိုင်ရာကွန်ရက်။" },
-        { name: "Yangon Sound Works", description: "ကျွန်ုပ်တို့၏ အသံနှောစပ်ခြင်းနှင့် mastering မိတ်ဖက်။" },
-        { name: "FrameWorks Post", description: "အရောင်ညှိခြင်းနှင့် အထူးဂရပ်ဖစ်များ စတူဒီယို။" },
-        { name: "Stagelight Distribution", description: "နိုင်ငံတကာဇာတ်ကားများကို MyanFlix သို့ ဦးဆုံးယူဆောင်ပေးသူ။" },
-      ],
-    },
-    testimonials: {
-      eyebrow: "အသိုင်းအဝိုင်း",
-      title: "အသိုင်းအဝိုင်း၏ အသံများ",
-      subtitle: "MyanFlix ကြည့်ရှုသူများနှင့် အသင်းဝင်များထံမှ ဇာတ်လမ်းများ။",
-      items: [
-        { quote: "နောက်ဆုံးတော့ မြန်မာရုပ်ရှင်များကို နိုင်ငံတကာဇာတ်ကားများနှင့် တန်းတူ ဂုဏ်ပြုသည့်နေရာတစ်ခုရှိပါပြီ။", name: "သီရိကျော်", role: "၂၀၂၄ ခုနှစ်မှစ၍ အသင်းဝင်" },
-        { quote: "ကျွန်ုပ်၏ ရုပ်ရှင်ကလပ်အတွက် စီစဉ်ခဲ့သည့် Watch Party ကို တစ်ရက်အတွင်း အုပ်စုအပြည့်ဖြစ်သွားသည်။", name: "နေလင်းဇော်", role: "အသိုင်းအဝိုင်းစီစဉ်သူ" },
-        { quote: "ဤနေရာမှ အကြံပြုချက်များကြောင့် ကျွန်ုပ်အကြိုက်ဆုံးဒါရိုက်တာသုံးဦးကို ရှာဖွေတွေ့ရှိခဲ့သည်။", name: "နှင်းဝေယံ", role: "၂၀၂၃ ခုနှစ်မှစ၍ အသင်းဝင်" },
-        { quote: "ဘာသာစကားနှစ်မျိုးဖြင့် စာတန်းထိုးထားခြင်းကြောင့် မိဘများကို အက်ပ်နှင့် မိတ်ဆက်ပေးရန် လွယ်ကူသွားသည်။", name: "ဇော်မင်းဦး", role: "၂၀၂၅ ခုနှစ်မှစ၍ အသင်းဝင်" },
-      ],
-    },
-    news: {
-      eyebrow: "ဇာတ်လမ်းများ",
-      title: "MyanFlix ဇာတ်လမ်းများ",
-      subtitle: "MyanFlix ပတ်ဝန်းကျင်မှ သတင်းများ၊ တွေ့ဆုံမေးမြန်းချက်များနှင့် ဆောင်းပါးများ။",
-      items: [
-        { tag: "တွေ့ဆုံမေးမြန်းချက်", title: "ကျွန်ုပ်တို့၏ ပထမဆုံး Original စီးရီး ရိုက်ကူးမှုနောက်ကွယ်", excerpt: "မကြာမီထွက်ရှိမည့် ဒရာမာဇာတ်လမ်းတွဲနောက်ကွယ်ရှိ အဖွဲ့နှင့် လုပ်ငန်းစဉ်၊ စိန်ခေါ်မှုများအကြောင်း ဆွေးနွေးထားသည်။", date: "ယခုလ" },
-        { tag: "အသိုင်းအဝိုင်း", title: "ဒေသဆိုင်ရာ ရုပ်ရှင်ကလပ်များ Watch Party အသုံးပြုပုံ", excerpt: "နိုင်ငံတစ်ဝှမ်းလုံးရှိ အသိုင်းအဝိုင်းများ ဇာတ်လမ်းတူညီစွာကြည့်ရှုမှုများအတွက် စုစည်းလာပုံကို လေ့လာကြည့်ကြပါစို့။", date: "မကြာသေးမီက" },
-        { tag: "ထုတ်ကုန်", title: "ကျွန်ုပ်တို့၏ streaming pipeline အတွင်းသို့", excerpt: "တင်ခြင်းမှ ပြန်ကြည့်ခြင်းအထိ — ရုပ်ရှင်တစ်ကားကို မိနစ်ပိုင်းအတွင်း သင့်စခရင်ပေါ်ရောက်အောင် ယူဆောင်ပေးသည့် အင်ဂျင်နီယာအလုပ်။", date: "ယခုလ" },
-      ],
-    },
-    roadmap: {
-      eyebrow: "နောက်တစ်ဆင့်",
-      title: "ရှေ့ဆက်လမ်းကြောင်း",
-      subtitle: "MyanFlix ဦးတည်ရာ — ပြီးစီးပြီးသား၊ လုပ်ဆောင်နေဆဲနှင့် လာမည့်အစီအစဉ်များ။",
-      items: [
-        { period: "ပြီးစီးပြီး", title: "ဇာတ်လမ်းတွဲနှင့် ရာသီများ", description: "တစ်ကြိမ်ဝယ်ယူမှုဖြင့် ရာသီနှင့်အပိုင်းအားလုံးကို ဖွင့်ပေးသော ဇာတ်လမ်းတွဲစနစ်အပြည့်အစုံ။", status: "shipped" },
-        { period: "ပြီးစီးပြီး", title: "ဖုန်းနံပါတ်ဖြင့် ဝင်ရောက်ခြင်း", description: "ဖုန်းနံပါတ်နှင့် တစ်ကြိမ်သုံးကုဒ်တစ်ခုဖြင့်သာ အကောင့်ဖွင့်ပြီး ဝင်ရောက်နိုင်ပါသည်။", status: "shipped" },
-        { period: "လုပ်ဆောင်နေဆဲ", title: "စမတ်တီဗီအက်ပ်", description: "ဧည့်ခန်းအတွက် အထူးဒီဇိုင်းထုတ်ထားသော အက်ပ်ကို ယခုစမ်းသပ်နေဆဲ။", status: "inProgress" },
-        { period: "လာမည့်အစီအစဉ်", title: "အော့ဖ်လိုင်း ဒေါင်းလုဒ်များ", description: "Wi-Fi ဖြင့် ဒေါင်းလုဒ်လုပ်ပြီး ချိတ်ဆက်မှုမလိုဘဲ နေရာမရွေးကြည့်ရှုနိုင်ပါမည်။", status: "upcoming" },
-        { period: "လာမည့်အစီအစဉ်", title: "Watch Party များ", description: "မိတ်ဆွေများနှင့်အတူ မည်သည့်နေရာမှမဆို တစ်ပြိုင်နက်တည်း ကြည့်ရှုနိုင်ခြင်း။", status: "upcoming" },
-      ],
-    },
-    cta: {
-      title: "ထပ်မံရှာဖွေစရာများ ရှိပါသေးသည်",
-      subtitle: "ရုပ်ရှင်နှင့် ဇာတ်လမ်းတွဲများ အပြည့်အစုံကို လေ့လာကြည့်ရှုပါ၊ သို့မဟုတ် အမျိုးအစားအလိုက် ရှာဖွေပါ။",
-      browseMedia: "မီဒီယာများကြည့်ရန်",
-      exploreCategories: "အမျိုးအစားများကြည့်ရန်",
+    store: {
+      hero: {
+        regionLabel: "ရွေးချယ်ထားသော ဂိမ်းများ",
+        kicker: "ရွေးချယ်ထားသော ဂိမ်း",
+        // The name leads and the verb closes — SOV, like every credit line
+        // this file has ever carried. Studio names stay Latin.
+        byStudio: (name: string) => `${name} ဖန်တီးသည်`,
+        explore: "ဂိမ်းကို လေ့လာရန်",
+        allGames: "ဂိမ်းအားလုံး",
+        prev: "ယခင်ဂိမ်း",
+        next: "နောက်ဂိမ်း",
+        goTo: (title: string) => `${title} ကို ပြရန်`,
+        // A whole Burmese phrase — "the nth of total" reads total-first here,
+        // which is exactly why this is one string and never an "of" template.
+        slideLabel: (n: number, total: number) => `${total} ခုအနက် ${n} ခုမြောက်`,
+      },
+      badge: {
+        live: "တိုက်ရိုက်",
+        new: "အသစ်",
+        trending: "ခေတ်စား",
+        limited: "အချိန်ကန့်သတ်",
+        comingSoon: "မကြာမီ",
+        online: "အွန်လိုင်း",
+      },
+      price: {
+        free: "အခမဲ့",
+      },
+      featured: {
+        kicker: "စင်မြင့်ပေါ်မှ",
+        title: "ရွေးချယ်ထားသော ဂိမ်းများ",
+      },
+      promos: {
+        kicker: "အထူးတင်ဆက်မှုများ",
+        title: "MyanFlix တွင် ဖြစ်ပျက်နေသည်များ",
+        newRelease: "အသစ်ထွက်ရှိမှု",
+        comingSoon: "မကြာမီ ရောက်လာမည်",
+        freeToPlay: "အခမဲ့ ကစားနိုင်သည်",
+        limitedEvent: "အချိန်ကန့်သတ် ပွဲ",
+        expected: (year: number) => `${year} တွင် ထွက်ရှိရန် မျှော်မှန်းထားသည်`,
+      },
+      events: {
+        seasonUpdate: "ရာသီအသစ် မွမ်းမံမှု",
+        multiplayerEvent: "အများကစား ပွဲ",
+      },
+      live: {
+        kicker: "ယခု ပွင့်လင်းနေသည်",
+        title: "တိုက်ရိုက် စည်ကားနေသည်",
+        // Sans, beside the mono player figure — the count never enters this word.
+        playing: "ကစားနေသည်",
+        eventLive: "ပွဲ စတင်နေပြီ",
+      },
+      discover: {
+        kicker: "ရှာဖွေကြည့်ရန်",
+        title: "အသစ်တစ်ခု ရှာဖွေကြည့်ပါ",
+      },
+      explore: {
+        kicker: "ဂိမ်းအလွန်",
+        title: "နောက်ထပ် လေ့လာရန်",
+        locked: "ကြည့်ရှုရန် ဝင်ရောက်ပါ",
+      },
+      gameCopy: {
+        "game-lacquer-city":
+          "မိုးရေစိုနေသော မြို့ကြီးထဲ လမ်းကြားတိုင်းက သင့်ကို မှတ်မိနေသည်။ ရောင်းဝယ်၊ တက်ချီပြီး မြို့ဟောင်းရပ်ကွက်၏ လျှို့ဝှက်ချက်များကို ဖော်ထုတ်ပါ။",
+        "game-monsoon-run":
+          "မုန်တိုင်း မပိတ်မီ ရေလွှမ်းနေသော လမ်းများပေါ်တွင် သူငယ်ချင်း သုံးယောက်နှင့်အတူ ပြေးလွှားပါ။",
+        "game-the-long-quiet":
+          "လူသူကင်းမဲ့ တိုက်ခန်းတစ်ခုမှ အချက်ပြသံ ထွက်ပေါ်နေသည်။ ဖြေကြားနေသူ မရှိသင့်ပါ။",
+        "game-teahouse-letters":
+          "လက်ဖက်ရည် ငှဲ့ရင်း စာများဖတ်ကာ ဆိုင်ရှေ့ဖြတ်သွားသူတို့၏ ဘဝများကို ပြုပြင်ပေးပါ။",
+        "game-orbital-ferry":
+          "ပျက်စီးလုနီး စခန်းများကြားမှ နောက်ဆုံး ကူးတို့ယာဉ်ကို မောင်းနှင်ပြီး မည်သူ စီးခွင့်ရမည်ကို ဆုံးဖြတ်ပါ။",
+        "game-the-ninth-floor":
+          "ညတိုင်း ဟိုတယ်က အခန်းဖွဲ့စည်းပုံ ပြောင်းလဲသွားသည်။ မတည်ရှိသော အခန်းကို ရှာဖွေပါ။",
+        "game-shwe-market-tycoon":
+          "ဈေးထဲတွင် အစည်ကားဆုံး ဆိုင်ခန်းကို တည်ဆောက်ပါ — ဈေးဆစ်၊ ကုန်ဖြည့်ပြီး အောင်ပွဲခံပါ။",
+        "game-emberfall":
+          "မှိန်လုနီး မီးကျီးနိုင်ငံကို ပြန်လည်ထူထောင်ပြီး ညရှည်ကြီးကို ဖြတ်သန်းရန် မျိုးနွယ်စုများကို ဦးဆောင်ပါ။",
+        "game-delta-drift":
+          "မြစ်ဝကျွန်းပေါ် ရေလမ်းကြားများတွင် ခွင့်ပြုချက်မဲ့ ညသန်းခေါင် ပြိုင်ပွဲများဖြင့် ကင်းလှည့်တပ်ကို ကျော်ပြေးပါ။",
+        "game-paper-tigers":
+          "ခေါက်နိုင်သော စစ်မြေပြင်ပေါ်တွင် စက္ကူ စစ်တပ်များကို ကွပ်ကဲပါ — မြေမျက်နှာပြင်ကို သင်ကိုယ်တိုင် ခေါက်ယူနိုင်သည်။",
+        "game-starlit-bazaar":
+          "ကြယ်စုများကြား ဆင်နွှဲသော ညဈေးတန်း။ ကြယ်တံခါး ပွင့်ချိန်တွင် ဆိုင်ခင်းလိုက်ပါ။",
+        "game-signal-thirty":
+          "တိပ်ခွေ မိနစ်သုံးဆယ်။ လှိုင်းနှုန်း တစ်ခုတည်း။ ထပ်မပတ်မီ အသံလွှင့်ချက်ကို ဖြေရှင်းပါ။",
+      },
     },
   },
   player: {
@@ -1153,6 +1677,10 @@ const mm = {
     haveAccount: "အကောင့် ရှိပြီးသားလား?",
     signInLink: "ဝင်ရောက်ရန်",
     genericError: "တစ်ခုခု မှားယွင်းသွားသည်။ ထပ်စမ်းကြည့်ပါ။",
+    continueWithGoogle: "Google ဖြင့် ဆက်လုပ်ရန်",
+    or: "သို့မဟုတ်",
+    googleFailed: "Google ဖြင့် ဝင်ရောက်ခြင်း မအောင်မြင်ပါ။ ထပ်စမ်းကြည့်ပါ။",
+    googleNotConfigured: "Google ဖြင့် ဝင်ရောက်ခြင်းကို ယခု အသုံးပြု၍ မရသေးပါ။ ဖုန်းနံပါတ်ဖြင့် ဝင်ရောက်ပါ။",
   },
   wallet: {
     eyebrow: "ငွေကြေး",
@@ -1357,9 +1885,9 @@ const mm = {
   },
   dialogs: {
     subscribeTitle: "အစီအစဉ် ရွေးပါ",
-    subscribeDescription: "အစီအစဉ်တစ်ခုလျှင် ရက် ၃၀ အကန့်အသတ်မဲ့ ကြည့်ရှုနိုင်သည်။",
+    subscribeDescription: "ရွေးချယ်သော အစီအစဉ်၏ သက်တမ်းအတွင်း အကန့်အသတ်မဲ့ ကြည့်ရှုနိုင်သည်။",
     walletBalance: "ပိုက်ဆံအိတ် လက်ကျန်",
-    days30: "ရက် ၃၀",
+    planDuration: (days: number) => `${days} ရက်`,
     subscribe: "စာရင်းသွင်းရန်",
     subscribing: "စာရင်းသွင်းနေသည်…",
     noPlans: "လောလောဆယ် အစီအစဉ်များ မရှိသေးပါ။",

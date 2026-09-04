@@ -21,7 +21,7 @@ import { COMMENT_BODY_MAX, type Comment, type CommentTarget } from "@/types/comm
 import type { TranslationShape } from "@/lib/i18n/translations";
 
 /**
- * Comment thread for a movie or series.
+ * Comment thread for a movie, series or book.
  *
  * REPLY-FIRST BY DESIGN: the only affordance on a comment is "reply", and there
  * are deliberately no reactions — a like button turns a conversation into a
@@ -75,9 +75,14 @@ export function CommentsSection(target: CommentTarget) {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [openReplies, setOpenReplies] = useState<Record<string, boolean>>({});
 
-  // Both ids are in the key: a movie and a series are different threads even
-  // in the impossible case that they ever shared an id.
-  const queryKey = ["comments", target.movieId ?? null, target.seriesId ?? null];
+  // All three ids are in the key: a movie, a series and a book are different
+  // threads even in the impossible case that they ever shared an id.
+  const queryKey = [
+    "comments",
+    target.movieId ?? null,
+    target.seriesId ?? null,
+    target.bookId ?? null,
+  ];
 
   const {
     data: comments,

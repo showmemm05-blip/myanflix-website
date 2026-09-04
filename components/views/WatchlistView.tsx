@@ -98,7 +98,7 @@ export function WatchlistView({
                 <div key={movie.id} className="relative isolate min-w-0">
                   <MediaCard
                     item={item}
-                    sizes="(max-width: 640px) 92vw, (max-width: 1280px) 46vw, 380px"
+                    sizes="(max-width: 640px) 46vw, (max-width: 768px) 30vw, 220px"
                   />
 
                   {/* Un-save sits where the browse card's watchlist pin does —
@@ -141,5 +141,6 @@ export function WatchlistView({
   );
 }
 
-/** The landscape card's ladder — one per row on a phone, up to three at the account measure. */
-const gridClass = "grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3";
+/** The portrait card's ladder, bounded by the 896px account measure — four across at the cap. */
+const gridClass =
+  "grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-6 md:grid-cols-4";

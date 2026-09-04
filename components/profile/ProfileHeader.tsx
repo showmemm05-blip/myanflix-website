@@ -48,7 +48,7 @@ export function ProfileHeader({ user }: { user: AppUser }) {
     setBusy("upload");
     try {
       const updated = await profileService.uploadAvatar(file);
-      updateUser(updated); // Navbar avatar refreshes instantly — no reload.
+      updateUser(updated); // Account-menu avatar refreshes instantly — no reload.
       toast.success(t.profile.photoUpdated);
     } catch {
       toast.error(t.profile.photoUploadFailed);
@@ -156,7 +156,7 @@ export function ProfileHeader({ user }: { user: AppUser }) {
               name heading right above already covers username-only accounts. */}
           {user.phone && <p className="truncate text-sm text-muted-foreground nums">{user.phone}</p>}
           <p className="mt-1 text-xs text-muted-foreground">{t.profile.memberSince(memberSince)}</p>
-          <div className="mt-3.5 flex justify-center sm:justify-start">
+          <div className="mt-3.5 flex flex-wrap justify-center gap-2 sm:justify-start">
             {user.isSubscribed && expiresAt ? (
               <Chip tone="premium" variant="outline">
                 <Crown className="size-3.5" />

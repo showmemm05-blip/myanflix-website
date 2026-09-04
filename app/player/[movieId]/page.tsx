@@ -600,7 +600,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
 
   if (!movie) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="flex min-h-[60vh] items-center justify-center p-4">
         <EmptyState
           icon={Clapperboard}
           title={t.player.state.notFound}
@@ -621,6 +621,8 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const posterUrl = movie.coverUrl ?? FALLBACK_COVER_URL;
   const showRail = Boolean(movie.seriesId);
   const similarItems = (similarMovies ?? []).map((m) => movieToBrowseItem(m, formatDuration(m.duration)));
+  // null when the runtime was never measured — the Clock chip is dropped rather than reading "0m".
+  const runtime = formatDuration(movie.duration);
   // The bar has to survive a drag and an open menu, and there's no reason to hide
   // it from a paused picture — nobody is watching anything at that moment.
   const showControls = controlsVisible || !isPlaying || isScrubbing || isMenuOpen;
@@ -632,10 +634,10 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   }));
 
   return (
-    <div className="relative flex min-h-screen flex-col">
+    <div className="relative flex flex-col">
       <AmbientBackdrop videoRef={videoRef} posterUrl={posterUrl} active={hasStarted} />
 
-      <main
+      <div
         className={cn(
           "mx-auto w-full flex-1 pb-8 lg:px-8 lg:pt-6",
           isTheater ? "max-w-[1920px]" : "max-w-[1600px]",
@@ -931,10 +933,12 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
                   <Calendar />
                   <span className="nums">{movie.releaseYear}</span>
                 </Chip>
-                <Chip tone="neutral" size="sm" variant="outline">
-                  <Clock />
-                  <span className="nums">{formatDuration(movie.duration)}</span>
-                </Chip>
+                {runtime && (
+                  <Chip tone="neutral" size="sm" variant="outline">
+                    <Clock />
+                    <span className="nums">{runtime}</span>
+                  </Chip>
+                )}
                 <Chip tone="neutral" size="sm" variant="outline">
                   {movie.genre}
                 </Chip>
@@ -952,8 +956,9 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
           </div>
 
           {showRail && (
-            // top-[4.5rem] clears the sticky h-14 context bar above the player.
-            <div className={cn("px-4 sm:px-6 lg:px-0", isTheater ? "mt-6" : "lg:sticky lg:top-[4.5rem]")}>
+            // top-6 mirrors the content column's lg:pt-6, so the episode list's
+            // top edge stays flush with the video's.
+            <div className={cn("px-4 sm:px-6 lg:px-0", isTheater ? "mt-6" : "lg:sticky lg:top-6")}>
               <EpisodeRail
                 seriesId={movie.seriesId!}
                 currentEpisodeId={movie.id}
@@ -967,11 +972,17 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
           // -mx-8 cancels main's lg:px-8 so the rail's own px-8 lines its
           // heading up with the player content while the scroller still
           // bleeds to the container edge, matching the movies page.
-          <div className="mt-8 lg:-mx-8">
+          //
+          // lg:max-w-[1600px] carries NO auto margins on purpose: in theater
+          // mode this wrapper is 1920px wide, and PosterRail's own
+          // `mx-auto max-w-[1600px]` would centre the rail inside it, throwing
+          // "Recommended" ~124px right of the video. Capping the wrapper while
+          // leaving it left-aligned makes that inner mx-auto a no-op.
+          <div className="mt-8 lg:-mx-8 lg:max-w-[1600px]">
             <PosterRail title={t.player.meta.recommended} items={similarItems} isLoading={isSimilarLoading} />
           </div>
         ) : null}
-      </main>
+      </div>
 
       <SubscribeDialog open={subscribeOpen} onOpenChange={setSubscribeOpen} />
       <ShareDialog

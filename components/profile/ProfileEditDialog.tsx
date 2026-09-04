@@ -211,7 +211,7 @@ export function ProfileEditDialog({
     setPhotoBusy("upload");
     try {
       const updated = await profileService.uploadAvatar(file);
-      updateUser(updated); // Navbar avatar refreshes instantly — no reload.
+      updateUser(updated); // Account-menu avatar refreshes instantly — no reload.
       toast.success(t.profile.photoUpdated);
     } catch {
       toast.error(t.profile.photoUploadFailed);

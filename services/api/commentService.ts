@@ -2,7 +2,7 @@ import { apiClient } from "./apiClient";
 import type { Comment, CommentTarget } from "@/types/comment";
 
 /**
- * Comments on a movie or a series.
+ * Comments on a movie, a series or a book.
  *
  * The shapes come back ready to render — the backend already resolves the
  * author's avatar into an absolute URL and nests one level of replies — so

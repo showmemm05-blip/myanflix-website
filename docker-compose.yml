@@ -8,5 +8,9 @@ services:
         # hostname like "backend:3001"). Point this at the real API domain
         # once deployed.
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3001/api}
+        # "Continue with Google" — OAuth Web client ID, baked in at build
+        # time like the API URL. Must equal backend/.env GOOGLE_CLIENT_ID.
+        # Empty = button hidden.
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     ports:
       - "${PORT:-3003}:3003"

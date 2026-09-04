@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/empty/EmptyState";
 import { chipClass } from "@/components/system/Chip";
 import { seriesService } from "@/services/api/seriesService";
 import { useLanguage } from "@/lib/context/language-context";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, UNKNOWN_DURATION } from "@/lib/format";
 import { FALLBACK_COVER_URL } from "@/lib/placeholder";
 import { cn } from "@/lib/utils";
 import type { PlayerEpisode } from "@/types/series";
@@ -108,7 +108,7 @@ function EpisodeRow({
             ? t.player.episodes.nowPlaying
             : isInProgress
               ? t.player.episodes.continueWatching
-              : formatDuration(episode.duration)}
+              : (formatDuration(episode.duration) ?? UNKNOWN_DURATION)}
         </p>
       </div>
     </Link>
@@ -184,7 +184,7 @@ export function EpisodeRail({
     <section
       className={cn(
         "flex flex-col overflow-hidden rounded-3xl bg-card/60 ring-1 ring-white/8 backdrop-blur-xl ring-inset",
-        variant === "sidebar" && "lg:max-h-[calc(100vh-10rem)]",
+        variant === "sidebar" && "lg:max-h-[calc(100vh-7rem)]",
         className,
       )}
     >

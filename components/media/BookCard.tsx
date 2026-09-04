@@ -1,10 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { Headphones } from "lucide-react";
+import Link from "next/link";
+import { memo } from "react";
 
 import { cn } from "@/lib/utils";
 import type { Book } from "@/types/book";
+
+const FALLBACK_COVER = "https://picsum.photos/seed/myanflix-book/480/672";
 
 /**
  * THE BOOK CARD — a hardcover on a shelf, not a movie poster.
@@ -18,17 +21,33 @@ import type { Book } from "@/types/book";
  *    tilt — a browse gesture, not a zoom;
  *  - the TYPE is literary, not cinematic: a small category over the title, the
  *    title in the heading face with room to wrap to two lines, then the author
- *    — the line a reader actually scans a shelf by;
- *  - audiobooks are marked with a small headphone tile on the cover, because
- *    format changes what "reading" means.
+ *    — the line a reader actually scans a shelf by.
  *
- * No link overlay and no pointer cursor: the library is a labeled preview
- * until the books backend ships, and a card that promises a click it can't
- * honor would read as broken.
+ * The whole card is one link to the book's detail page, as a full-card overlay
+ * at z-[1] rather than an anchor wrapping the article — same rule MediaCard
+ * follows, so a future control on the cover can sit above it at z-[2].
  */
-export function BookCard({ book, className }: { book: Book; className?: string }) {
+export const BookCard = memo(function BookCard({
+  book,
+  className,
+  priority = false,
+}: {
+  book: Book;
+  className?: string;
+  priority?: boolean;
+}) {
+  const category = book.categories[0]?.name;
+
   return (
-    <article className={cn("group/book flex min-w-0 flex-col", className)}>
+    <article
+      className={cn("group/book relative flex min-w-0 flex-col", className)}
+    >
+      <Link
+        href={`/books/${book.id}`}
+        aria-label={book.title}
+        className="focus-ring absolute inset-0 z-[1] rounded-lg"
+      />
+
       <div className="relative">
         {/* ─ The cover ─ */}
         <div
@@ -39,9 +58,10 @@ export function BookCard({ book, className }: { book: Book; className?: string }
           )}
         >
           <Image
-            src={book.coverUrl}
+            src={book.coverUrl ?? FALLBACK_COVER}
             alt=""
             fill
+            priority={priority}
             sizes="(max-width: 640px) 46vw, (max-width: 1024px) 23vw, 200px"
             className="object-cover"
           />
@@ -55,16 +75,6 @@ export function BookCard({ book, className }: { book: Book; className?: string }
             aria-hidden
             className="absolute inset-y-0 right-0 w-[3px] bg-gradient-to-l from-white/30 to-transparent"
           />
-
-          {book.format === "Audiobook" && (
-            <span
-              aria-label={book.format}
-              title={book.format}
-              className="absolute right-1.5 bottom-1.5 flex size-6 items-center justify-center rounded-md bg-black/55 text-white ring-1 ring-white/20 backdrop-blur-md ring-inset"
-            >
-              <Headphones className="size-3.5" />
-            </span>
-          )}
         </div>
 
         {/* ─ Shelf shadow — the book lifts, the shadow stays on the shelf ─ */}
@@ -76,14 +86,18 @@ export function BookCard({ book, className }: { book: Book; className?: string }
 
       {/* ─ The shelf label: category · title · author ─ */}
       <div className="min-w-0 px-0.5 pt-3">
-        <p className="truncate text-[10px] font-semibold tracking-[0.14em] text-primary/85 uppercase">
-          {book.genre}
-        </p>
+        {category && (
+          <p className="truncate text-[10px] font-semibold tracking-[0.14em] text-primary/85 uppercase">
+            {category}
+          </p>
+        )}
         <h3 className="mt-1 line-clamp-2 font-heading text-sm leading-snug font-semibold text-foreground transition-colors duration-150 ease-out group-hover/book:text-primary">
           {book.title}
         </h3>
-        <p className="mt-1 truncate text-xs text-muted-foreground">{book.author}</p>
+        <p className="mt-1 truncate text-xs text-muted-foreground">
+          {book.author}
+        </p>
       </div>
     </article>
   );
-}
+});

@@ -46,7 +46,11 @@ export function PosterRail({
         title={title}
         // A rail's heading is short and its actions are icons, so it stays one
         // row at every width instead of stacking the way body sections do.
-        className="flex-row items-end justify-between gap-3 px-4 sm:px-6 lg:px-8"
+        //
+        // mx-auto max-w-[1600px] is not decoration: every page section uses
+        // that container, and a rail that padded off the raw viewport edge
+        // drifted out of line with the headings above it on wide screens.
+        className="mx-auto w-full max-w-[1600px] flex-row items-end justify-between gap-3 px-4 sm:px-6 lg:px-8"
         action={
           <>
             {viewAllHref && (
@@ -71,18 +75,18 @@ export function PosterRail({
 
       <div
         ref={scroller}
-        className="scrollbar-none flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pt-2 pb-4 sm:px-6 lg:px-8"
+        className="scrollbar-none mx-auto flex w-full max-w-[1600px] snap-x snap-mandatory scroll-pl-4 gap-3 overflow-x-auto scroll-smooth px-4 pt-2 pb-4 sm:scroll-pl-6 sm:gap-4 sm:px-6 lg:scroll-pl-8 lg:px-8"
       >
         {isLoading
           ? Array.from({ length: 8 }).map((_, i) => (
-              <MediaCardSkeleton key={i} className="w-72 shrink-0 sm:w-80" />
+              <MediaCardSkeleton key={i} className="w-36 shrink-0 sm:w-40 lg:w-44" />
             ))
           : items.map((item) => (
               <MediaCard
                 key={item.id}
                 item={item}
-                sizes="(max-width: 640px) 78vw, 340px"
-                className="w-72 shrink-0 snap-start sm:w-80"
+                sizes="(max-width: 640px) 144px, (max-width: 1024px) 160px, 176px"
+                className="w-36 shrink-0 snap-start sm:w-40 lg:w-44"
               />
             ))}
       </div>

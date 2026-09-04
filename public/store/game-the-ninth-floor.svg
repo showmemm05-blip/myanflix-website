@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="ga" cx="24%" cy="20%" r="80%">
+      <stop offset="0%" stop-color="#5c7ba6" stop-opacity="0.85"/>
+      <stop offset="55%" stop-color="#5c7ba6" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#5c7ba6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="gb" cx="80%" cy="70%" r="85%">
+      <stop offset="0%" stop-color="#6a4a9e" stop-opacity="0.65"/>
+      <stop offset="55%" stop-color="#6a4a9e" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#6a4a9e" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="gc" cx="60%" cy="10%" r="45%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="60%" stop-color="#0b0d16" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#0b0d16" stop-opacity="0.55"/>
+    </linearGradient>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.05 0"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="#0b0d16"/>
+  <rect width="1600" height="900" fill="url(#ga)"/>
+  <rect width="1600" height="900" fill="url(#gb)"/>
+  <polygon points="225,900 464,0 625,0 386,900" fill="#5c7ba6" opacity="0.12"/>
+  <polygon points="-80,900 315,0 596,0 200,900" fill="#6a4a9e" opacity="0.21"/>
+  <polygon points="1177,900 1458,0 1667,0 1386,900" fill="#5c7ba6" opacity="0.14"/>
+  <polygon points="111,900 295,0 458,0 273,900" fill="#6a4a9e" opacity="0.23"/>
+  <polygon points="1292,900 1652,0 2095,0 1735,900" fill="#5c7ba6" opacity="0.13"/>
+  <polygon points="358,900 697,0 1068,0 729,900" fill="#6a4a9e" opacity="0.22"/>
+  <rect width="1600" height="900" fill="url(#gc)"/>
+  <circle cx="1232" cy="200" r="108" fill="none" stroke="#5c7ba6" stroke-opacity="0.5" stroke-width="2.5"/>
+  <rect width="1600" height="900" filter="url(#grain)"/>
+  <rect width="1600" height="900" fill="url(#scrim)"/>
+</svg>

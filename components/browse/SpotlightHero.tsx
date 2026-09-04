@@ -57,6 +57,8 @@ export function SpotlightHero({ movies }: { movies: Movie[] }) {
   if (!active) return null;
 
   const canPlay = active.accessType === "FREE" || isSubscribed;
+  // null when the runtime was never measured — the hero meta line simply skips it.
+  const runtime = formatDuration(active.duration);
 
   return (
     <section
@@ -99,7 +101,7 @@ export function SpotlightHero({ movies }: { movies: Movie[] }) {
               {active.rating.toFixed(1)}
             </span>
             <span className="nums">{active.releaseYear}</span>
-            <span className="nums">{formatDuration(active.duration)}</span>
+            {runtime && <span className="nums">{runtime}</span>}
             <Chip tone="neutral" variant="outline" size="sm">
               {active.genre}
             </Chip>

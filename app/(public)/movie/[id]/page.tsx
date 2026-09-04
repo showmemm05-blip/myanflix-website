@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PosterRail } from "@/components/browse/PosterRail";
+import { CastRail } from "@/components/media/CastRail";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { movieToBrowseItem } from "@/components/browse/browse-item";
 import { EmptyState } from "@/components/empty/EmptyState";
@@ -78,6 +79,8 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
   const hasAccess = accessType === "FREE" || isSubscribed;
   const inWatchlist = isInWatchlist(movie.id);
   const similarItems = (similarMovies ?? []).map((m) => movieToBrowseItem(m, formatDuration(m.duration)));
+  // null when the runtime was never measured — the hero meta line skips it (dot included).
+  const runtime = formatDuration(movie.duration);
 
   return (
     <div className="flex flex-col">
@@ -152,8 +155,12 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
                   <span className="nums">{movie.rating.toFixed(1)}</span>
                 </Chip>
                 <span className="text-muted-foreground nums">{movie.releaseYear}</span>
-                <Dot />
-                <span className="text-muted-foreground nums">{formatDuration(movie.duration)}</span>
+                {runtime && (
+                  <>
+                    <Dot />
+                    <span className="text-muted-foreground nums">{runtime}</span>
+                  </>
+                )}
                 <Dot />
                 <span className="text-muted-foreground">{movie.language}</span>
                 {accessType && <AccessBadge accessType={accessType} wording="full" />}
@@ -251,6 +258,11 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
           </Surface>
         </div>
       </section>
+
+      {/* The cast sits above "More like this": who is in this film is a fact
+          about the film, and belongs with it rather than after the pivot to
+          other titles. CastRail renders nothing when there is no cast. */}
+      <CastRail actors={movie.actors} className="mt-12" />
 
       {similarItems.length > 0 || isSimilarLoading ? (
         <div className="mt-12">

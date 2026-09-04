@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Surface } from "@/components/system";
+import { GoogleSignIn } from "@/components/auth/GoogleSignIn";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { ApiError } from "@/services/api/apiClient";
@@ -87,7 +88,7 @@ function StepIndicator({ current, labels }: { current: number; labels: string[] 
  * account or creates one), so /login and /register both just render this.
  */
 export function PhoneAuthForm() {
-  const { checkPhoneExists, verifyPassword, requestOtp, verifyOtp } = useAuth();
+  const { checkPhoneExists, verifyPassword, requestOtp, verifyOtp, loginWithGoogle } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
 
@@ -100,6 +101,14 @@ export function PhoneAuthForm() {
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const cooldownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  // "Continue with Google" lives on the phone step only. The ref makes a
+  // second Google callback a no-op even before React has re-rendered with
+  // the busy state — the state is what the UI reads, the ref is what the
+  // guard reads.
+  const [googleBusy, setGoogleBusy] = useState(false);
+  // Google's account picker is open — the phone form waits (see GoogleSignIn).
+  const [googlePopupOpen, setGooglePopupOpen] = useState(false);
+  const googleInFlight = useRef(false);
 
   const phoneForm = useForm<PhoneValues>({ resolver: zodResolver(phoneSchema) });
   const loginPasswordForm = useForm<LoginPasswordValues>({ resolver: zodResolver(loginPasswordSchema) });
@@ -191,6 +200,38 @@ export function PhoneAuthForm() {
     }
   };
 
+  const onGoogleCode = async (code: string) => {
+    // Both directions of the busy guard: a Google code that arrives while
+    // the phone check is still in flight is ignored, so two sign-in requests
+    // can never race — the button's native disabled covers the click, this
+    // covers a popup that was already open when the phone check started.
+    if (googleInFlight.current || phoneForm.formState.isSubmitting) return;
+    googleInFlight.current = true;
+    setGoogleBusy(true);
+    setError(null);
+    try {
+      await loginWithGoogle({ code });
+      // Deliberately still busy — we are navigating away, exactly like the
+      // code step after a successful verify.
+      router.push("/");
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.status === 503
+            ? t.auth.googleNotConfigured
+            : err.message
+          : t.auth.googleFailed,
+      );
+      googleInFlight.current = false;
+      setGoogleBusy(false);
+    }
+  };
+
+  const onGoogleError = () => {
+    if (googleInFlight.current) return;
+    setError(t.auth.googleFailed);
+  };
+
   const changePhone = () => {
     setStep("phone");
     setError(null);
@@ -236,31 +277,45 @@ export function PhoneAuthForm() {
   let form: ReactNode;
 
   if (step === "phone") {
+    // One sign-in at a time: a Google exchange locks the phone field and its
+    // Continue; a phone check dims the Google button (see GoogleSignIn).
+    const busy = googleBusy || googlePopupOpen || phoneForm.formState.isSubmitting;
     form = (
-      <form onSubmit={phoneForm.handleSubmit(onSubmitPhone)} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="phone">{t.auth.phoneLabel}</Label>
-          <div className="relative">
-            <Phone aria-hidden className={iconClasses} />
-            <Input
-              id="phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder={t.auth.phonePlaceholder}
-              className={cn(iconFieldClasses, "nums")}
-              {...phoneForm.register("phone")}
-            />
+      <div className="flex flex-col gap-4">
+        <form onSubmit={phoneForm.handleSubmit(onSubmitPhone)} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="phone">{t.auth.phoneLabel}</Label>
+            <div className="relative">
+              <Phone aria-hidden className={iconClasses} />
+              <Input
+                id="phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder={t.auth.phonePlaceholder}
+                className={cn(iconFieldClasses, "nums")}
+                disabled={googleBusy || googlePopupOpen}
+                {...phoneForm.register("phone")}
+              />
+            </div>
+            {phoneForm.formState.errors.phone && (
+              <p className={errorTextClasses}>{phoneForm.formState.errors.phone.message}</p>
+            )}
           </div>
-          {phoneForm.formState.errors.phone && (
-            <p className={errorTextClasses}>{phoneForm.formState.errors.phone.message}</p>
-          )}
-        </div>
-        <Button type="submit" disabled={phoneForm.formState.isSubmitting} className={submitClasses}>
-          {phoneForm.formState.isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Phone className="size-4" />}
-          {t.auth.continue}
-        </Button>
-      </form>
+          <Button type="submit" disabled={busy} className={submitClasses}>
+            {phoneForm.formState.isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Phone className="size-4" />}
+            {t.auth.continue}
+          </Button>
+        </form>
+        <GoogleSignIn
+          disabled={phoneForm.formState.isSubmitting}
+          busy={googleBusy}
+          onCode={onGoogleCode}
+          onError={onGoogleError}
+          onPopupChange={setGooglePopupOpen}
+          className={submitClasses}
+        />
+      </div>
     );
   } else if (step === "password" && isNewAccount) {
     form = (

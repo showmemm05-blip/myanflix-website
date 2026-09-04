@@ -65,7 +65,7 @@ export function MediaRail({
 
       <div
         ref={scroller}
-        className="scrollbar-none flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pt-1 pb-3 sm:px-6 lg:px-8"
+        className="scrollbar-none flex snap-x snap-mandatory scroll-pl-4 sm:scroll-pl-6 lg:scroll-pl-8 gap-4 overflow-x-auto scroll-smooth px-4 pt-1 pb-3 sm:px-6 lg:px-8"
       >
         {children}
       </div>

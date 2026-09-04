@@ -22,7 +22,6 @@ import {
 import { SEARCH_MIN_LENGTH } from "@/hooks/use-search-term";
 import { useLanguage } from "@/lib/context/language-context";
 import { cn } from "@/lib/utils";
-import { BROWSE_GENRES } from "./genres";
 import type { GridDensity } from "./PosterGrid";
 
 export type BrowseTab = "movies" | "series" | "books" | "music";
@@ -57,9 +56,11 @@ const CONTROL =
 export function BrowseBar({
   tab,
   onTabChange,
+  tabs: allowedTabs = BROWSE_TABS,
   search,
   onSearchChange,
   genre,
+  genreOptions,
   onGenreChange,
   sort,
   onSortChange,
@@ -72,14 +73,18 @@ export function BrowseBar({
 }: {
   tab: BrowseTab;
   onTabChange: (tab: BrowseTab) => void;
+  /** Which modes this surface offers — the /media catalog carries movies|series only. */
+  tabs?: BrowseTab[];
   search: string;
   onSearchChange: (value: string) => void;
   /** Undefined means "every genre" — the select's own reset option. */
   genre: string | undefined;
+  /** DB-derived (facets), never a hard-coded list — the same values the filter sheet offers. */
+  genreOptions: string[];
   onGenreChange: (genre: string | undefined) => void;
   sort: string;
   onSortChange: (sort: string) => void;
-  /** Supplied by the page — series have no rating, so their list is shorter. */
+  /** Supplied by the surface from t.filters.sort* — series get the shorter honest subset. */
   sortOptions: { value: string; label: string }[];
   onOpenFilters: () => void;
   activeFilterCount: number;
@@ -95,7 +100,10 @@ export function BrowseBar({
   isTooShort?: boolean;
 }) {
   const { t } = useLanguage();
-  const searchable = tab === "movies" || tab === "series";
+  // Books included: the books grid honours the search term, and a search
+  // page where the Books tab cannot START a search was a reviewer-flagged
+  // dead end (the term was only clearable, never typeable, from there).
+  const searchable = tab === "movies" || tab === "series" || tab === "books";
   const hintId = useId();
 
   // UI-only state: whether the user unfolded the field. The field also counts
@@ -114,12 +122,16 @@ export function BrowseBar({
     setSearchOpen(false);
   };
 
-  const tabs: { value: BrowseTab; label: string }[] = [
-    { value: "movies", label: t.search.movies },
-    { value: "series", label: t.search.series },
-    { value: "books", label: t.search.books },
-    { value: "music", label: t.search.music },
-  ];
+  const tabLabels: Record<BrowseTab, string> = {
+    movies: t.search.movies,
+    series: t.search.series,
+    books: t.search.books,
+    music: t.search.music,
+  };
+  const tabs: { value: BrowseTab; label: string }[] = allowedTabs.map((value) => ({
+    value,
+    label: tabLabels[value],
+  }));
 
   const placeholder = tab === "movies" ? t.browse.searchMovies : t.browse.searchSeries;
   // base-ui treats an empty string as "no value" (it would render the
@@ -191,7 +203,7 @@ export function BrowseBar({
                 <SelectContent align="end">
                   <SelectItem value={ALL_GENRES}>{t.browse.allGenres}</SelectItem>
                   <SelectSeparator />
-                  {BROWSE_GENRES.map((option) => (
+                  {genreOptions.map((option) => (
                     <SelectItem key={option} value={option}>
                       {option}
                     </SelectItem>

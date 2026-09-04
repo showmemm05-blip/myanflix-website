@@ -193,6 +193,8 @@ export function WalletView(props: WalletViewProps) {
         </div>
       </Surface>
 
+      {/* ── Where you stand on the membership ladder ─────────────────── */}
+
       {/* ── What it adds up to ───────────────────────────────────────── */}
       {!props.isSummaryError && (
         <div className="grid gap-4 sm:grid-cols-2">

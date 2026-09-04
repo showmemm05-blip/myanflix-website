@@ -17,14 +17,25 @@ export type GridDensity = "comfortable" | "compact";
  * catalog. Counts step with the breakpoint rather than auto-fitting so a card
  * never lands at an awkward in-between size on a tablet.
  */
+/**
+ * Column counts for a PORTRAIT card. The old ladder (1 -> 2 -> 3 -> 4) was
+ * built for the wide dossier plate; at 2:3 those same counts would blow each
+ * poster up to the height of a phone screen. `comfortable` now matches the
+ * /media catalog's grid exactly, and `compact` steps one column further at
+ * each stop — so the two surfaces finally read as one product.
+ */
 const DENSITY_CLASS: Record<GridDensity, string> = {
-  comfortable: "grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3 2xl:grid-cols-4",
-  compact: "grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5",
+  comfortable:
+    "grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-6 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7",
+  compact:
+    "grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-4 sm:gap-x-4 sm:gap-y-5 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8",
 };
 
 const DENSITY_SIZES: Record<GridDensity, string> = {
-  comfortable: "(max-width: 640px) 92vw, (max-width: 1280px) 46vw, (max-width: 1536px) 31vw, 380px",
-  compact: "(max-width: 640px) 92vw, (max-width: 1024px) 46vw, (max-width: 1536px) 24vw, 300px",
+  comfortable:
+    "(max-width: 640px) 46vw, (max-width: 1024px) 23vw, (max-width: 1536px) 16vw, 220px",
+  compact:
+    "(max-width: 640px) 31vw, (max-width: 1024px) 19vw, (max-width: 1536px) 13vw, 180px",
 };
 
 export function PosterGrid({

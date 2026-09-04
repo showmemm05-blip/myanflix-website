@@ -1,22 +1,33 @@
-import { apiClient, type RequestSignalOptions } from "./apiClient";
+import { apiClient, toCsvParams, type RequestSignalOptions } from "./apiClient";
 import { mapMovie, type BackendMovie } from "./movieService";
-import type { PaginatedResponse, PaginationParams } from "@/types/api";
+import type { PaginatedResponse } from "@/types/api";
 import type { Movie } from "@/types/movie";
 import type {
   PlayerEpisodesResponse,
   SeasonSummary,
   Series,
+  SeriesFacets,
   SeriesListItem,
   SeriesPurchaseEntry,
 } from "@/types/series";
+import type { SeriesQuery } from "@/types/series";
 
 export const seriesService = {
-  /** `options` (optional, last) carries React Query's AbortSignal down to axios. */
-  getSeries(pagination: PaginationParams = {}, options: RequestSignalOptions = {}) {
+  /**
+   * The series catalog read — search/filter/sort all server-side, same wire
+   * format as movies. `total` returned as the backend counted it.
+   * `options` (optional, last) carries React Query's AbortSignal down to axios.
+   */
+  getSeries(query: SeriesQuery = {}, options: RequestSignalOptions = {}) {
     return apiClient.get<PaginatedResponse<SeriesListItem>>("/series", {
       ...options,
-      params: pagination,
+      params: toCsvParams(query as Record<string, unknown>),
     });
+  },
+
+  /** DB-derived filter options for the series tab (genres/languages/years). */
+  getSeriesFacets(options: RequestSignalOptions = {}): Promise<SeriesFacets> {
+    return apiClient.get<SeriesFacets>("/series/facets", options);
   },
 
   async getSeriesById(id: string): Promise<Series | null> {

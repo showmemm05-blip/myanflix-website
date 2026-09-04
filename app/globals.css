@@ -379,6 +379,478 @@
 }
 
 @layer utilities {
+  /* ── The book surface ────────────────────────────────────────────────────
+     The reader is the one route that opts out of the app's forced dark
+     theme. A book is a lit page you look AT, not a screen you look INTO, so
+     the surface is a paper colour and the chrome borrows from it — every
+     value below is a variable the reader sets per theme on its root element,
+     which is why nothing here references the app palette. */
+  .reader-surface {
+    background: var(--paper);
+    color: var(--ink);
+    /* Theme switches crossfade instead of snapping — neutered wholesale by
+       the global prefers-reduced-motion guard at the end of this file. */
+    transition:
+      background-color 0.25s ease,
+      color 0.25s ease;
+  }
+  /* Paper — warm off-white, the default. Ink is never pure black: real
+     printing lays down a warm near-black, and #000 on white glares. */
+  .reader-paper {
+    --paper: #faf7f1;
+    --paper-raised: #ffffff;
+    --ink: #1c1a17;
+    --ink-soft: #57514a;
+    --ink-faint: #8c847a;
+    --rule: rgba(28, 26, 23, 0.12);
+    --accent: #8a5a2b;
+    --hl-yellow: rgba(255, 213, 79, 0.45);
+    --hl-green: rgba(129, 199, 132, 0.4);
+    --hl-blue: rgba(100, 181, 246, 0.35);
+    --hl-pink: rgba(244, 143, 177, 0.4);
+  }
+  /* Sepia — for long sessions and warm rooms. */
+  .reader-sepia {
+    --paper: #f2e5cf;
+    --paper-raised: #f8efdf;
+    --ink: #3a2f22;
+    --ink-soft: #6b5a45;
+    --ink-faint: #97836a;
+    --rule: rgba(58, 47, 34, 0.16);
+    --accent: #8a5a2b;
+    --hl-yellow: rgba(230, 181, 46, 0.42);
+    --hl-green: rgba(124, 179, 96, 0.38);
+    --hl-blue: rgba(94, 156, 211, 0.34);
+    --hl-pink: rgba(222, 128, 158, 0.38);
+  }
+  /* Night — not the app's dark theme: a lower-contrast grey-on-charcoal,
+     because pure white text on pure black smears at reading sizes. */
+  .reader-night {
+    --paper: #16161a;
+    --paper-raised: #1e1e24;
+    --ink: #ddd8d0;
+    --ink-soft: #a29c94;
+    --ink-faint: #79736c;
+    --rule: rgba(221, 216, 208, 0.14);
+    --accent: #d8a35f;
+    /* Translucent marks over dark paper need less pigment, or the text
+       underneath loses contrast. */
+    --hl-yellow: rgba(255, 213, 79, 0.28);
+    --hl-green: rgba(129, 199, 132, 0.26);
+    --hl-blue: rgba(100, 181, 246, 0.26);
+    --hl-pink: rgba(244, 143, 177, 0.26);
+  }
+  /* AMOLED — true black for OLED panels, where #000 pixels are simply OFF.
+     Ink is the night theme's warm off-white a touch dimmer: full-contrast
+     white on true black halates at reading sizes. */
+  .reader-amoled {
+    --paper: #000000;
+    --paper-raised: #0b0b0d;
+    --ink: #d9d4cb;
+    --ink-soft: color-mix(in oklab, var(--ink) 72%, var(--paper));
+    --ink-faint: color-mix(in oklab, var(--ink) 52%, var(--paper));
+    --rule: rgba(255, 255, 255, 0.12);
+    --accent: #d8a35f;
+    --hl-yellow: rgba(255, 213, 79, 0.24);
+    --hl-green: rgba(129, 199, 132, 0.22);
+    --hl-blue: rgba(100, 181, 246, 0.22);
+    --hl-pink: rgba(244, 143, 177, 0.22);
+  }
+
+  /* The reading face: a serif for Latin, its Myanmar counterpart after it,
+     so a Burmese book is set in a serif too rather than silently falling
+     back to the UI sans. */
+  .font-reading {
+    font-family:
+      var(--font-literata), var(--font-noto-serif-myanmar), Georgia,
+      "Times New Roman", serif;
+  }
+  /* The sans reading face — the UI's Inter, with the Myanmar sans behind it. */
+  .font-reading-sans {
+    font-family:
+      var(--font-inter), var(--font-noto-myanmar), system-ui, sans-serif;
+  }
+  /* "Easy read" — Atkinson Hyperlegible (loaded in app/layout.tsx). There is
+     no dyslexia-specific Myanmar face anywhere, so Burmese under this
+     setting intentionally falls back to Noto Sans Myanmar, same as sans. */
+  .font-reading-dyslexic {
+    font-family:
+      var(--font-atkinson), var(--font-noto-myanmar), system-ui, sans-serif;
+  }
+
+  /* ── The reading surface ─────────────────────────────────────────────────
+     Typography for a book chapter. Written by hand rather than pulled from
+     @tailwindcss/typography because the plugin sets an ARTICLE — space
+     between paragraphs, ragged right, everything ranged left. A book sets a
+     BLOCK: paragraphs run on, indented rather than spaced, and the page is
+     an even grey. The differences below are that distinction, and they are
+     most of why this now reads as a book.
+
+     Every colour is a --ink/--paper variable from the reader theme, and
+     every size is relative to --reading-scale, so one control resizes the
+     page and one class recolours it. */
+  .prose-reading {
+    font-size: calc(1.125rem * var(--reading-scale, 1));
+    /* The line-spacing setting writes --reading-leading on the article;
+       1.72 is the pre-suite value, kept as the default. */
+    line-height: var(--reading-leading, 1.72);
+    /* Size/leading changes glide rather than jump; the global
+       prefers-reduced-motion guard makes both instant. */
+    transition:
+      font-size 0.18s ease,
+      line-height 0.18s ease;
+    color: var(--ink);
+    text-rendering: optimizeLegibility;
+    font-variant-numeric: oldstyle-nums;
+    /* Real ligatures and proper kerning — the details that separate set
+       type from rendered text. */
+    font-feature-settings: "kern" 1, "liga" 1, "clig" 1, "onum" 1;
+  }
+  /* Hyphenation and justification are Latin typesetting. Burmese has no
+     hyphenation rules, and its words are not space-separated — justifying it
+     puts the whole line's slack into the handful of phrase spaces, opening
+     craters. Both are therefore scoped to :not([lang="my"]); ChapterContent
+     tags the language (see its isMyanmar note). */
+  .prose-reading:not([lang="my"]) {
+    hyphens: auto;
+    -webkit-hyphens: auto;
+  }
+
+  /* Paragraphs run on: no gap, first line indented. This single rule is the
+     strongest "book" signal there is. */
+  .prose-reading p {
+    margin: 0;
+    text-indent: 1.4em;
+    orphans: 2;
+    widows: 2;
+  }
+  /* ...except the first of a chapter, and any paragraph opening a new
+     section — an indent marks continuation, so there is nothing to continue
+     from after a heading, a rule, or a block. */
+  .prose-reading > p:first-child,
+  .prose-reading > h1 + p,
+  .prose-reading > h2 + p,
+  .prose-reading > h3 + p,
+  .prose-reading > hr + p,
+  .prose-reading > blockquote + p,
+  .prose-reading > figure + p,
+  .prose-reading > img + p,
+  .prose-reading > pre + p,
+  .prose-reading > ul + p,
+  .prose-reading > ol + p {
+    text-indent: 0;
+  }
+
+  /* Justified with hyphenation once the measure is wide enough to justify
+     without rivers; narrow screens stay ragged-right, which is correct. */
+  @media (min-width: 640px) {
+    .prose-reading:not([lang="my"]) p {
+      text-align: justify;
+    }
+  }
+
+  /* The drop cap. Only on the chapter's opening paragraph, only where there
+     is room for it. */
+  @media (min-width: 480px) {
+    .prose-reading:not([lang="my"]) > p:first-child::first-letter {
+      float: left;
+      font-size: 3.1em;
+      line-height: 0.84;
+      padding-right: 0.08em;
+      padding-top: 0.06em;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    /* A drop cap needs the small-caps opening that traditionally follows it;
+       without it the capital just looks oversized. */
+    .prose-reading:not([lang="my"]) > p:first-child::first-line {
+      font-variant-caps: small-caps;
+      letter-spacing: 0.02em;
+    }
+  }
+
+  /* A drop cap is a float, and a float escapes its own paragraph: when the
+     opening paragraph is shorter than the cap is tall, it would go on
+     shaping the next one. Clearing whatever follows contains it, and is a
+     no-op once the first paragraph is long enough to close the float. */
+  .prose-reading > p:first-child + * {
+    clear: left;
+  }
+
+  .prose-reading h1,
+  .prose-reading h2,
+  .prose-reading h3 {
+    color: var(--ink);
+    text-indent: 0;
+    text-align: left;
+    hyphens: none;
+    -webkit-hyphens: none;
+    font-weight: 600;
+    letter-spacing: -0.008em;
+    line-height: 1.25;
+  }
+  .prose-reading h1 {
+    font-size: calc(1.55em * var(--reading-scale, 1));
+    margin: 1.9em 0 0.7em;
+  }
+  .prose-reading h2 {
+    font-size: calc(1.28em * var(--reading-scale, 1));
+    margin: 1.7em 0 0.6em;
+  }
+  .prose-reading h3 {
+    font-size: calc(1.1em * var(--reading-scale, 1));
+    margin: 1.5em 0 0.5em;
+  }
+
+  .prose-reading ul,
+  .prose-reading ol {
+    margin: 1.1em 0;
+    padding-left: 1.6em;
+    text-indent: 0;
+  }
+  .prose-reading ul {
+    list-style: disc;
+  }
+  .prose-reading ol {
+    list-style: decimal;
+  }
+  .prose-reading li {
+    margin: 0.35em 0;
+  }
+  .prose-reading li p {
+    text-indent: 0;
+    text-align: left;
+  }
+  /* The indent is the only paragraph separator in this model, so wherever it
+     is suppressed a margin has to take over — otherwise consecutive
+     paragraphs inside a list item run together into one block. */
+  .prose-reading li p + p {
+    margin-top: 0.7em;
+  }
+
+  /* Set in from both margins and italicised, the way an extract is set in
+     print — not bracketed by a coloured bar, which is a web convention. */
+  .prose-reading blockquote {
+    margin: 1.6em 1.8em;
+    font-style: italic;
+    color: var(--ink-soft);
+    text-indent: 0;
+  }
+  .prose-reading blockquote p {
+    text-indent: 0;
+    text-align: left;
+  }
+  .prose-reading blockquote p + p {
+    margin-top: 0.7em;
+  }
+
+  .prose-reading pre {
+    margin: 1.5em 0;
+    padding: 1em 1.1em;
+    overflow-x: auto;
+    border-radius: 0.5rem;
+    background: color-mix(in oklab, var(--ink) 6%, transparent);
+    font-size: 0.85em;
+    text-indent: 0;
+    hyphens: none;
+  }
+  .prose-reading code {
+    padding: 0.1em 0.35em;
+    border-radius: 0.25rem;
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
+    font-size: 0.86em;
+    hyphens: none;
+  }
+  .prose-reading pre code {
+    background: transparent;
+    padding: 0;
+  }
+  .prose-reading a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in oklab, var(--accent) 45%, transparent);
+  }
+  .prose-reading a:hover {
+    text-decoration-color: var(--accent);
+  }
+  .prose-reading img {
+    display: block;
+    margin: 1.8em auto;
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.35rem;
+  }
+  /* A section break, set as printers set one: centred marks with air around
+     them, not a rule across the measure. */
+  .prose-reading hr {
+    border: 0;
+    /* Tailwind preflight sets hr{height:0} and the UA sheet adds
+       overflow:hidden — together they clip the ornament below to nothing. */
+    height: auto;
+    overflow: visible;
+    margin: 2.2em 0;
+    text-align: center;
+    text-indent: 0;
+  }
+  .prose-reading hr::before {
+    content: "❦";
+    color: var(--ink-faint);
+    font-size: 1.05em;
+    letter-spacing: 0.6em;
+  }
+  .prose-reading strong {
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .prose-reading em {
+    font-style: italic;
+  }
+
+  /* Myanmar leading floor: stacked vowel signs and kinzi need more air than
+     Latin, so whatever the line-spacing setting says, Burmese never sets
+     tighter than 1.85 — and it always sits a step looser than Latin at the
+     same setting. Never letter-spaced, at any setting. */
+  .prose-reading[lang="my"],
+  .prose-reading [lang="my"] {
+    line-height: max(calc(var(--reading-leading, 1.72) + 0.08), 1.85);
+    letter-spacing: 0;
+  }
+
+  /* Alignment 'left' — an explicit override class on the article, so it
+     outranks the ≥640px justify rule above (declared later, same
+     specificity). Myanmar blocks are already never justified. */
+  .prose-reading.prose-align-left p {
+    text-align: left;
+  }
+
+  /* ── Highlights & search marks ─────────────────────────────────────────
+     Painted as <mark data-anno-id> wrappers over the text nodes; colors are
+     per-theme --hl-* vars so a yellow that reads on paper doesn't blind on
+     AMOLED. */
+  .prose-reading mark.reader-highlight {
+    background: var(--hl-yellow);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  .prose-reading mark.reader-highlight[data-anno-color="green"] {
+    background: var(--hl-green);
+  }
+  .prose-reading mark.reader-highlight[data-anno-color="blue"] {
+    background: var(--hl-blue);
+  }
+  .prose-reading mark.reader-highlight[data-anno-color="pink"] {
+    background: var(--hl-pink);
+  }
+  /* A highlight carrying a note advertises it — the dotted rule is the
+     affordance to click for the note popover. */
+  .prose-reading mark.reader-highlight[data-has-note] {
+    text-decoration: underline dotted;
+    text-decoration-color: var(--ink-faint);
+    text-underline-offset: 3px;
+  }
+
+  /* The one-shot flash on a search-result jump. The pulse is decoration —
+     under reduced motion the global guard collapses the animation to a
+     single instant frame and the solid tint alone marks the spot. */
+  mark.reader-search-flash {
+    background: color-mix(in oklab, var(--accent) 32%, transparent);
+    color: inherit;
+    border-radius: 2px;
+    animation: reader-flash-pulse 1.3s ease-in-out 2;
+  }
+  @keyframes reader-flash-pulse {
+    0%,
+    100% {
+      background-color: color-mix(in oklab, var(--accent) 32%, transparent);
+    }
+    50% {
+      background-color: color-mix(in oklab, var(--accent) 55%, transparent);
+    }
+  }
+
+  /* ── Reader chrome pieces ──────────────────────────────────────────────
+     Transition classes for the suite's moving parts. Every one of these is
+     killed by the global prefers-reduced-motion guard below. */
+
+  /* The in-reader dimmer — a black veil whose opacity is the "brightness"
+     setting. Sits ABOVE the bars: a hardware dimmer dims the whole screen. */
+  .reader-dim {
+    transition: opacity 0.2s ease;
+  }
+
+  /* Paginated text mode: the column track slides between pages. */
+  .reader-paginator-track {
+    transition: transform 0.24s ease-out;
+  }
+
+  /* Single/double page stage: sheets crossfade on turn, and the fitted
+     width eases while zooming. */
+  .reader-stage-sheet {
+    transition: opacity 0.15s ease;
+  }
+  .reader-zoomable {
+    transition: width 0.16s ease, height 0.16s ease;
+  }
+
+  /* The thumbnail strip slides up over the bottom bar. */
+  .reader-thumb-strip {
+    transition:
+      transform 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  /* ── Reader range slider ───────────────────────────────────────────────
+     <input type=range> painted from the reader theme vars — text size and
+     brightness in the settings panel. Track/thumb pseudo-elements can't
+     share a selector list across engines, hence the duplication. */
+  .reader-range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 1.25rem;
+    background: transparent;
+    cursor: pointer;
+  }
+  .reader-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--ink) 18%, transparent);
+  }
+  .reader-range::-moz-range-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--ink) 18%, transparent);
+  }
+  .reader-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    margin-top: -6px;
+    height: 16px;
+    width: 16px;
+    border-radius: 9999px;
+    border: 1px solid var(--rule);
+    background: var(--accent);
+  }
+  .reader-range::-moz-range-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 9999px;
+    border: 1px solid var(--rule);
+    background: var(--accent);
+  }
+  .reader-range:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 9999px;
+  }
+}
+
+@layer utilities {
   /* ── Typography scale ────────────────────────────────────────────────────
      The Aurora Theater type system, codified once so every page speaks with
      the same voice instead of re-deriving sizes per component. */
@@ -588,4 +1060,23 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ── mf-store: THE ARCADE (homepage storefront) ──────────────────────────
+   Two idle motions, both decorative, both neutralised by the global
+   prefers-reduced-motion guard above. Used ONLY by components/home/Store*. */
+@keyframes mf-store-drift {
+  from { transform: scale(1.08) translate3d(0, 0, 0); }
+  to { transform: scale(1.16) translate3d(-1.2%, -1.2%, 0); }
+}
+.mf-store-drift {
+  animation: mf-store-drift 28s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes mf-store-float {
+  0%, 100% { transform: translate3d(0, 0, 0); opacity: 0.35; }
+  50% { transform: translate3d(4px, -14px, 0); opacity: 0.8; }
+}
+.mf-store-float {
+  animation: mf-store-float 9s ease-in-out infinite;
 }

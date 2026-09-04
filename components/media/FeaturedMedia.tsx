@@ -21,9 +21,11 @@ import type { MusicAlbum } from "@/types/music";
  * screen of /media says "this library is three kinds of thing", not "this is
  * a movie site with two extra tabs".
  *
- * The film panel links to its detail page; the book and album panels link to
- * their category pages (their catalogs are previews without detail pages yet).
+ * The film and book panels link to their detail pages; the album panel still
+ * links to its category page (music remains a preview catalog).
  */
+const FALLBACK_BOOK_COVER = "https://picsum.photos/seed/myanflix-book/480/672";
+
 export function FeaturedMedia({
   movie,
   isMovieLoading,
@@ -32,7 +34,8 @@ export function FeaturedMedia({
 }: {
   movie: Movie | null;
   isMovieLoading: boolean;
-  book: Book;
+  /** Null while the library is loading, or when nothing is published yet. */
+  book: Book | null;
   album: MusicAlbum;
 }) {
   const { t } = useLanguage();
@@ -100,8 +103,9 @@ export function FeaturedMedia({
 
       {/* ─ Book of the week + album spotlight ─ */}
       <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:col-span-2 lg:grid-cols-1">
+        {book && (
         <Link
-          href="/media/books"
+          href={`/books/${book.id}`}
           className={cn(
             "group/fbook focus-ring relative isolate flex items-center gap-4 overflow-hidden rounded-2xl p-4 sm:p-5",
             "bg-premium/8 ring-1 ring-white/10 ring-inset",
@@ -109,7 +113,13 @@ export function FeaturedMedia({
           )}
         >
           <div className="relative aspect-[5/7] w-16 shrink-0 overflow-hidden rounded-r-md rounded-l-[3px] shadow-e2 ring-1 ring-white/10 ring-inset transition-transform duration-300 ease-out group-hover/fbook:-rotate-2 sm:w-20">
-            <Image src={book.coverUrl} alt="" fill sizes="80px" className="object-cover" />
+            <Image
+              src={book.coverUrl ?? FALLBACK_BOOK_COVER}
+              alt=""
+              fill
+              sizes="80px"
+              className="object-cover"
+            />
             <div
               aria-hidden
               className="absolute inset-y-0 left-0 w-[5px] bg-gradient-to-r from-black/50 via-white/15 to-transparent"
@@ -126,6 +136,7 @@ export function FeaturedMedia({
             <p className="mt-1 truncate text-xs text-muted-foreground">{book.author}</p>
           </div>
         </Link>
+        )}
 
         <Link
           href="/media/music"

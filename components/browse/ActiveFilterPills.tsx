@@ -1,5 +1,6 @@
 "use client";
 
+import { hasMyanmar } from "@/components/books/reader-settings";
 import { X } from "lucide-react";
 
 import { chipClass } from "@/components/system/Chip";
@@ -27,7 +28,14 @@ export function ActiveFilterPills({ pills, onClearAll }: { pills: ActivePill[]; 
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Kicker className="mr-0.5 hidden sm:block">{t.filters.title}</Kicker>
+      <Kicker
+        className="mr-0.5 hidden sm:block"
+        // Kicker tracks 0.18em; Burmese must not be letter-spaced (mm is the
+        // default locale, where this label reads "စစ်ထုတ်မှုများ").
+        style={{ letterSpacing: hasMyanmar(t.filters.title) ? 0 : undefined }}
+      >
+        {t.filters.title}
+      </Kicker>
       {pills.map((pill) => (
         <button
           key={pill.key}
@@ -42,7 +50,7 @@ export function ActiveFilterPills({ pills, onClearAll }: { pills: ActivePill[]; 
           <X className="opacity-70" />
         </button>
       ))}
-      {pills.length > 1 && (
+      {pills.length >= 1 && (
         <button
           type="button"
           onClick={onClearAll}

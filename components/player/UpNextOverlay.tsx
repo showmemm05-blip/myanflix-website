@@ -34,6 +34,8 @@ export function UpNextOverlay({
 }: UpNextOverlayProps) {
   const { t } = useLanguage();
   const elapsedFraction = totalSeconds > 0 ? 1 - Math.max(0, secondsRemaining) / totalSeconds : 0;
+  // null when the runtime was never measured — a lone dash under a title reads as a bug, so the line is dropped.
+  const runtime = formatDuration(episode.duration);
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
@@ -67,7 +69,7 @@ export function UpNextOverlay({
           <p className="line-clamp-2 font-heading text-base leading-snug font-semibold tracking-tight text-white">
             {episode.title}
           </p>
-          <p className="text-sm text-white/60 nums">{formatDuration(episode.duration)}</p>
+          {runtime && <p className="text-sm text-white/60 nums">{runtime}</p>}
 
           <div className="mt-3 flex items-center gap-2">
             <Button onClick={onPlayNow} className="h-10 rounded-full px-5">

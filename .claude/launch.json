@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "myanflix-web-3010",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "--port", "3010"],
+      "port": 3010
+    }
+  ]
+}

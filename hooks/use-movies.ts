@@ -1,6 +1,5 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { movieService } from "@/services/api/movieService";
-import { searchService } from "@/services/api/searchService";
 import { historyService } from "@/services/api/historyService";
 import { SEARCH_STALE_TIME_MS } from "@/hooks/use-search-term";
 import type { MovieQuery } from "@/types/movie";
@@ -41,6 +40,41 @@ export function useMovies(query: MovieQuery = {}) {
   });
 }
 
+/** Exported so anything (prefetch, invalidation) can address the infinite catalog's cache entries. */
+export const moviesInfiniteKey = (query: MovieQuery) => ["movies", "infinite", query] as const;
+
+/**
+ * The infinite-scroll catalog query — same one query path as `useMovies`
+ * (GET /movies), paged. `pages[0].total` is the backend's real total for the
+ * whole filtered set: it IS the match count the UI shows, never a page's
+ * `items.length`.
+ */
+export function useMoviesInfinite(query: MovieQuery = {}) {
+  return useInfiniteQuery({
+    queryKey: moviesInfiniteKey(query),
+    queryFn: ({ pageParam, signal }) =>
+      movieService.getMovies({ ...query, page: pageParam }, { signal }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, pages) => {
+      const loaded = pages.reduce((n, p) => n + p.items.length, 0);
+      return loaded < lastPage.total ? lastPage.page + 1 : undefined;
+    },
+    // Holds the previous key's pages on screen while a new filter/term loads,
+    // so the grid recedes instead of flashing empty.
+    placeholderData: keepPreviousData,
+    staleTime: SEARCH_STALE_TIME_MS,
+  });
+}
+
+/** The filter sheet's option lists — DB-derived, so empty facets can honestly hide their control. */
+export function useMovieFacets() {
+  return useQuery({
+    queryKey: ["movies", "facets"],
+    queryFn: ({ signal }) => movieService.getFacets({ signal }),
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useMovie(id: string) {
   return useQuery({
     queryKey: ["movie", id],
@@ -70,22 +104,6 @@ export function useCategory(id: string) {
     queryKey: ["category", id],
     queryFn: () => movieService.getCategoryById(id),
     enabled: Boolean(id),
-  });
-}
-
-export function useSearch(query: MovieQuery) {
-  return useQuery({
-    queryKey: ["search", query],
-    queryFn: () => searchService.search(query),
-    enabled: Boolean(query.search) || Object.keys(query).length > 0,
-  });
-}
-
-export function useSearchSuggestions(term: string) {
-  return useQuery({
-    queryKey: ["search-suggestions", term],
-    queryFn: () => searchService.getSuggestions(term),
-    enabled: term.trim().length > 0,
   });
 }
 

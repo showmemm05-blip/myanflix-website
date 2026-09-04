@@ -18,6 +18,8 @@ bundle when `next build` runs — the browser reads it from the bundle, it
 never asks the container for it at request time. That means it has to be
 correct **at build time**, and changing it means rebuilding the image, not
 just restarting the container with a different env var.
+`NEXT_PUBLIC_GOOGLE_CLIENT_ID` ("Continue with Google") follows the same rule —
+leave it empty and the Google button is simply not in the bundle.
 
 ## Moving to the real VPS
 

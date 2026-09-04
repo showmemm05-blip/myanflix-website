@@ -14,6 +14,14 @@ export interface AuthTokens {
 
 export type OtpVerifyResponse = { user: AuthUser } & AuthTokens;
 
+/**
+ * Exactly one of the two, as the backend demands: `code` is the one-time
+ * authorization code from Google's popup (exchanged and verified
+ * server-side); `credential` is a GIS ID token (kept for the older button /
+ * One Tap path).
+ */
+export type GoogleLoginInput = { credential?: string; code?: string };
+
 export const authService = {
   checkPhoneExists(phone: string) {
     return apiClient.post<{ exists: boolean }>("/auth/phone/check", { phone }, { skipAuth: true });
@@ -30,6 +38,11 @@ export const authService = {
   /** `password` is only meaningful (and required by the backend) when this phone has no account yet. */
   verifyOtp(phone: string, code: string, password?: string) {
     return apiClient.post<OtpVerifyResponse>("/auth/otp/verify", { phone, code, password }, { skipAuth: true });
+  },
+
+  /** Google code / ID token → session; the backend exchanges and verifies signature/expiry/audience itself. */
+  loginWithGoogle(input: GoogleLoginInput) {
+    return apiClient.post<OtpVerifyResponse>("/auth/google", input, { skipAuth: true });
   },
 
   logout(refreshToken: string) {

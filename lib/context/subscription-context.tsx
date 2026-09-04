@@ -21,12 +21,19 @@ interface SubscriptionContextValue {
   isSubscribed: boolean;
   expiresAt: string | null;
   planName: string | null;
+  durationDays: number | null;
   isLoading: boolean;
   subscribe: (planId: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
-const EMPTY_STATUS: SubscriptionStatus = { isActive: false, expiresAt: null, planName: null };
+const EMPTY_STATUS: SubscriptionStatus = {
+  isActive: false,
+  expiresAt: null,
+  planId: null,
+  planName: null,
+  durationDays: null,
+};
 
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
 
@@ -68,6 +75,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         // invalidate the query directly so the navbar pill and any open
         // wallet-balance UI reflect the debit immediately.
         queryClient.invalidateQueries({ queryKey: ["wallet-summary"] });
+        // A completed subscription purchase is the one moment the level's
+        // qualifying total (lifetime subscription spend) moves — deposits no
         toast.success("Subscribed", {
           description: plan
             ? `You're now subscribed to ${plan.name}. Enjoy all subscription content!`
@@ -94,6 +103,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       isSubscribed: status.isActive,
       expiresAt: status.expiresAt,
       planName: status.planName,
+      durationDays: status.durationDays,
       isLoading,
       subscribe,
       refresh: loadStatus,

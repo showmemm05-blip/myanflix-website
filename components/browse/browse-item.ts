@@ -20,14 +20,18 @@ export interface BrowseItem {
   /** Movies only — series carry no rating of their own. */
   rating: number | null;
   releaseYear: number;
-  /** The right half of the meta line: a runtime for movies, an episode count for series. */
-  meta: string;
+  /**
+   * The right half of the meta line: a runtime for movies, an episode count
+   * for series. null = nothing to show after the year (an unmeasured runtime
+   * is omitted, separator and all — never printed as "0m").
+   */
+  meta: string | null;
   genre: string;
   /** Only movies can be watchlisted — the watchlist is keyed by movie id. */
   watchlistId: string | null;
 }
 
-export function movieToBrowseItem(movie: Movie, runtime: string): BrowseItem {
+export function movieToBrowseItem(movie: Movie, runtime: string | null): BrowseItem {
   return {
     id: movie.id,
     href: `/movie/${movie.id}`,

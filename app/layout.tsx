@@ -1,5 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Inter, Noto_Sans_Myanmar, Plus_Jakarta_Sans } from "next/font/google";
+import {
+  Atkinson_Hyperlegible,
+  Geist_Mono,
+  Inter,
+  Literata,
+  Noto_Sans_Myanmar,
+  Noto_Serif_Myanmar,
+  Plus_Jakarta_Sans,
+} from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -36,6 +44,41 @@ const notoSansMyanmar = Noto_Sans_Myanmar({
   weight: ["400", "500", "600", "700"],
 });
 
+// The reader's face, and only the reader's — Literata was drawn for
+// long-form screen reading (it is what Google Play Books sets), and a serif
+// is most of what makes a page of text read as a book rather than as a web
+// page. Nothing outside /read uses it.
+const literata = Literata({
+  variable: "--font-literata",
+  subsets: ["latin", "latin-ext"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
+// The Burmese half of that pairing: Literata has no Myanmar glyphs, and the
+// sans fallback would make a Burmese book the one book that isn't set in a
+// serif.
+const notoSerifMyanmar = Noto_Serif_Myanmar({
+  variable: "--font-noto-serif-myanmar",
+  subsets: ["myanmar"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+// The reader's "Easy read" face — Atkinson Hyperlegible was designed by the
+// Braille Institute for low-vision legibility and is the closest
+// well-hinted, freely-licensed face to a dyslexia-friendly setting.
+// Self-hosted by next/font (no runtime CDN request). No dyslexia-specific
+// Myanmar face exists, so Burmese under this setting falls back to
+// Noto Sans Myanmar via the .font-reading-dyslexic stack in globals.css.
+const atkinsonHyperlegible = Atkinson_Hyperlegible({
+  variable: "--font-atkinson",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "MyanFlix — Stream & Own Your Favorite Movies",
   description: "MyanFlix is a premium movie streaming platform. Buy and stream your favorite Myanmar and international films.",
@@ -59,7 +102,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${plusJakartaSans.variable} ${geistMono.variable} ${notoSansMyanmar.variable} h-full antialiased`}
+      className={`${inter.variable} ${plusJakartaSans.variable} ${geistMono.variable} ${notoSansMyanmar.variable} ${literata.variable} ${notoSerifMyanmar.variable} ${atkinsonHyperlegible.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full bg-background">

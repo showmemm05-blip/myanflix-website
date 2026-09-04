@@ -3,7 +3,7 @@ import { Film } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * The one logo lockup — Navbar, MobileMenu, Footer, and the auth pages all
+ * The one logo lockup — AppShell, MobileMenu, Footer, and the auth pages all
  * pointed three separate copies of this at slightly different sizes.
  */
 export function Brand({

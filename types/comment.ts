@@ -21,13 +21,14 @@ export interface Comment {
 }
 
 /**
- * Which title a comment belongs to. Exactly one id, never both and never
- * neither — the backend rejects anything else with a 400, so the union keeps
+ * Which title a comment belongs to. Exactly one id of the three, never two and
+ * never none — the backend rejects anything else with a 400, so the union keeps
  * that rule in the type system rather than in a runtime check on every call.
  */
 export type CommentTarget =
-  | { movieId: string; seriesId?: undefined }
-  | { seriesId: string; movieId?: undefined };
+  | { movieId: string; seriesId?: undefined; bookId?: undefined }
+  | { seriesId: string; movieId?: undefined; bookId?: undefined }
+  | { bookId: string; movieId?: undefined; seriesId?: undefined };
 
 /** Mirrors the backend's 1..1000 rule on a trimmed body. */
 export const COMMENT_BODY_MAX = 1000;

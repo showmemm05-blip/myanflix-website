@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { authService } from "@/services/api/authService";
+import { authService, type GoogleLoginInput } from "@/services/api/authService";
 import { profileService } from "@/services/api/profileService";
 import { tokenStore, onUnauthorized } from "@/lib/auth/token-store";
 import { connectSocket, disconnectSocket } from "@/lib/socket";
@@ -26,6 +26,8 @@ interface AuthContextValue {
   requestOtp: (phone: string) => Promise<void>;
   /** Step 3: verifies the code, logging into the existing account or creating one — `password` required only when creating. */
   verifyOtp: (phone: string, code: string, password?: string) => Promise<void>;
+  /** Google: exchanges a popup auth code (or a GIS ID token) for a session — same tail as verifyOtp. */
+  loginWithGoogle: (input: GoogleLoginInput) => Promise<void>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
   /** Replace the in-memory user (e.g. after an avatar change) so every consumer — navbar included — updates instantly. */
@@ -100,6 +102,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loadProfile();
   };
 
+  const loginWithGoogle = async (input: GoogleLoginInput) => {
+    const { accessToken, refreshToken } = await authService.loginWithGoogle(input);
+    tokenStore.setTokens(accessToken, refreshToken);
+    connectSocket(accessToken);
+    await loadProfile();
+  };
+
   const logout = () => {
     const refreshToken = tokenStore.getRefreshToken();
     tokenStore.clear();
@@ -122,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         verifyPassword,
         requestOtp,
         verifyOtp,
+        loginWithGoogle,
         logout,
         refreshProfile: loadProfile,
         updateUser: setUser,

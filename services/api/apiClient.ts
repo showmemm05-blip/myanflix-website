@@ -59,6 +59,35 @@ export interface RequestSignalOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * The canonical wire format for array params: CSV, one key per facet
+ * (`genres=Action,Drama`), which is what the backend's ToStringArray
+ * decorator normalizes from and what deep links spell by hand. Empty
+ * arrays, empty strings and undefined are dropped so the URL only carries
+ * what actually narrows the query.
+ */
+export function toCsvParams(
+  query: Record<string, unknown>,
+): Record<string, string | number | boolean> {
+  const params: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null) continue;
+    if (Array.isArray(value)) {
+      const joined = value.filter((v) => v !== "" && v != null).join(",");
+      if (joined) params[key] = joined;
+      continue;
+    }
+    if (typeof value === "string") {
+      if (value !== "") params[key] = value;
+      continue;
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      params[key] = value;
+    }
+  }
+  return params;
+}
+
 const axiosClient = axios.create({ baseURL: API_BASE_URL });
 
 axiosClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {

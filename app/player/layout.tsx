@@ -1,15 +1,10 @@
-import { Navbar } from "@/components/navbar/Navbar";
+import { AppShell } from "@/components/layout/AppShell";
 
 /**
- * The player deliberately skips the Footer (nothing should sit below an
- * unbounded episode list mid-binge), but it keeps the Navbar so wallet,
- * notifications, and navigation stay one click away while watching.
+ * The player runs in the same shell as every other route — the rail on desktop,
+ * the tab bar on phones — minus the Footer: nothing should sit below an
+ * unbounded episode list mid-binge.
  */
 export default function PlayerLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen flex-col">
-      <Navbar />
-      {children}
-    </div>
-  );
+  return <AppShell showFooter={false}>{children}</AppShell>;
 }

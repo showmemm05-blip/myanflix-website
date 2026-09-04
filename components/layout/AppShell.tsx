@@ -36,7 +36,13 @@ import { notificationService } from "@/services/api/notificationService";
  * switcher and sign-out all live in the rail's account menu on desktop and in
  * the overflow sheet on mobile; the footer still links browse/account/support.
  */
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  showFooter = true,
+}: {
+  children: React.ReactNode;
+  showFooter?: boolean;
+}) {
   const pathname = usePathname();
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -169,7 +175,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <main className="flex-1">{children}</main>
 
-        <Footer />
+        {showFooter && <Footer />}
       </div>
 
       <TabBar items={tabItems} />

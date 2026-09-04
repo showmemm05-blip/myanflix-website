@@ -26,7 +26,7 @@ import { AccessBadge, Chip, chipClass, Kicker, SectionHeader, StatTile, Surface 
 import { seriesService } from "@/services/api/seriesService";
 import { useSubscription } from "@/lib/context/subscription-context";
 import { useLanguage } from "@/lib/context/language-context";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, UNKNOWN_DURATION } from "@/lib/format";
 import { FALLBACK_COVER_URL, FALLBACK_POSTER_URL } from "@/lib/placeholder";
 import { cn } from "@/lib/utils";
 import type { Movie } from "@/types/movie";
@@ -345,7 +345,7 @@ function EpisodeRow({
         <p className="truncate text-sm font-semibold">{title}</p>
         <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
           <Clock className="size-3" />
-          <span className="nums">{episode.duration > 0 ? formatDuration(episode.duration) : "—"}</span>
+          <span className="nums">{formatDuration(episode.duration) ?? UNKNOWN_DURATION}</span>
         </p>
         {episode.description && (
           <p className="mt-1.5 line-clamp-2 hidden text-xs text-muted-foreground sm:block">
