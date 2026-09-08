@@ -126,8 +126,16 @@ export function PhoneAuthForm() {
   // (the API rejects fields it doesn't know). When the backend learns about
   // channels, pass `channel` into requestOtp inside sendCode below.
   const [channel, setChannel] = useState<OtpChannel>("sms");
+  // The tile the user has picked on the code step. Picking never sends —
+  // only the "Send code by …" button does — so this can differ from
+  // `channel` until they confirm.
+  const [pickedChannel, setPickedChannel] = useState<OtpChannel>("sms");
   const [sendingChannel, setSendingChannel] = useState<OtpChannel | null>(null);
   const channelTitleId = useId();
+  const channelHintId = useId();
+  // What the screen reader hears after a confirmed send — the visible
+  // identity row changes too, but it is not a live region.
+  const [announce, setAnnounce] = useState("");
   const cooldownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   // "Continue with Google" lives on the phone step only. The ref makes a
   // second Google callback a no-op even before React has re-rendered with
@@ -199,6 +207,7 @@ export function PhoneAuthForm() {
     try {
       await requestOtp(phone);
       setChannel(via);
+      setAnnounce(t.auth.otpSentVia(t.auth.otpChannels[via].name, phone));
       setStep("code");
       startCooldown();
       codeForm.reset();
@@ -225,10 +234,10 @@ export function PhoneAuthForm() {
     await sendCode();
   };
 
-  const onChooseChannel = (via: OtpChannel) => {
+  const onConfirmSend = () => {
     if (cooldown > 0 || sendingChannel) return;
     setError(null);
-    void sendCode(via);
+    void sendCode(pickedChannel);
   };
 
   const onSubmitCode = async (values: OtpCodeValues) => {
@@ -283,6 +292,8 @@ export function PhoneAuthForm() {
     setCooldown(0);
     setPendingPassword("");
     setChannel("sms");
+    setPickedChannel("sms");
+    setAnnounce("");
     if (cooldownInterval.current) clearInterval(cooldownInterval.current);
     loginPasswordForm.reset();
     createPasswordForm.reset();
@@ -547,28 +558,51 @@ export function PhoneAuthForm() {
             >
               {t.auth.otpChannelTitle}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p id={channelHintId} className="text-xs text-muted-foreground">
               {t.auth.otpChannelHint}
             </p>
           </div>
           <OtpChannelPicker
-            selected={channel}
-            sending={sendingChannel}
-            cooldown={cooldown}
+            value={pickedChannel}
             labels={t.auth.otpChannels}
-            sentBadge={t.auth.otpSentBadge}
             labelledBy={channelTitleId}
-            onChoose={onChooseChannel}
+            describedBy={channelHintId}
+            onChange={setPickedChannel}
           />
-          {/* The visible countdown ticks every second, so it is deliberately
-              NOT a live region — only "Sending…" is announced. */}
-          {(sendingChannel || cooldown > 0) && (
-            <p className="nums text-center text-xs text-muted-foreground">
-              {sendingChannel ? t.auth.otpSending : t.auth.resendIn(cooldown)}
-            </p>
-          )}
+          {/* focusableWhenDisabled keeps keyboard focus on the button while
+              it is locked (sending / cooldown) instead of dropping to body. */}
+          <Button
+            type="button"
+            variant="outline"
+            size="pill-sm"
+            onClick={onConfirmSend}
+            disabled={cooldown > 0 || sendingChannel !== null}
+            focusableWhenDisabled
+            className="w-full font-semibold aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
+          >
+            {sendingChannel ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <OtpChannelIcon
+                channel={pickedChannel}
+                className="size-5 [&>svg]:size-3"
+              />
+            )}
+            {sendingChannel
+              ? t.auth.otpSending
+              : t.auth.otpSendVia(t.auth.otpChannels[pickedChannel].name)}
+          </Button>
+          {/* Always rendered so the card doesn't jump when the countdown
+              ends. It ticks every second, so it is deliberately NOT a live
+              region — the sr-only span below announces the state changes. */}
+          <p
+            aria-hidden={cooldown === 0 || sendingChannel !== null}
+            className="nums min-h-4 text-center text-xs text-muted-foreground"
+          >
+            {cooldown > 0 && !sendingChannel ? t.auth.resendIn(cooldown) : ""}
+          </p>
           <span aria-live="polite" className="sr-only">
-            {sendingChannel ? t.auth.otpSending : ""}
+            {sendingChannel ? t.auth.otpSending : announce}
           </span>
         </div>
       </form>

@@ -1,13 +1,7 @@
 "use client";
 
-import {
-  Check,
-  Loader2,
-  MessageCircle,
-  MessageSquareText,
-  Send,
-} from "lucide-react";
-import type { ReactNode } from "react";
+import { MessageCircle, MessageSquareText, Send } from "lucide-react";
+import { useRef, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -74,86 +68,91 @@ export function OtpChannelIcon({
 }
 
 interface OtpChannelPickerProps {
-  /** The channel the current code went out on. */
-  selected: OtpChannel;
-  /** Set while a code is being requested on that channel. */
-  sending: OtpChannel | null;
-  /** Seconds left before another code may be requested; 0 = ready. */
-  cooldown: number;
+  /** The tile the user has picked — nothing is sent until they confirm. */
+  value: OtpChannel;
   labels: Record<OtpChannel, { name: string; hint: string }>;
-  sentBadge: string;
   /** id of the visible heading that names this group. */
   labelledBy: string;
-  onChoose: (channel: OtpChannel) => void;
+  /** id of the one-line instruction under the heading. */
+  describedBy?: string;
+  onChange: (channel: OtpChannel) => void;
 }
 
 /**
- * Three equal tiles — icon, app name, one-line hint. Tapping a tile asks for
- * a fresh code on that channel, so the tiles ARE the resend control; the
- * countdown underneath (rendered by the parent) says when they wake up.
- * The tile that carries the current code wears a small check on its icon so
- * it is obvious which app to go and look in.
- *
- * Locked tiles use aria-disabled rather than disabled so keyboard and
- * screen-reader users can still discover Telegram/Viber during the cooldown;
- * the parent's onChoose guard is what actually refuses the tap.
+ * Three equal tiles — icon, app name, one-line hint — behaving as a radio
+ * group: tapping one only SELECTS it; the parent's "Send code by …" button
+ * is what actually asks for a code, so nobody gets a code they didn't mean
+ * to request. Where the CURRENT code went is stated once, in the identity
+ * row above the code field — the tiles deliberately carry no second marker.
  */
 export function OtpChannelPicker({
-  selected,
-  sending,
-  cooldown,
+  value,
   labels,
-  sentBadge,
   labelledBy,
-  onChoose,
+  describedBy,
+  onChange,
 }: OtpChannelPickerProps) {
-  const locked = cooldown > 0 || sending !== null;
+  const tiles = useRef<Array<HTMLButtonElement | null>>([]);
+
+  // Arrow keys move the selection like native radios; Tab enters/leaves the
+  // group as one stop (only the selected tile is tabbable).
+  const onKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    let next: number;
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        next = (index + 1) % OTP_CHANNELS.length;
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        next = (index - 1 + OTP_CHANNELS.length) % OTP_CHANNELS.length;
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = OTP_CHANNELS.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    onChange(OTP_CHANNELS[next]);
+    tiles.current[next]?.focus();
+  };
 
   return (
     <div
-      role="group"
+      role="radiogroup"
       aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
       className="grid grid-cols-3 gap-2"
     >
-      {OTP_CHANNELS.map((channel) => {
-        const isSelected = channel === selected;
-        const isSending = channel === sending;
-        const showSent = isSelected && !isSending;
+      {OTP_CHANNELS.map((channel, index) => {
+        const isSelected = channel === value;
         return (
           <button
             key={channel}
+            ref={(el) => {
+              tiles.current[index] = el;
+            }}
             type="button"
-            aria-current={isSelected ? "true" : undefined}
-            aria-disabled={locked || undefined}
-            onClick={() => onChoose(channel)}
+            role="radio"
+            aria-checked={isSelected}
+            tabIndex={isSelected ? 0 : -1}
+            onClick={() => onChange(channel)}
+            onKeyDown={(event) => onKeyDown(event, index)}
             className={cn(
-              "relative flex flex-col items-center gap-2 rounded-xl px-2 py-3 text-center outline-none ring-1 ring-inset transition-[background-color,box-shadow,transform,opacity] duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              "relative flex flex-col items-center gap-2 rounded-xl px-2 py-3 text-center ring-1 ring-inset outline-none transition-[background-color,box-shadow,transform] duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.98]",
               isSelected
-                ? "bg-white/[0.08] ring-white/25"
-                : "bg-white/[0.04] ring-white/10",
-              locked
-                ? "cursor-not-allowed"
-                : "active:scale-[0.98] not-aria-disabled:hover:bg-white/[0.07] not-aria-disabled:hover:ring-white/20",
-              locked && !isSelected && "opacity-75",
+                ? "bg-primary/10 ring-primary/60"
+                : "bg-white/[0.04] ring-white/10 hover:bg-white/[0.07] hover:ring-white/20",
             )}
           >
-            {isSending ? (
-              <span className="inline-flex size-9 items-center justify-center rounded-full bg-white/10 text-foreground">
-                <Loader2 aria-hidden className="size-4 animate-spin" />
-              </span>
-            ) : (
-              <span className="relative">
-                <OtpChannelIcon channel={channel} />
-                {showSent && (
-                  <span
-                    aria-hidden
-                    className="absolute -top-0.5 -right-0.5 inline-flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-card"
-                  >
-                    <Check className="size-2.5" strokeWidth={3} />
-                  </span>
-                )}
-              </span>
-            )}
+            <OtpChannelIcon channel={channel} />
             <span className="flex flex-col gap-0.5">
               <span className="text-sm font-semibold text-foreground">
                 {labels[channel].name}
@@ -162,7 +161,6 @@ export function OtpChannelPicker({
                 {labels[channel].hint}
               </span>
             </span>
-            {showSent && <span className="sr-only">{sentBadge}</span>}
           </button>
         );
       })}
