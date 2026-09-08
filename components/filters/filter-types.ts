@@ -68,7 +68,6 @@ export const AGE_RATING_LABELS: Record<AgeRating, string> = {
   NC17: "NC-17",
 };
 
-export const AGE_RATING_VALUES: AgeRating[] = ["G", "PG", "PG13", "R", "NC17"];
 
 /** Everything except sort counts toward "N filters applied" and the bar badge. */
 export function countActiveFilters(f: FilterState): number {

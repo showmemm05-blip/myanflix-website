@@ -126,4 +126,3 @@ export function createPrefetchSystem(window: PrefetchWindowConfig, options: Pref
   };
 }
 
-export type { PrefetchWindowConfig, CacheEntry, SegmentMeta, DownloadStatus } from "./types";

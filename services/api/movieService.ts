@@ -1,8 +1,6 @@
 import { apiClient, toCsvParams, type RequestSignalOptions } from "./apiClient";
-import type { PaginatedResponse, PaginationParams } from "@/types/api";
-import type { Category } from "@/types/category";
+import type { PaginatedResponse } from "@/types/api";
 import type { Movie, MovieFacets, MovieQuery } from "@/types/movie";
-import type { PurchaseEntry } from "@/types/purchase";
 
 export interface BackendMovie {
   id: string;
@@ -59,26 +57,6 @@ export function mapMovie(m: BackendMovie): Movie {
     isInWatchlist: false,
     createdAt: m.createdAt,
     updatedAt: m.updatedAt,
-  };
-}
-
-interface BackendPurchaseEntry {
-  id: string;
-  movieId: string;
-  movieTitle: string;
-  posterUrl: string | null;
-  amount: number;
-  createdAt: string;
-}
-
-function mapPurchase(entry: BackendPurchaseEntry): PurchaseEntry {
-  return {
-    id: entry.id,
-    movieId: entry.movieId,
-    movieTitle: entry.movieTitle,
-    posterUrl: entry.posterUrl,
-    amount: entry.amount,
-    purchasedAt: entry.createdAt,
   };
 }
 
@@ -143,12 +121,6 @@ export const movieService = {
     return res.items;
   },
 
-  async getRecommended(genres: string[], limit = 12): Promise<Movie[]> {
-    if (genres.length === 0) return [];
-    const res = await movieService.getMovies({ genre: genres[0], limit });
-    return res.items;
-  },
-
   async getMyanmarMovies(limit = 12): Promise<Movie[]> {
     // "Myanmar" is defined as language === "Burmese" — now a server param.
     const res = await movieService.getMovies({ languages: ["Burmese"], limit });
@@ -169,23 +141,4 @@ export const movieService = {
     return res.items;
   },
 
-  getCategories() {
-    return apiClient.get<Category[]>("/categories");
-  },
-
-  async getCategoryById(id: string): Promise<Category | null> {
-    try {
-      return await apiClient.get<Category>(`/categories/${id}`);
-    } catch {
-      return null;
-    }
-  },
-
-  /** Historical purchases from before the subscription model — frozen, no longer how access is granted. */
-  async getMyPurchases(pagination: PaginationParams = {}): Promise<PaginatedResponse<PurchaseEntry>> {
-    const res = await apiClient.get<PaginatedResponse<BackendPurchaseEntry>>("/movies/me/purchases", {
-      params: pagination,
-    });
-    return { ...res, items: res.items.map(mapPurchase) };
-  },
 };

@@ -4,11 +4,9 @@ import type { PaginatedResponse } from "@/types/api";
 import type { Movie } from "@/types/movie";
 import type {
   PlayerEpisodesResponse,
-  SeasonSummary,
   Series,
   SeriesFacets,
   SeriesListItem,
-  SeriesPurchaseEntry,
 } from "@/types/series";
 import type { SeriesQuery } from "@/types/series";
 
@@ -38,10 +36,6 @@ export const seriesService = {
     }
   },
 
-  getSeasons(id: string) {
-    return apiClient.get<SeasonSummary[]>(`/series/${id}/seasons`);
-  },
-
   /** Published episodes in playback order — episodes are Movie rows, playable via the normal player. */
   async getEpisodes(id: string, seasonNumber?: number): Promise<Movie[]> {
     const episodes = await apiClient.get<BackendMovie[]>(`/series/${id}/episodes`, {
@@ -55,8 +49,4 @@ export const seriesService = {
     return apiClient.get<PlayerEpisodesResponse>(`/series/${seriesId}/player-episodes`);
   },
 
-  /** Historical purchases from before the subscription model — frozen, no longer how access is granted. */
-  getMySeriesPurchases() {
-    return apiClient.get<SeriesPurchaseEntry[]>("/series/me/purchases");
-  },
 };

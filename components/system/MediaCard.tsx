@@ -26,8 +26,7 @@ import type { BrowseItem } from "@/components/browse/browse-item";
  * meant /media looked like one product and the rails looked like another, and
  * the landscape card gave a film's own artwork the smallest element on the
  * plate. Portrait is how a catalogue of films is read, so it is now the only
- * shape — `media/MovieCard` and `browse/PosterCard` are both thin aliases of
- * this component.
+ * shape — `media/MovieCard` is a thin alias of this component.
  *
  * The one always-on overlay is a gold crown on premium titles: access changes
  * what a click can do, so it must not hide on hover — but at this width the

@@ -85,4 +85,3 @@ export const LANES: Record<LaneKey, Lane> = {
 };
 
 export const LANE_ORDER: Lane[] = Object.values(LANES).sort((a, b) => a.order - b.order);
-export const OPEN_LANES: Lane[] = LANE_ORDER.filter((l) => l.state !== "announced");

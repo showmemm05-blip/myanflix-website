@@ -3,15 +3,6 @@ import { seriesService } from "@/services/api/seriesService";
 import { SEARCH_STALE_TIME_MS } from "@/hooks/use-search-term";
 import type { SeriesQuery } from "@/types/series";
 
-export function useSeriesList(query: SeriesQuery = {}) {
-  return useQuery({
-    queryKey: ["series", query],
-    // Signal forwarded for the same reason as the movies query: an unobserved
-    // in-flight request should stop, not finish.
-    queryFn: ({ signal }) => seriesService.getSeries(query, { signal }),
-  });
-}
-
 export const seriesInfiniteKey = (query: SeriesQuery) => ["series", "infinite", query] as const;
 
 /**

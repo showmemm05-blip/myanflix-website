@@ -106,7 +106,21 @@ axiosClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 let refreshPromise: Promise<string | null> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
+/**
+ * Single-flight access-token refresh. Shared by the 401 retry path below and
+ * by lib/socket.ts when the gateway rejects a handshake with an expired JWT —
+ * both racing at once still make exactly one POST /auth/refresh. Resolves
+ * with the new access token (already written to tokenStore, which notifies
+ * onTokensChanged subscribers) or null when the session cannot be renewed.
+ */
+export function refreshAccessToken(): Promise<string | null> {
+  refreshPromise ??= performRefresh().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+}
+
+async function performRefresh(): Promise<string | null> {
   const refreshToken = tokenStore.getRefreshToken();
   if (!refreshToken) return null;
 
@@ -164,10 +178,7 @@ async function request<T>(
       throw new ApiError(message, status);
     }
 
-    refreshPromise ??= refreshAccessToken().finally(() => {
-      refreshPromise = null;
-    });
-    const newToken = await refreshPromise;
+    const newToken = await refreshAccessToken();
 
     if (!newToken) {
       tokenStore.clear();

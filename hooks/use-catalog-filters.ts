@@ -234,6 +234,8 @@ export function useCatalogFilters(mode: "media" | "search") {
   // Resolved once, in parallel, capped at 10 by the parse; a 404 (deleted
   // actor) silently drops that selection rather than erroring the page.
   const actorsResolved = useRef(false);
+  /** The last URL this hook wrote — a second identical write in the same tick is skipped. */
+  const lastWrittenUrl = useRef<string | null>(null);
   useEffect(() => {
     if (actorsResolved.current) return;
     const unresolved = rawFilters.actors.filter((a) => a.name === a.id);
@@ -319,7 +321,19 @@ export function useCatalogFilters(mode: "media" | "search") {
       if (seriesFilters.accessType) params.set("access", seriesFilters.accessType);
     }
 
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    // Idempotent on purpose. A mount that restores saved preferences changes
+    // filters, series filters and the term in quick succession, and each one
+    // re-runs this effect with the SAME resulting URL. Replacing the current
+    // URL with itself several times within one commit tipped Next.js into its
+    // hard-navigation fallback — a full reload, which restored preferences
+    // again, and looped. So: build the URL, and only write it when it differs
+    // from what the address bar already says.
+    const next = `${pathname}?${params.toString()}`;
+    const currentParams = new URLSearchParams(window.location.search);
+    const current = `${window.location.pathname}?${currentParams.toString()}`;
+    if (next === current || next === lastWrittenUrl.current) return;
+    lastWrittenUrl.current = next;
+    router.replace(next, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, effectiveTerm, filters, seriesFilters, pathname]);
 

@@ -12,6 +12,7 @@ import {
   RotateCw,
 } from "lucide-react";
 import { useLanguage } from "@/lib/context/language-context";
+import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import { BRIGHTNESS_MAX, BRIGHTNESS_MIN, clampScale, hasMyanmar, PAGE_BACKGROUND_VALUE, READER_FONT_CLASS, READER_THEME_CLASS, READER_THEME_SWATCH, READER_THEMES, SCALE_MAX, SCALE_MIN, SCALE_STEP, SIZE_PRESET_ORDER, SIZE_PRESETS, type PageBackgroundId, type ReaderSettingsV2, type SizePresetId } from "./reader-settings";
 import { useFullscreen } from "./use-fullscreen";
@@ -54,18 +55,6 @@ export interface ReaderSettingsPanelProps {
   onRotate?: () => void;
   /** Override the built-in document-level fullscreen wiring if the reader owns one. */
   fullscreen?: { supported: boolean; active: boolean; toggle: () => void };
-}
-
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
-  useEffect(() => {
-    const mql = window.matchMedia(query);
-    const update = () => setMatches(mql.matches);
-    update();
-    mql.addEventListener("change", update);
-    return () => mql.removeEventListener("change", update);
-  }, [query]);
-  return matches;
 }
 
 // ── Small painted-from-theme controls ──────────────────────────────────────

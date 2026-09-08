@@ -28,5 +28,3 @@ export interface NotificationPreferences {
   announcements: boolean;
 }
 
-export type AppLanguage = "en" | "my";
-export type AppTheme = "dark" | "system";

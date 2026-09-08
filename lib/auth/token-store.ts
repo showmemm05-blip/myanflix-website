@@ -1,7 +1,11 @@
 /**
- * localStorage-persisted JWT tokens + a pub-sub hook so apiClient can force
- * a logout (via AuthContext) when a refresh attempt fails, without a
- * circular import between the two modules.
+ * localStorage-persisted JWT tokens + two pub-sub hooks so apiClient can
+ * talk to AuthContext without a circular import between the two modules:
+ *  - onUnauthorized: force a logout when a refresh attempt fails.
+ *  - onTokensChanged: fires after every setTokens()/clear(), so the socket
+ *    can be re-handshaked with the rotated access token instead of keeping
+ *    the one it was created with (which the gateway rejects as "jwt expired"
+ *    on the next reconnect once the 15-minute lifetime has passed).
  */
 import type { AppUser } from "@/types/user";
 
@@ -37,6 +41,7 @@ export const tokenStore = {
     if (!isBrowser()) return;
     window.localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
     window.localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    notifyTokensChanged(accessToken);
   },
 
   setUser(user: AppUser): void {
@@ -49,6 +54,7 @@ export const tokenStore = {
     window.localStorage.removeItem(ACCESS_TOKEN_KEY);
     window.localStorage.removeItem(REFRESH_TOKEN_KEY);
     window.localStorage.removeItem(USER_KEY);
+    notifyTokensChanged(null);
   },
 };
 
@@ -65,4 +71,20 @@ export function onUnauthorized(listener: UnauthorizedListener): () => void {
 
 export function notifyUnauthorized(): void {
   unauthorizedListeners.forEach((listener) => listener());
+}
+
+type TokensChangedListener = (accessToken: string | null) => void;
+const tokensChangedListeners: TokensChangedListener[] = [];
+
+/** Subscribe to token writes; `null` means the store was cleared. */
+export function onTokensChanged(listener: TokensChangedListener): () => void {
+  tokensChangedListeners.push(listener);
+  return () => {
+    const index = tokensChangedListeners.indexOf(listener);
+    if (index >= 0) tokensChangedListeners.splice(index, 1);
+  };
+}
+
+function notifyTokensChanged(accessToken: string | null): void {
+  tokensChangedListeners.forEach((listener) => listener(accessToken));
 }

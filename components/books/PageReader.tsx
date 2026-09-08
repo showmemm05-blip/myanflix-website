@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import {
   Bookmark as BookmarkIcon,
   BookOpen,
@@ -97,18 +98,6 @@ const RENDER_WINDOW = 2;
 /** Below this, "Spread" quietly behaves as single — the settings panel keeps
     saying Spread, but a portrait phone can't honestly show two sheets. */
 const DOUBLE_MIN_WIDTH_QUERY = "(min-width: 900px)";
-
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
-  useEffect(() => {
-    const mql = window.matchMedia(query);
-    const update = () => setMatches(mql.matches);
-    update();
-    mql.addEventListener("change", update);
-    return () => mql.removeEventListener("change", update);
-  }, [query]);
-  return matches;
-}
 
 /**
  * THE PAGE READER — PDF books.

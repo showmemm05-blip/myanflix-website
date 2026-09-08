@@ -52,20 +52,6 @@ export interface SeriesListItem extends Series {
   episodeCount: number;
 }
 
-export interface SeasonSummary {
-  seasonNumber: number;
-  episodeCount: number;
-}
-
-export interface SeriesPurchaseEntry {
-  id: string;
-  seriesId: string;
-  seriesTitle: string;
-  posterUrl: string | null;
-  amount: number;
-  createdAt: string;
-}
-
 /** The caller's own watch progress for one episode — null when never started. */
 export interface PlayerEpisodeProgress {
   progressPercent: number;

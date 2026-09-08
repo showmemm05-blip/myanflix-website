@@ -8,12 +8,10 @@ import {
   useSyncExternalStore,
 } from "react";
 import Link from "next/link";
-import { List, Type, X } from "lucide-react";
-import { useAuth } from "@/lib/context/auth-context";
+import { List, X } from "lucide-react";
 import { useLanguage } from "@/lib/context/language-context";
 import { cn } from "@/lib/utils";
-import { DEFAULT_READER_SETTINGS, hasMyanmar, loadReaderSettings, saveReaderSettings, type ReaderSettingsV2, type ReaderTheme } from "./reader-settings";
-import { ReaderSettingsPanel } from "./ReaderSettingsPanel";
+import { hasMyanmar } from "./reader-settings";
 
 /**
  * Idle time before the chrome fades. Long enough to use it, short enough
@@ -220,86 +218,6 @@ export function ReaderButton({
   );
 }
 
-/**
- * Trigger + panel for the reading settings.
- *
- * A thin wrapper over ReaderSettingsPanel kept for the readers' CURRENT prop
- * shape (theme/scale + change callbacks): the readers compile and work
- * unchanged, get the full v2 panel, and only theme/scale apply live until
- * their builders switch them onto the v2 settings object directly. Every
- * other field the panel edits is persisted through the v2 store, waiting.
- */
-export function ReaderSettings({
-  theme,
-  onThemeChange,
-  scale,
-  onScaleChange,
-  open,
-  onOpenChange,
-}: {
-  theme: ReaderTheme;
-  onThemeChange: (t: ReaderTheme) => void;
-  /** Omitted for the page reader — text size means nothing to a page image. */
-  scale?: number;
-  onScaleChange?: (s: number) => void;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { t } = useLanguage();
-  const { user } = useAuth();
-  // Wraps trigger AND panel: the outside-press dismissal treats both as
-  // inside, so pressing the trigger doesn't close-then-reopen.
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  // Lazily read once (server renders null → defaults; harmless, the panel
-  // only ever renders after a click), then re-read on login/logout via a
-  // render-phase adjustment — no effect, no cascading render.
-  const [stored, setStored] = useState<ReaderSettingsV2 | null>(() =>
-    typeof window === "undefined" ? null : loadReaderSettings(user?.id),
-  );
-  const [prevUid, setPrevUid] = useState(user?.id);
-  if (prevUid !== user?.id) {
-    setPrevUid(user?.id);
-    setStored(loadReaderSettings(user?.id));
-  }
-
-  // The reader's live props win over the stored blob for the fields the
-  // reader still owns — the panel must show what the page is doing.
-  const settings: ReaderSettingsV2 = {
-    ...(stored ?? DEFAULT_READER_SETTINGS),
-    theme,
-    ...(scale !== undefined ? { scale } : {}),
-  };
-
-  const handleChange = (patch: Partial<ReaderSettingsV2>) => {
-    const next = { ...settings, ...patch };
-    setStored(next);
-    saveReaderSettings(user?.id, next);
-    if (patch.theme !== undefined) onThemeChange(patch.theme);
-    if (patch.scale !== undefined) onScaleChange?.(patch.scale);
-  };
-
-  return (
-    <div className="relative" ref={wrapRef}>
-      <ReaderButton
-        label={t.book.reader.settingsTitle}
-        active={open}
-        onClick={() => onOpenChange(!open)}
-      >
-        <Type className="size-4" />
-      </ReaderButton>
-
-      <ReaderSettingsPanel
-        mode={scale !== undefined ? "text" : "pages"}
-        settings={settings}
-        onChange={handleChange}
-        open={open}
-        onOpenChange={onOpenChange}
-        dismissRef={wrapRef}
-      />
-    </div>
-  );
-}
 
 /**
  * The contents drawer — closed by default, so the page is the whole screen

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import {
   ArrowDownWideNarrow,
   LayoutGrid,
@@ -23,6 +23,7 @@ import { SEARCH_MIN_LENGTH } from "@/hooks/use-search-term";
 import { useLanguage } from "@/lib/context/language-context";
 import { cn } from "@/lib/utils";
 import type { GridDensity } from "./PosterGrid";
+import { SearchSuggestions, type SearchSuggestionsHandle } from "./SearchSuggestions";
 
 export type BrowseTab = "movies" | "series" | "books" | "music";
 export const BROWSE_TABS: BrowseTab[] = ["movies", "series", "books", "music"];
@@ -121,6 +122,17 @@ export function BrowseBar({
     onSearchChange("");
     setSearchOpen(false);
   };
+
+  // The suggestion panel under the field (movies only). The bar says WHEN it
+  // may show — on focus and on typing — and forwards the input's keys to it;
+  // the panel itself owns the results and the highlighted row.
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [activeOptionId, setActiveOptionId] = useState<string | null>(null);
+  const closeSuggest = useCallback(() => setSuggestOpen(false), []);
+  const searchWrapRef = useRef<HTMLDivElement>(null);
+  const suggestRef = useRef<SearchSuggestionsHandle>(null);
+  const listboxId = useId();
+  const suggestable = tab === "movies";
 
   const tabLabels: Record<BrowseTab, string> = {
     movies: t.search.movies,
@@ -263,7 +275,7 @@ export function BrowseBar({
               the right at a sane width. */}
           {searchable && open && (
             <div className="absolute inset-0 z-10 flex items-center gap-1.5 bg-background sm:static sm:z-auto sm:order-last sm:ml-1.5 sm:w-64 sm:bg-transparent">
-              <div className="relative min-w-0 flex-1">
+              <div ref={searchWrapRef} className="relative min-w-0 flex-1">
                 {/* The field's own glyph doubles as its progress indicator —
                     the search icon spins in place. Nothing moves, nothing is
                     added to the row, and the signal is where the user is
@@ -279,9 +291,18 @@ export function BrowseBar({
                 <Input
                   ref={inputRef}
                   value={search}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                  onFocus={() => setSearchOpen(true)}
+                  onChange={(e) => {
+                    onSearchChange(e.target.value);
+                    setSuggestOpen(true);
+                  }}
+                  onFocus={() => {
+                    setSearchOpen(true);
+                    setSuggestOpen(true);
+                  }}
                   onKeyDown={(e) => {
+                    // Arrows/Enter/Escape go to the panel first; Escape only
+                    // clears the field once the panel is already gone.
+                    if (suggestRef.current?.handleKeyDown(e)) return;
                     if (e.key === "Escape") closeSearch();
                   }}
                   onBlur={() => {
@@ -290,8 +311,25 @@ export function BrowseBar({
                   placeholder={placeholder}
                   aria-busy={isSearching}
                   aria-describedby={isTooShort ? hintId : undefined}
+                  role={suggestable ? "combobox" : undefined}
+                  aria-autocomplete={suggestable ? "list" : undefined}
+                  aria-expanded={suggestable ? suggestOpen && search.trim().length >= SEARCH_MIN_LENGTH : undefined}
+                  aria-controls={suggestable ? listboxId : undefined}
+                  aria-activedescendant={activeOptionId ?? undefined}
                   className="h-9 rounded-full pr-3 pl-10"
                 />
+                {suggestable && (
+                  <SearchSuggestions
+                    ref={suggestRef}
+                    term={search}
+                    tab={tab}
+                    open={suggestOpen}
+                    onClose={closeSuggest}
+                    anchorRef={searchWrapRef}
+                    listboxId={listboxId}
+                    onActiveChange={setActiveOptionId}
+                  />
+                )}
                 {/* Why nothing happened, said quietly and next to the cause.
                     It hangs below the bar rather than widening it, so a stray
                     keystroke never reflows the whole strip. */}

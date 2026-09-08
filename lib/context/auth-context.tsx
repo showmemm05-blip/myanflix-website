@@ -10,7 +10,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { authService, type GoogleLoginInput } from "@/services/api/authService";
 import { profileService } from "@/services/api/profileService";
-import { tokenStore, onUnauthorized } from "@/lib/auth/token-store";
+import { tokenStore, onUnauthorized, onTokensChanged } from "@/lib/auth/token-store";
 import { connectSocket, disconnectSocket } from "@/lib/socket";
 import type { AppUser } from "@/types/user";
 
@@ -60,6 +60,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     connectSocket(accessToken);
     loadProfile().finally(() => setIsLoading(false));
   }, []);
+
+  // Closes the refresh gap: apiClient rotates the access token every ~15
+  // minutes on the first 401 it sees, and the socket must re-handshake with
+  // the new one or the gateway rejects its next reconnect ("jwt expired") and
+  // live wallet/notification updates silently stop. connectSocket() is a
+  // no-op when the token is unchanged, so this coexists with the explicit
+  // mount/login/logout calls; a clear() (null) tears the socket down.
+  useEffect(
+    () =>
+      onTokensChanged((accessToken) => {
+        if (accessToken) connectSocket(accessToken);
+        else disconnectSocket();
+      }),
+    [],
+  );
 
   useEffect(
     () =>

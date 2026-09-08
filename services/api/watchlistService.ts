@@ -24,10 +24,6 @@ export const watchlistService = {
     return [...readIds()];
   },
 
-  isInWatchlist(movieId: string): boolean {
-    return readIds().has(movieId);
-  },
-
   addToWatchlist(movieId: string): void {
     const ids = readIds();
     ids.add(movieId);

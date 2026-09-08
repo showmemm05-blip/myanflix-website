@@ -26,14 +26,6 @@
 export const SLUG =
   "font-mono text-[11px] font-medium tracking-[0.12em] text-muted-foreground uppercase nums";
 
-/**
- * THE DECK — the one line under a headline. Inter, generous leading, sized to
- * read as prose rather than as a subtitle. Kept exported for reuse, though
- * the hero deliberately runs its description at a quieter body cut — DECK's
- * text-lg+ is too loud under a display title that sits on artwork.
- */
-export const DECK =
-  "text-lg leading-[1.45] text-foreground/80 sm:text-xl lg:text-[1.375rem]";
 
 /**
  * BURMESE NEEDS AIR THAT LATIN DOES NOT.

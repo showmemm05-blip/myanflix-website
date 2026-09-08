@@ -377,50 +377,6 @@ export function saveBookView(
   pendingBookViews.set(key, { view, timer });
 }
 
-// ── Legacy single-value API ────────────────────────────────────────────────
-// Kept so ChapterReader/PageReader compile unchanged until their builders
-// switch them over to loadReaderSettings. Never delete the keys they read —
-// migration for other users of this device depends on them.
-
-/** @deprecated Use loadReaderSettings(userId).theme — kept until the readers switch to the v2 store. */
-export function loadReaderTheme(): ReaderTheme {
-  try {
-    const stored = window.localStorage.getItem(LEGACY_THEME_KEY);
-    if (isOneOf(stored, READER_THEMES)) return stored;
-  } catch {
-    // Storage blocked — paper is a fine default.
-  }
-  return "paper";
-}
-
-/** @deprecated Use saveReaderSettings — kept until the readers switch to the v2 store. */
-export function saveReaderTheme(theme: ReaderTheme) {
-  try {
-    window.localStorage.setItem(LEGACY_THEME_KEY, theme);
-  } catch {
-    // The preference just won't persist.
-  }
-}
-
-/** @deprecated Use loadReaderSettings(userId).scale — kept until the readers switch to the v2 store. */
-export function loadReaderScale(): number {
-  try {
-    const stored = Number(window.localStorage.getItem(LEGACY_SCALE_KEY));
-    if (stored >= SCALE_MIN && stored <= SCALE_MAX) return stored;
-  } catch {
-    // Fall through to the default.
-  }
-  return 1;
-}
-
-/** @deprecated Use saveReaderSettings — kept until the readers switch to the v2 store. */
-export function saveReaderScale(scale: number) {
-  try {
-    window.localStorage.setItem(LEGACY_SCALE_KEY, String(scale));
-  } catch {
-    // The preference just won't persist.
-  }
-}
 
 /**
  * Myanmar script must never be letter-spaced (tracking pulls combining marks
