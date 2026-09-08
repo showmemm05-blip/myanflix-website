@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,9 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Surface } from "@/components/system";
 import { GoogleSignIn } from "@/components/auth/GoogleSignIn";
+import {
+  OtpChannelIcon,
+  OtpChannelPicker,
+  type OtpChannel,
+} from "@/components/auth/OtpChannelPicker";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { ApiError } from "@/services/api/apiClient";
+import { hasMyanmar } from "@/components/books/reader-settings";
 import { cn } from "@/lib/utils";
 import {
   phoneSchema,
@@ -30,7 +36,8 @@ const RESEND_COOLDOWN_SECONDS = 60;
 const fieldClasses = "h-11 rounded-xl border-white/10 bg-white/[0.04] px-3.5";
 /** Same field, with room carved out for the leading affordance icon. */
 const iconFieldClasses = cn(fieldClasses, "pl-10");
-const iconClasses = "pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground";
+const iconClasses =
+  "pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground";
 const submitClasses = "mt-1 h-11 w-full rounded-full text-sm font-semibold";
 // The negative margin keeps the comfortable tap area from stretching the row.
 const linkButtonClasses =
@@ -42,7 +49,13 @@ const errorTextClasses = "text-xs text-destructive";
  * gradient, upcoming stays a hairline. The labels underneath are the same
  * eyebrow treatment used everywhere else in the app.
  */
-function StepIndicator({ current, labels }: { current: number; labels: string[] }) {
+function StepIndicator({
+  current,
+  labels,
+}: {
+  current: number;
+  labels: string[];
+}) {
   return (
     <ol className="flex items-start gap-2">
       {labels.map((label, index) => (
@@ -62,6 +75,7 @@ function StepIndicator({ current, labels }: { current: number; labels: string[] 
             )}
           />
           <span
+            style={{ letterSpacing: hasMyanmar(label) ? 0 : undefined }}
             className={cn(
               "text-[10px] font-semibold tracking-[0.14em] uppercase transition-colors duration-300 ease-out",
               index === current
@@ -88,7 +102,13 @@ function StepIndicator({ current, labels }: { current: number; labels: string[] 
  * account or creates one), so /login and /register both just render this.
  */
 export function PhoneAuthForm() {
-  const { checkPhoneExists, verifyPassword, requestOtp, verifyOtp, loginWithGoogle } = useAuth();
+  const {
+    checkPhoneExists,
+    verifyPassword,
+    requestOtp,
+    verifyOtp,
+    loginWithGoogle,
+  } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
 
@@ -100,6 +120,14 @@ export function PhoneAuthForm() {
   const [pendingPassword, setPendingPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  // Where the current code went out — SMS by default, or the chat app the
+  // user picked on the code step. UI only for now: the backend still sends
+  // the code its own way, so nothing about the channel is put on the wire
+  // (the API rejects fields it doesn't know). When the backend learns about
+  // channels, pass `channel` into requestOtp inside sendCode below.
+  const [channel, setChannel] = useState<OtpChannel>("sms");
+  const [sendingChannel, setSendingChannel] = useState<OtpChannel | null>(null);
+  const channelTitleId = useId();
   const cooldownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   // "Continue with Google" lives on the phone step only. The ref makes a
   // second Google callback a no-op even before React has re-rendered with
@@ -110,10 +138,18 @@ export function PhoneAuthForm() {
   const [googlePopupOpen, setGooglePopupOpen] = useState(false);
   const googleInFlight = useRef(false);
 
-  const phoneForm = useForm<PhoneValues>({ resolver: zodResolver(phoneSchema) });
-  const loginPasswordForm = useForm<LoginPasswordValues>({ resolver: zodResolver(loginPasswordSchema) });
-  const createPasswordForm = useForm<CreatePasswordValues>({ resolver: zodResolver(createPasswordSchema) });
-  const codeForm = useForm<OtpCodeValues>({ resolver: zodResolver(otpCodeSchema) });
+  const phoneForm = useForm<PhoneValues>({
+    resolver: zodResolver(phoneSchema),
+  });
+  const loginPasswordForm = useForm<LoginPasswordValues>({
+    resolver: zodResolver(loginPasswordSchema),
+  });
+  const createPasswordForm = useForm<CreatePasswordValues>({
+    resolver: zodResolver(createPasswordSchema),
+  });
+  const codeForm = useForm<OtpCodeValues>({
+    resolver: zodResolver(otpCodeSchema),
+  });
 
   const startCooldown = () => {
     setCooldown(RESEND_COOLDOWN_SECONDS);
@@ -158,14 +194,18 @@ export function PhoneAuthForm() {
     }
   };
 
-  const sendCode = async () => {
+  const sendCode = async (via: OtpChannel = "sms") => {
+    setSendingChannel(via);
     try {
       await requestOtp(phone);
+      setChannel(via);
       setStep("code");
       startCooldown();
       codeForm.reset();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.auth.genericError);
+    } finally {
+      setSendingChannel(null);
     }
   };
 
@@ -185,15 +225,20 @@ export function PhoneAuthForm() {
     await sendCode();
   };
 
-  const onResend = () => {
-    if (cooldown > 0) return;
-    sendCode();
+  const onChooseChannel = (via: OtpChannel) => {
+    if (cooldown > 0 || sendingChannel) return;
+    setError(null);
+    void sendCode(via);
   };
 
   const onSubmitCode = async (values: OtpCodeValues) => {
     setError(null);
     try {
-      await verifyOtp(phone, values.code, isNewAccount ? pendingPassword : undefined);
+      await verifyOtp(
+        phone,
+        values.code,
+        isNewAccount ? pendingPassword : undefined,
+      );
       router.push("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.auth.genericError);
@@ -237,6 +282,7 @@ export function PhoneAuthForm() {
     setError(null);
     setCooldown(0);
     setPendingPassword("");
+    setChannel("sms");
     if (cooldownInterval.current) clearInterval(cooldownInterval.current);
     loginPasswordForm.reset();
     createPasswordForm.reset();
@@ -258,17 +304,30 @@ export function PhoneAuthForm() {
    * past the first shows the same row, so "wrong number?" is answered in the
    * same place whether you're on the password step or the code step.
    */
-  const identityRow = (message: string) => (
+  const identityRow = (message: string, icon?: ReactNode) => (
     <Surface
       tone="subtle"
       radius="lg"
       className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 px-3.5 py-3"
     >
       <p className="flex min-w-0 flex-1 items-start gap-2 text-sm text-muted-foreground">
-        <Phone aria-hidden className="mt-0.5 size-3.5 shrink-0 text-primary" />
+        {icon ?? (
+          <Phone
+            aria-hidden
+            className="mt-0.5 size-3.5 shrink-0 text-primary"
+          />
+        )}
         <span className="min-w-0">{message}</span>
       </p>
-      <button type="button" onClick={changePhone} className={linkButtonClasses}>
+      <button
+        type="button"
+        onClick={changePhone}
+        disabled={sendingChannel !== null}
+        className={cn(
+          linkButtonClasses,
+          "disabled:cursor-not-allowed disabled:opacity-60",
+        )}
+      >
         {t.auth.changePhone}
       </button>
     </Surface>
@@ -279,10 +338,14 @@ export function PhoneAuthForm() {
   if (step === "phone") {
     // One sign-in at a time: a Google exchange locks the phone field and its
     // Continue; a phone check dims the Google button (see GoogleSignIn).
-    const busy = googleBusy || googlePopupOpen || phoneForm.formState.isSubmitting;
+    const busy =
+      googleBusy || googlePopupOpen || phoneForm.formState.isSubmitting;
     form = (
       <div className="flex flex-col gap-4">
-        <form onSubmit={phoneForm.handleSubmit(onSubmitPhone)} className="flex flex-col gap-4">
+        <form
+          onSubmit={phoneForm.handleSubmit(onSubmitPhone)}
+          className="flex flex-col gap-4"
+        >
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="phone">{t.auth.phoneLabel}</Label>
             <div className="relative">
@@ -299,11 +362,17 @@ export function PhoneAuthForm() {
               />
             </div>
             {phoneForm.formState.errors.phone && (
-              <p className={errorTextClasses}>{phoneForm.formState.errors.phone.message}</p>
+              <p className={errorTextClasses}>
+                {phoneForm.formState.errors.phone.message}
+              </p>
             )}
           </div>
           <Button type="submit" disabled={busy} className={submitClasses}>
-            {phoneForm.formState.isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Phone className="size-4" />}
+            {phoneForm.formState.isSubmitting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Phone className="size-4" />
+            )}
             {t.auth.continue}
           </Button>
         </form>
@@ -320,7 +389,9 @@ export function PhoneAuthForm() {
   } else if (step === "password" && isNewAccount) {
     form = (
       <form
-        onSubmit={(event) => createPasswordForm.handleSubmit(onSubmitCreatePassword)(event)}
+        onSubmit={(event) =>
+          createPasswordForm.handleSubmit(onSubmitCreatePassword)(event)
+        }
         className="flex flex-col gap-4"
       >
         {identityRow(t.auth.creatingAccountFor(phone))}
@@ -338,7 +409,9 @@ export function PhoneAuthForm() {
             />
           </div>
           {createPasswordForm.formState.errors.password && (
-            <p className={errorTextClasses}>{createPasswordForm.formState.errors.password.message}</p>
+            <p className={errorTextClasses}>
+              {createPasswordForm.formState.errors.password.message}
+            </p>
           )}
         </div>
         <div className="flex flex-col gap-1.5">
@@ -355,10 +428,16 @@ export function PhoneAuthForm() {
             />
           </div>
           {createPasswordForm.formState.errors.confirmPassword && (
-            <p className={errorTextClasses}>{createPasswordForm.formState.errors.confirmPassword.message}</p>
+            <p className={errorTextClasses}>
+              {createPasswordForm.formState.errors.confirmPassword.message}
+            </p>
           )}
         </div>
-        <Button type="submit" disabled={createPasswordForm.formState.isSubmitting} className={submitClasses}>
+        <Button
+          type="submit"
+          disabled={createPasswordForm.formState.isSubmitting}
+          className={submitClasses}
+        >
           {createPasswordForm.formState.isSubmitting ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
@@ -371,7 +450,9 @@ export function PhoneAuthForm() {
   } else if (step === "password") {
     form = (
       <form
-        onSubmit={(event) => loginPasswordForm.handleSubmit(onSubmitLoginPassword)(event)}
+        onSubmit={(event) =>
+          loginPasswordForm.handleSubmit(onSubmitLoginPassword)(event)
+        }
         className="flex flex-col gap-4"
       >
         {identityRow(t.auth.signingInAs(phone))}
@@ -389,10 +470,16 @@ export function PhoneAuthForm() {
             />
           </div>
           {loginPasswordForm.formState.errors.password && (
-            <p className={errorTextClasses}>{loginPasswordForm.formState.errors.password.message}</p>
+            <p className={errorTextClasses}>
+              {loginPasswordForm.formState.errors.password.message}
+            </p>
           )}
         </div>
-        <Button type="submit" disabled={loginPasswordForm.formState.isSubmitting} className={submitClasses}>
+        <Button
+          type="submit"
+          disabled={loginPasswordForm.formState.isSubmitting}
+          className={submitClasses}
+        >
           {loginPasswordForm.formState.isSubmitting ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
@@ -404,8 +491,17 @@ export function PhoneAuthForm() {
     );
   } else {
     form = (
-      <form onSubmit={codeForm.handleSubmit(onSubmitCode)} className="flex flex-col gap-4">
-        {identityRow(t.auth.otpSent(phone))}
+      <form
+        onSubmit={codeForm.handleSubmit(onSubmitCode)}
+        className="flex flex-col gap-4"
+      >
+        {identityRow(
+          t.auth.otpSentVia(t.auth.otpChannels[channel].name, phone),
+          <OtpChannelIcon
+            channel={channel}
+            className="size-5 [&>svg]:size-3"
+          />,
+        )}
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="code">{t.auth.otpLabel}</Label>
           <Input
@@ -415,7 +511,10 @@ export function PhoneAuthForm() {
             autoComplete="one-time-code"
             maxLength={6}
             placeholder="123456"
-            className={cn(fieldClasses, "nums h-12 text-center text-lg tracking-[0.35em] md:text-lg")}
+            className={cn(
+              fieldClasses,
+              "nums h-12 text-center text-lg tracking-[0.35em] md:text-lg",
+            )}
             data-1p-ignore
             data-lpignore="true"
             data-bwignore="true"
@@ -423,21 +522,55 @@ export function PhoneAuthForm() {
             {...codeForm.register("code")}
           />
           {codeForm.formState.errors.code && (
-            <p className={cn(errorTextClasses, "text-center")}>{codeForm.formState.errors.code.message}</p>
+            <p className={cn(errorTextClasses, "text-center")}>
+              {codeForm.formState.errors.code.message}
+            </p>
           )}
         </div>
-        <Button type="submit" disabled={codeForm.formState.isSubmitting} className={submitClasses}>
-          {codeForm.formState.isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+        <Button
+          type="submit"
+          disabled={codeForm.formState.isSubmitting}
+          className={submitClasses}
+        >
+          {codeForm.formState.isSubmitting ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <ShieldCheck className="size-4" />
+          )}
           {isNewAccount ? t.auth.verifyAndCreate : t.auth.verifyAndSignIn}
         </Button>
-        <button
-          type="button"
-          onClick={onResend}
-          disabled={cooldown > 0}
-          className="focus-ring nums self-center rounded-full px-3 py-2.5 text-sm font-medium text-primary transition-colors duration-150 ease-out hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
-        >
-          {cooldown > 0 ? t.auth.resendIn(cooldown) : t.auth.resendCode}
-        </button>
+        <div className="mt-1 flex flex-col gap-2.5">
+          <div className="flex flex-col gap-0.5">
+            <p
+              id={channelTitleId}
+              className="text-sm font-medium text-foreground"
+            >
+              {t.auth.otpChannelTitle}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {t.auth.otpChannelHint}
+            </p>
+          </div>
+          <OtpChannelPicker
+            selected={channel}
+            sending={sendingChannel}
+            cooldown={cooldown}
+            labels={t.auth.otpChannels}
+            sentBadge={t.auth.otpSentBadge}
+            labelledBy={channelTitleId}
+            onChoose={onChooseChannel}
+          />
+          {/* The visible countdown ticks every second, so it is deliberately
+              NOT a live region — only "Sending…" is announced. */}
+          {(sendingChannel || cooldown > 0) && (
+            <p className="nums text-center text-xs text-muted-foreground">
+              {sendingChannel ? t.auth.otpSending : t.auth.resendIn(cooldown)}
+            </p>
+          )}
+          <span aria-live="polite" className="sr-only">
+            {sendingChannel ? t.auth.otpSending : ""}
+          </span>
+        </div>
       </form>
     );
   }
