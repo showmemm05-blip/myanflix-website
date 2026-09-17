@@ -25,10 +25,10 @@ import { AuroraBackdrop } from "@/components/system/AuroraBackdrop";
  * complete signed in or out. The page therefore fires ZERO catalogue requests
  * in both auth states; the only network touch anywhere below is StoreLive's
  * read of the shared public ['peak-users'] key. The single auth read lives
- * inside StoreExploreMore, where it only changes two href strings (movies and
- * books route through /login?next=… for a signed-out visitor, because the
- * catalogue behind them requires a token). Nothing else on the page knows or
- * cares who is looking at it.
+ * inside StoreExploreMore, where it only changes one href string (books
+ * route through /login?next=… for a signed-out visitor, because that
+ * catalogue still requires a token; movies are browsable signed out). Nothing
+ * else on the page knows or cares who is looking at it.
  *
  * THE ONE AMBIENT BACKGROUND lives here: AuroraBackdrop variant="hero" as the
  * first child of the relative/isolate root, lighting the gutters around the

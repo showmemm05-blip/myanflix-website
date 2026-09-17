@@ -6,8 +6,10 @@ import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Clapperboard, ListVideo, Play } from "lucide-react";
 import { EmptyState } from "@/components/empty/EmptyState";
+import { SignInEmptyState } from "@/components/empty/SignInEmptyState";
 import { chipClass } from "@/components/system/Chip";
 import { seriesService } from "@/services/api/seriesService";
+import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { formatDuration, UNKNOWN_DURATION } from "@/lib/format";
 import { FALLBACK_COVER_URL } from "@/lib/placeholder";
@@ -149,10 +151,13 @@ export function EpisodeRail({
   className,
 }: EpisodeRailProps) {
   const { t } = useLanguage();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  // The strip is members-only on the API: never ask for it as a guest.
+  const isGuest = !isAuthenticated && !isAuthLoading;
   const { data, isLoading, isError } = useQuery({
     queryKey: ["series", seriesId, "player-episodes"],
     queryFn: () => seriesService.getPlayerEpisodes(seriesId),
-    enabled: Boolean(seriesId),
+    enabled: Boolean(seriesId) && isAuthenticated,
   });
 
   const seasons = useMemo(() => data?.seasons ?? [], [data]);
@@ -220,7 +225,7 @@ export function EpisodeRail({
       )}
 
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-2">
-        {isLoading && (
+        {(isLoading || isAuthLoading) && (
           <div className="flex flex-col">
             {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
               <EpisodeRowSkeleton key={index} />
@@ -228,9 +233,18 @@ export function EpisodeRail({
           </div>
         )}
 
+        {isGuest && (
+          <SignInEmptyState
+            icon={ListVideo}
+            title={t.player.state.signInTitle}
+            description={t.player.state.signInBody}
+            returnTo={`/player/${currentEpisodeId}`}
+          />
+        )}
+
         {isError && <EmptyState icon={AlertTriangle} title={t.player.episodes.loadError} />}
 
-        {!isLoading && !isError && episodeCount === 0 && (
+        {isAuthenticated && !isLoading && !isError && episodeCount === 0 && (
           <EmptyState icon={Clapperboard} title={t.player.episodes.emptyState} />
         )}
 

@@ -12,6 +12,23 @@ interface QueueItem {
 const IMMEDIATE_PRIORITY = -Infinity;
 
 /**
+ * A segment fetch that got an HTTP answer, just not a good one. Carries the
+ * status so the Hls loader can hand it to hls.js as the response code — the
+ * player page keys its recovery on it (403/410 from the cache server mean
+ * the signed link is bad or expired, which a retry of the same URL can never
+ * fix; only a fresh stream lookup can).
+ */
+export class SegmentHttpError extends Error {
+  constructor(
+    readonly status: number,
+    url: string,
+  ) {
+    super(`Segment fetch failed: ${status} for ${url}`);
+    this.name = "SegmentHttpError";
+  }
+}
+
+/**
  * Concurrency-limited, cancellable, priority-ordered fetch queue for segment
  * bytes. Every caller (PrefetchManager's background prefetch, or the custom
  * Hls loader's just-in-time fetch) goes through `request()`, which dedupes
@@ -135,7 +152,7 @@ export class DownloadManager {
 
     try {
       const response = await fetch(segment.url, { signal: controller.signal });
-      if (!response.ok) throw new Error(`Segment fetch failed: ${response.status}`);
+      if (!response.ok) throw new SegmentHttpError(response.status, segment.url);
       const data = await response.arrayBuffer();
       this.cache.markDownloaded(segment.url, data, performance.now() - startedAt);
       item.resolve(data);

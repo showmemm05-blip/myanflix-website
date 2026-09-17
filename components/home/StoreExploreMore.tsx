@@ -6,6 +6,7 @@ import Link from "next/link";
 import { RevealSection } from "@/components/home/RevealSection";
 import { StoreHeading, StoreSection } from "@/components/home/StoreSection";
 import { Chip } from "@/components/system/Chip";
+import { loginHref } from "@/lib/auth/return-to";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { LANES, type Lane } from "@/lib/home/lanes";
@@ -25,19 +26,18 @@ import { LANES, type Lane } from "@/lib/home/lanes";
 const EXPLORE_LANES: Lane[] = [LANES.film, LANES.book, LANES.music];
 
 /**
- * Signed out, /media/movies and /media/books are dead ends by design:
- * BrowseSurface has no auth branch, so a logged-out visitor gets skeletons
- * and then a false "nothing here". The gate therefore lives on the LINK —
- * gated lanes route through /login?next=<destination> until there is a
- * session. Music is the exception: its surface is local-data preview and
- * works for everyone, so it always links direct (and carries the registry's
- * preview label instead of a lock).
+ * Movies (and the series that share their surface) are browsable signed out
+ * — only watching needs a session, and those pages say so themselves. Books
+ * are still members-only, so the book lane is the one that routes through
+ * /login?next=<destination> until there is a session. Music always links
+ * direct: its surface is local-data preview and works for everyone (and
+ * carries the registry's preview label instead of a lock).
  */
 function laneHref(lane: Lane, isAuthenticated: boolean): string {
   // Registry invariant: every non-announced lane carries a real href.
   const href = lane.href ?? "/media";
-  if (lane.key === "music" || isAuthenticated) return href;
-  return `/login?next=${encodeURIComponent(href)}`;
+  if (lane.key !== "book" || isAuthenticated) return href;
+  return loginHref(href);
 }
 
 export function StoreExploreMore() {
@@ -53,7 +53,7 @@ export function StoreExploreMore() {
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           {EXPLORE_LANES.map((lane) => {
             const Icon = lane.icon;
-            const gated = lane.key !== "music" && !isAuthenticated;
+            const gated = lane.key === "book" && !isAuthenticated;
 
             return (
               <Link

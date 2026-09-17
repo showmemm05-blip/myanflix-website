@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Loader2, MessageCircle, MessageSquare } from "lucide-react";
+import { ChevronDown, Loader2, LogIn, MessageCircle, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Chip, SectionHeader, Surface } from "@/components/system";
 import { EmptyState } from "@/components/empty/EmptyState";
 import { ErrorState } from "@/components/empty/ErrorState";
+import { loginHref } from "@/lib/auth/return-to";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { cn } from "@/lib/utils";
@@ -70,6 +72,7 @@ function relativeTime(iso: string, t: TranslationShape): string {
 
 export function CommentsSection(target: CommentTarget) {
   const { t } = useLanguage();
+  const pathname = usePathname();
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -161,9 +164,10 @@ export function CommentsSection(target: CommentTarget) {
               <Button
                 variant="outline"
                 className="h-10 rounded-full px-4"
-                render={<Link href="/login" />}
+                render={<Link href={loginHref(pathname)} />}
                 nativeButton={false}
               >
+                <LogIn className="size-4" />
                 {t.comments.signIn}
               </Button>
             </Surface>

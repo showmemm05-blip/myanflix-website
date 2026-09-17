@@ -12,6 +12,7 @@ import { useLanguage } from "@/lib/context/language-context";
 import { ALBUMS } from "@/lib/media/music-data";
 import { formatDuration } from "@/lib/format";
 import { movieService } from "@/services/api/movieService";
+import { useAuth } from "@/lib/context/auth-context";
 import { useBooks } from "@/hooks/use-books";
 
 /**
@@ -27,6 +28,7 @@ import { useBooks } from "@/hooks/use-books";
  */
 export function AllMediaView() {
   const { t } = useLanguage();
+  const { isAuthenticated } = useAuth();
 
   const topRated = useQuery({
     queryKey: ["home", "top-rated"],
@@ -45,8 +47,9 @@ export function AllMediaView() {
     .map((movie) => movieToBrowseItem(movie, formatDuration(movie.duration)));
 
   // Newest-first is what the library returns, so the first row is both the
-  // shelf's lead and the mosaic's book pick.
-  const booksQuery = useBooks({ limit: 14 });
+  // shelf's lead and the mosaic's book pick. The library is members-only,
+  // so a guest never asks for it and the shelf simply stays hidden.
+  const booksQuery = useBooks({ limit: 14 }, { enabled: isAuthenticated });
   const books = booksQuery.data?.items ?? [];
   const featuredBook = books[0] ?? null;
   const featuredAlbum = ALBUMS.find((a) => a.featured) ?? ALBUMS[0];

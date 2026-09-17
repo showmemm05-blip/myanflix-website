@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { BookOpen, Film, LoaderCircle, Music, Tv, X } from "lucide-react";
 import { SpotlightHero, SpotlightHeroSkeleton } from "./SpotlightHero";
 import { BrowseBar, DensityToggle } from "./BrowseBar";
@@ -17,12 +18,15 @@ import {
   type SeriesFilterState,
 } from "@/components/filters/filter-types";
 import { EmptyState } from "@/components/empty/EmptyState";
+import { SignInEmptyState } from "@/components/empty/SignInEmptyState";
+import { ErrorState } from "@/components/empty/ErrorState";
 import { useHomeRows, useMovieFacets, useMoviesInfinite } from "@/hooks/use-movies";
 import { useSeriesFacets, useSeriesInfinite } from "@/hooks/use-series";
 import { useCatalogFilters } from "@/hooks/use-catalog-filters";
 import { useBooks } from "@/hooks/use-books";
 import { BookCard } from "@/components/media/BookCard";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { formatDuration } from "@/lib/format";
 import type { Movie } from "@/types/movie";
@@ -48,7 +52,14 @@ const QUICK_GENRE_COUNT = 12;
  */
 export function BrowseSurface({ mode = "search" }: { mode?: "media" | "search" }) {
   const { t } = useLanguage();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const isSearchSurface = mode === "search";
+  // Where "Sign in" brings a guest back to — this exact tab, term and filters.
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const queryString = searchParams.toString();
+  // Where a guest lands again after signing in: this exact tab and filters.
+  const signInReturnTo = queryString ? `${pathname}?${queryString}` : pathname;
 
   const {
     tab,
@@ -89,8 +100,13 @@ export function BrowseSurface({ mode = "search" }: { mode?: "media" | "search" }
   const seriesInfinite = useSeriesInfinite(seriesQuery);
 
   // Books are searched server-side on the same settled term the movies grid
-  // uses (the tab renders from this query alone).
-  const booksQuery = useBooks({ limit: 60, search: effectiveTerm || undefined });
+  // uses (the tab renders from this query alone). The library is
+  // members-only, so a guest never fires the request — the tab shows a
+  // sign-in prompt instead.
+  const booksQuery = useBooks(
+    { limit: 60, search: effectiveTerm || undefined },
+    { enabled: isAuthenticated },
+  );
 
   /**
    * One "we're working on it" signal covering BOTH halves of the wait: the
@@ -392,7 +408,12 @@ export function BrowseSurface({ mode = "search" }: { mode?: "media" | "search" }
                 </>
               }
             />
-            {!moviesInfinite.isLoading && movieItems.length === 0 ? (
+            {moviesInfinite.isError && movieItems.length === 0 ? (
+              <ErrorState
+                description={t.browse.loadFailed}
+                onRetry={() => void moviesInfinite.refetch()}
+              />
+            ) : !moviesInfinite.isLoading && movieItems.length === 0 ? (
               <EmptyState icon={Film} title={t.browse.noMoviesTitle} description={t.browse.noMoviesBody} />
             ) : (
               <>
@@ -441,7 +462,12 @@ export function BrowseSurface({ mode = "search" }: { mode?: "media" | "search" }
                 </>
               }
             />
-            {!seriesInfinite.isLoading && seriesItems.length === 0 ? (
+            {seriesInfinite.isError && seriesItems.length === 0 ? (
+              <ErrorState
+                description={t.browse.loadFailed}
+                onRetry={() => void seriesInfinite.refetch()}
+              />
+            ) : !seriesInfinite.isLoading && seriesItems.length === 0 ? (
               <EmptyState icon={Tv} title={t.browse.noSeriesTitle} description={t.browse.noSeriesBody} />
             ) : (
               <>
@@ -471,7 +497,7 @@ export function BrowseSurface({ mode = "search" }: { mode?: "media" | "search" }
               title={effectiveTerm ? t.browse.resultsFor(effectiveTerm) : t.media.newBooks}
               action={
                 <>
-                  {!booksQuery.isLoading && (
+                  {isAuthenticated && !isAuthLoading && !booksQuery.isLoading && (
                     <Chip tone="neutral" variant="outline" size="sm" className="nums">
                       {t.media.bookCount(booksQuery.data?.items.length ?? 0)}
                     </Chip>
@@ -489,7 +515,14 @@ export function BrowseSurface({ mode = "search" }: { mode?: "media" | "search" }
                 </>
               }
             />
-            {booksQuery.isLoading ? (
+            {!isAuthenticated && !isAuthLoading ? (
+              <SignInEmptyState
+                icon={BookOpen}
+                title={t.browse.booksSignInTitle}
+                description={t.browse.booksSignInBody}
+                returnTo={signInReturnTo}
+              />
+            ) : isAuthLoading || booksQuery.isLoading ? (
               <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {Array.from({ length: 12 }, (_, i) => (
                   <div key={i} className="flex flex-col">

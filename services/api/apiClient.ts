@@ -8,6 +8,7 @@
  * envelope so callers just get `data` back (or a thrown ApiError).
  */
 import axios, {
+  type AxiosError,
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig,
 } from "axios";
@@ -120,6 +121,19 @@ export function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
+/**
+ * Cross-tab guard. The token store is shared localStorage, and the backend
+ * accepts each refresh token exactly once — so when two tabs refresh at the
+ * same moment, the loser's 401 is not a dead session: the winner has (or is
+ * about to have) written a fresh pair. If the stored refresh token is no
+ * longer the one we sent, hand back the access token the winner stored
+ * instead of null, so the loser retries instead of clearing the store.
+ */
+function tokenRotatedByAnotherTab(sent: string): string | null {
+  const stored = tokenStore.getRefreshToken();
+  return stored && stored !== sent ? tokenStore.getAccessToken() : null;
+}
+
 async function performRefresh(): Promise<string | null> {
   const refreshToken = tokenStore.getRefreshToken();
   if (!refreshToken) return null;
@@ -137,13 +151,26 @@ async function performRefresh(): Promise<string | null> {
       response.data?.data?.accessToken;
     const nextRefreshToken: string | undefined =
       response.data?.data?.refreshToken;
-    if (!nextAccessToken || !nextRefreshToken) return null;
+    if (!nextAccessToken || !nextRefreshToken) {
+      return tokenRotatedByAnotherTab(refreshToken);
+    }
 
     tokenStore.setTokens(nextAccessToken, nextRefreshToken);
     return nextAccessToken;
   } catch {
-    return null;
+    return tokenRotatedByAnotherTab(refreshToken);
   }
+}
+
+/** Whether the request that failed actually carried a bearer token. */
+function sentWithAuthorization(err: AxiosError): boolean {
+  const headers = err.config?.headers;
+  if (!headers) return false;
+  const value =
+    typeof headers.get === "function"
+      ? headers.get("Authorization")
+      : (headers as Record<string, unknown>).Authorization;
+  return Boolean(value);
 }
 
 async function request<T>(
@@ -176,6 +203,19 @@ async function request<T>(
         : "Request failed";
       const status = axios.isAxiosError(err) ? (err.response?.status ?? 0) : 0;
       throw new ApiError(message, status);
+    }
+
+    // A guest hitting a members-only endpoint is not an expired session:
+    // nothing was sent, nothing can be refreshed, and there is no store to
+    // clear. Wiping the cache here is what used to send every public query
+    // on the page into a 401 → wipe → refetch loop. Surface it as a plain
+    // 401 the caller can render as "sign in required" instead.
+    if (
+      !sentWithAuthorization(err) &&
+      !tokenStore.getAccessToken() &&
+      !tokenStore.getRefreshToken()
+    ) {
+      throw new ApiError("Sign in required.", 401);
     }
 
     const newToken = await refreshAccessToken();

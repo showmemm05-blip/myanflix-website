@@ -100,8 +100,12 @@ function StepIndicator({
  * the end is what actually creates the session — login and signup are the
  * same backend call (verifying the code either logs into the existing
  * account or creates one), so /login and /register both just render this.
+ *
+ * `returnTo` is where a successful sign-in lands — the page a guest was
+ * bounced off (already validated as a same-origin path by the caller), or
+ * the home screen when there is none.
  */
-export function PhoneAuthForm() {
+export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
   const {
     checkPhoneExists,
     verifyPassword,
@@ -248,7 +252,7 @@ export function PhoneAuthForm() {
         values.code,
         isNewAccount ? pendingPassword : undefined,
       );
-      router.push("/");
+      router.push(returnTo ?? "/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.auth.genericError);
     }
@@ -267,7 +271,7 @@ export function PhoneAuthForm() {
       await loginWithGoogle({ code });
       // Deliberately still busy — we are navigating away, exactly like the
       // code step after a successful verify.
-      router.push("/");
+      router.push(returnTo ?? "/");
     } catch (err) {
       setError(
         err instanceof ApiError

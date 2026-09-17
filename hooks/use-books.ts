@@ -19,12 +19,19 @@ export function readingProgressKey(bookId: string, editionId: string | null) {
  * cache entry, signal-forwarded so a superseded search is aborted mid-flight,
  * and `keepPreviousData` so the shelf never flashes empty between terms.
  */
-export function useBooks(query: BookQuery = {}) {
+export function useBooks(
+  query: BookQuery = {},
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: ["books", query],
     queryFn: ({ signal }) => bookService.getBooks(query, { signal }),
     placeholderData: keepPreviousData,
     staleTime: SEARCH_STALE_TIME_MS,
+    // The library is members-only (GET /books is 401 for a guest), so a
+    // caller that can render to a guest passes `enabled: isAuthenticated`
+    // and never fires the request at all.
+    enabled,
   });
 }
 

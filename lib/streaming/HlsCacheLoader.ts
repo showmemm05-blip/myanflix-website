@@ -7,7 +7,7 @@ import type {
   LoaderStats,
 } from "hls.js";
 import type { CacheManager } from "./CacheManager";
-import type { DownloadManager } from "./DownloadManager";
+import { SegmentHttpError, type DownloadManager } from "./DownloadManager";
 import type { SegmentMeta } from "./types";
 
 function emptyStats(): LoaderStats {
@@ -33,6 +33,20 @@ const MAIN_FRAGMENT_TYPE = "main";
 
 function isMainFragment(context: FragmentLoaderContext): boolean {
   return (context.frag.type as string) === MAIN_FRAGMENT_TYPE;
+}
+
+/**
+ * What hls.js's `onError` callback gets. The HTTP status rides along as
+ * `code` when there was one (it surfaces as `data.response.code` on the
+ * ERROR event, which is how the player tells an expired signed link from a
+ * dropped connection); anything else is a network-level failure, `code: 0`,
+ * exactly as before.
+ */
+function loaderError(err: unknown): { code: number; text: string } {
+  return {
+    code: err instanceof SegmentHttpError ? err.status : 0,
+    text: err instanceof Error ? err.message : String(err),
+  };
 }
 
 /**
@@ -116,7 +130,7 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
         })
         .catch((err: unknown) => {
           if (this.aborted) return;
-          callbacks.onError({ code: 0, text: err instanceof Error ? err.message : String(err) }, context, null, this.stats);
+          callbacks.onError(loaderError(err), context, null, this.stats);
         });
     }
 
@@ -141,7 +155,7 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
 
       fetch(context.url, { signal: controller.signal, headers })
         .then((response) => {
-          if (!response.ok) throw new Error(`HTTP ${response.status} for ${context.url}`);
+          if (!response.ok) throw new SegmentHttpError(response.status, context.url);
           this.stats.loading.first = performance.now();
           return response.arrayBuffer();
         })
@@ -154,7 +168,7 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
         })
         .catch((err: unknown) => {
           if (this.aborted) return;
-          callbacks.onError({ code: 0, text: err instanceof Error ? err.message : String(err) }, context, null, this.stats);
+          callbacks.onError(loaderError(err), context, null, this.stats);
         });
     }
 

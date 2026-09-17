@@ -7,12 +7,14 @@ import { BookOpen, Search, X } from "lucide-react";
 
 import { BookCard } from "./BookCard";
 import { EmptyState } from "@/components/empty/EmptyState";
+import { SignInEmptyState } from "@/components/empty/SignInEmptyState";
 import { AuroraBackdrop } from "@/components/system/AuroraBackdrop";
 import { Chip, chipClass } from "@/components/system/Chip";
 import { SectionHeader } from "@/components/system/SectionHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { useBooks } from "@/hooks/use-books";
 import { useSearchTerm } from "@/hooks/use-search-term";
@@ -35,16 +37,23 @@ const FALLBACK_COVER = "https://picsum.photos/seed/myanflix-book/480/672";
  */
 export function BooksView() {
   const { t } = useLanguage();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   // The app's one search-timing policy — debounce, minimum length and stale
   // window all live in useSearchTerm, so the shelf searches exactly the way
   // the movies catalog does.
   const { term, setTerm, effectiveTerm, clear } = useSearchTerm();
   const [categoryId, setCategoryId] = useState<string | null>(null);
 
-  const { data, isLoading } = useBooks({
-    limit: 60,
-    search: effectiveTerm || undefined,
-  });
+  // The library is members-only (GET /books is 401 for a guest), so the
+  // request only goes out once there is a session — the shelf shows a
+  // sign-in prompt until then.
+  const { data, isLoading } = useBooks(
+    {
+      limit: 60,
+      search: effectiveTerm || undefined,
+    },
+    { enabled: isAuthenticated },
+  );
 
   const books = useMemo(() => data?.items ?? [], [data]);
 
@@ -216,7 +225,14 @@ export function BooksView() {
       )}
 
       <div className="mt-6">
-        {isLoading ? (
+        {!isAuthenticated && !isAuthLoading ? (
+          <SignInEmptyState
+            icon={BookOpen}
+            title={t.browse.booksSignInTitle}
+            description={t.browse.booksSignInBody}
+            returnTo="/media/books"
+          />
+        ) : isAuthLoading || isLoading ? (
           <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {Array.from({ length: 12 }, (_, i) => (
               <div key={i} className="flex flex-col">

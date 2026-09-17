@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Hls from "hls.js";
 import {
   AlertTriangle,
@@ -16,6 +16,7 @@ import {
   FastForward,
   Loader2,
   Lock,
+  LogIn,
   Pause,
   Play,
   Plus,
@@ -49,9 +50,11 @@ import { ShareDialog } from "@/components/modals/ShareDialog";
 import { Button } from "@/components/ui/button";
 import { AccessBadge, Chip, Kicker } from "@/components/system";
 import { useMovie, useSimilarMovies } from "@/hooks/use-movies";
+import { useAuth } from "@/lib/context/auth-context";
 import { useLibrary } from "@/lib/context/library-context";
 import { useSubscription } from "@/lib/context/subscription-context";
 import { useLanguage } from "@/lib/context/language-context";
+import { loginHref } from "@/lib/auth/return-to";
 import { seriesService } from "@/services/api/seriesService";
 import { historyService } from "@/services/api/historyService";
 import { videoService } from "@/services/api/videoService";
@@ -130,6 +133,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const { data: similarMovies, isLoading: isSimilarLoading } = useSimilarMovies(movieId);
   const { isInWatchlist, toggleWatchlist } = useLibrary();
   const { isSubscribed } = useSubscription();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   // Episodes inherit access from their parent series' own accessType —
   // per-episode access never exists.
@@ -140,7 +144,13 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   });
   const accessType = movie ? (movie.seriesId ? parentSeries?.accessType : movie.accessType) : undefined;
   const hasAccess = accessType === "FREE" || isSubscribed;
+  // Everything under /videos/* is members-only: a guest never asks for the
+  // stream, never saves progress, and gets the sign-in wall instead of the
+  // subscribe wall — whatever the title's access type says.
+  const isGuest = !isAuthenticated && !isAuthLoading;
+  const canWatch = isAuthenticated && hasAccess;
 
+  const queryClient = useQueryClient();
   const {
     data: streamInfo,
     error: streamError,
@@ -148,16 +158,32 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   } = useQuery({
     queryKey: ["stream", movieId],
     queryFn: () => videoService.getStreamInfo(movieId),
-    enabled: hasAccess,
+    enabled: canWatch,
     retry: false,
+    // The playlist URL carries an expiring signed token, and the player
+    // effect below is keyed on that URL: any background refetch that came
+    // back with a fresher token would tear hls.js down and restart the title
+    // from 0:00 mid-sitting. So the URL is fetched once and only replaced on
+    // purpose — by the 403/410 recovery in the error handler. (Window-focus
+    // refetching is already off globally; reconnect refetching is not.)
+    staleTime: Infinity,
+    refetchOnReconnect: false,
   });
+  /**
+   * Where playback was when a signed link was found expired (410) or
+   * rejected (403). The recovery fetches a fresh link, which rebuilds the
+   * player; this is how the rebuild knows to pick up from the same second
+   * instead of the start.
+   */
+  const resumePositionRef = useRef<number | null>(null);
 
   // Shares its query key with EpisodeRail's own fetch, so this adds no extra
   // network round trip — just lets the page itself know what comes next.
   const { data: playerEpisodes } = useQuery({
     queryKey: ["series", movie?.seriesId, "player-episodes"],
     queryFn: () => seriesService.getPlayerEpisodes(movie!.seriesId!),
-    enabled: Boolean(movie?.seriesId),
+    // Members-only on the API; a guest sees the sign-in wall instead.
+    enabled: Boolean(movie?.seriesId) && isAuthenticated,
   });
   const flatEpisodes = playerEpisodes?.seasons.flatMap((season) => season.episodes) ?? [];
   const currentEpisodeIndex = flatEpisodes.findIndex((episode) => episode.id === movieId);
@@ -183,6 +209,12 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const [volume, setVolume] = useState(80);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  /**
+   * The signed link was refused and a fresh one could not be had (the API
+   * returned the same link, or the refetch itself failed). Terminal for this
+   * player instance — shows the playback-error overlay instead of retrying.
+   */
+  const [playbackFailed, setPlaybackFailed] = useState(false);
   const [isTheater, setIsTheater] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [qualityLevels, setQualityLevels] = useState<QualityLevel[]>([{ label: "Auto", index: -1 }]);
@@ -285,6 +317,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
     setSubtitleTracks([]);
     setSubtitleTrack(SUBTITLES_OFF);
     setSubtitleLines([]);
+    setPlaybackFailed(false);
 
     if (Hls.isSupported()) {
       // Our own SegmentManager/CacheManager/DownloadManager/PrefetchManager stack owns the
@@ -295,6 +328,11 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
         { beforeSeconds: PREFETCH_BEFORE_SECONDS, afterSeconds: PREFETCH_AFTER_SECONDS },
         { maxConcurrentDownloads: 3, maxCacheEntries: 60 },
       );
+      // Set only by the 403/410 recovery below; -1 is hls.js's own "from the start".
+      const startPosition = resumePositionRef.current ?? -1;
+      resumePositionRef.current = null;
+      // One fresh-link attempt per player instance (see the ERROR handler).
+      let linkRecoveryTried = false;
       const hls = new Hls({
         fLoader: prefetchSystem.loaderClass,
         // Without a cap, hls.js's own congestion-avoidance logic will happily buffer minutes
@@ -303,6 +341,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
         maxBufferLength: PREFETCH_AFTER_SECONDS,
         maxMaxBufferLength: PREFETCH_AFTER_SECONDS,
         backBufferLength: PREFETCH_BEFORE_SECONDS,
+        startPosition,
       });
       hlsRef.current = hls;
       hls.loadSource(playlistUrl);
@@ -316,6 +355,10 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
         ];
         setQualityLevels(levels);
         prefetchRef.current = prefetchSystem.attach(hls, video);
+        // A rebuild after link recovery: the viewer was mid-sitting, so pick
+        // up playing rather than sitting paused at the remembered second.
+        // (No autoplay on first load — that stays a click.)
+        if (startPosition >= 0) void video.play().catch(() => undefined);
       });
       hls.on(Hls.Events.FRAG_LOADED, () => {
         loadedFragmentCountRef.current += 1;
@@ -337,9 +380,42 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
+            case Hls.ErrorTypes.NETWORK_ERROR: {
+              // 403/410 come from the cache server's token check: the signed
+              // link is rejected or has expired. Re-requesting the same URL
+              // (what startLoad() does — and hls.js itself never retries a
+              // 4xx, so it fails again at once) can never succeed. Ask the
+              // API for a fresh link ONCE per player instance; when it
+              // differs, the effect keyed on playlistUrl rebuilds the player
+              // from the remembered position. The same link coming back (a
+              // 403 that is not an expiry) or the refetch failing (lapsed
+              // subscription, API down) is terminal: stop and show the error.
+              // Looping startLoad() here would hammer cache AND API in a
+              // tight cycle for as long as the tab stays open.
+              const status = data.response?.code;
+              if (status === 403 || status === 410) {
+                if (linkRecoveryTried) {
+                  hls.destroy();
+                  setPlaybackFailed(true);
+                  break;
+                }
+                linkRecoveryTried = true;
+                resumePositionRef.current = video.currentTime;
+                void queryClient.invalidateQueries({ queryKey: ["stream", movieId] }).then(() => {
+                  // A fresh link already rebuilt the player — nothing to do.
+                  if (hlsRef.current !== hls) return;
+                  const fresh = queryClient.getQueryData<{ playlistUrl: string }>(["stream", movieId]);
+                  // A different link is on its way through the effect.
+                  if (fresh?.playlistUrl && fresh.playlistUrl !== playlistUrl) return;
+                  resumePositionRef.current = null;
+                  hls.destroy();
+                  setPlaybackFailed(true);
+                });
+                break;
+              }
               hls.startLoad();
               break;
+            }
             case Hls.ErrorTypes.MEDIA_ERROR:
               hls.recoverMediaError();
               break;
@@ -382,7 +458,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
         textTracks.removeEventListener("change", syncTextTracks);
       };
     }
-  }, [streamInfo?.playlistUrl]);
+  }, [streamInfo?.playlistUrl, movieId, queryClient]);
 
   // Sync volume/speed to the actual media element.
   useEffect(() => {
@@ -417,7 +493,9 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
 
   const saveProgress = useCallback(
     (force = false) => {
-      if (!movie || durationSeconds === 0) return;
+      // PATCH /videos/:id/watch-progress is 401 for a guest — and there is
+      // no history to write to anyway.
+      if (!isAuthenticated || !movie || durationSeconds === 0) return;
       const now = Date.now();
       if (!force && now - lastSavedAt.current < PROGRESS_SAVE_INTERVAL_MS) return;
       lastSavedAt.current = now;
@@ -425,7 +503,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
       const percent = Math.min(100, Math.round((time / durationSeconds) * 100));
       historyService.updateProgress(movie.id, percent, Math.round(time)).catch(() => {});
     },
-    [movie, durationSeconds],
+    [isAuthenticated, movie, durationSeconds],
   );
 
   useEffect(() => {
@@ -434,9 +512,14 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
     return () => clearInterval(interval);
   }, [isPlaying, saveProgress]);
 
+  // The unmount save runs once, so it reads the LATEST saver through a ref —
+  // the mount-time closure still has durationSeconds at 0 and would no-op.
+  const saveProgressRef = useRef(saveProgress);
   useEffect(() => {
-    return () => saveProgress(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    saveProgressRef.current = saveProgress;
+  }, [saveProgress]);
+  useEffect(() => {
+    return () => saveProgressRef.current(true);
   }, []);
 
   const goToEpisode = useCallback(
@@ -559,7 +642,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
 
   // Every shortcut confirms itself on screen and wakes the control bar, so the
   // keyboard never feels like it's doing something invisible.
-  usePlayerHotkeys(hasAccess && Boolean(streamInfo), {
+  usePlayerHotkeys(canWatch && Boolean(streamInfo), {
     onTogglePlay: () => {
       const willPlay = videoRef.current?.paused ?? false;
       togglePlay();
@@ -678,7 +761,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
                 className={cn(
                   "absolute inset-0 size-full object-contain transition-opacity duration-500",
                   hasStarted ? "opacity-100" : "opacity-0",
-                  hasAccess && "cursor-pointer",
+                  canWatch && "cursor-pointer",
                 )}
                 playsInline
                 // The cache server answers every stream URL with
@@ -688,8 +771,8 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
                 // side-loaded here — and for AmbientBackdrop's canvas to stop
                 // being tainted by Safari's native, cross-origin source.
                 crossOrigin="anonymous"
-                onClick={hasAccess ? handleVideoClick : undefined}
-                onDoubleClick={hasAccess ? handleVideoDoubleClick : undefined}
+                onClick={canWatch ? handleVideoClick : undefined}
+                onDoubleClick={canWatch ? handleVideoDoubleClick : undefined}
                 onPlay={() => {
                   setIsPlaying(true);
                   setHasStarted(true);
@@ -751,7 +834,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
 
               <PlayerHud message={hud} />
 
-              {hasAccess ? (
+              {canWatch ? (
                 isStreamLoading ? (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <Loader2 className="size-9 animate-spin text-white/80" />
@@ -768,7 +851,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
                       <p className="mt-1.5 max-w-sm text-sm text-white/70">{t.player.state.processingBody}</p>
                     </div>
                   </div>
-                ) : streamError ? (
+                ) : streamError || playbackFailed ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/70 p-6 text-center backdrop-blur-md">
                     <div className="flex size-14 items-center justify-center rounded-full bg-destructive/15 text-destructive ring-1 ring-destructive/25 ring-inset">
                       <AlertTriangle className="size-6" />
@@ -851,6 +934,42 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
                     </div>
                   </>
                 )
+              ) : isAuthLoading ? (
+                // A returning member's profile is still loading — neither wall applies yet.
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="size-9 animate-spin text-white/80" />
+                </div>
+              ) : isGuest ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/70 p-6 text-center backdrop-blur-md">
+                  <div className="flex size-14 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 ring-inset">
+                    <LogIn className="size-6" />
+                  </div>
+                  <div>
+                    <p className="font-heading text-lg font-semibold tracking-tight text-white">
+                      {t.player.state.signInTitle}
+                    </p>
+                    <p className="mt-1.5 max-w-sm text-sm text-white/70">{t.player.state.signInBody}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Button
+                      className="h-11 rounded-full px-5"
+                      render={<Link href={loginHref(`/player/${movieId}`)} />}
+                      nativeButton={false}
+                    >
+                      <LogIn className="size-4" />
+                      {t.player.state.signIn}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-11 rounded-full px-5"
+                      render={<Link href={backHref} />}
+                      nativeButton={false}
+                    >
+                      <ArrowLeft className="size-4" />
+                      {t.common.back}
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/70 p-6 text-center backdrop-blur-md">
                   <div className="flex size-14 items-center justify-center rounded-full bg-premium/15 text-premium ring-1 ring-premium/30 ring-inset">

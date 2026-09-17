@@ -10,6 +10,7 @@ import {
   Crown,
   Film,
   Globe,
+  LogIn,
   Play,
   Plus,
   Share2,
@@ -28,10 +29,12 @@ import { ShareDialog } from "@/components/modals/ShareDialog";
 import { AccessBadge, Chip, Kicker, SectionHeader, Surface } from "@/components/system";
 import { useQuery } from "@tanstack/react-query";
 import { useMovie, useSimilarMovies } from "@/hooks/use-movies";
+import { useAuth } from "@/lib/context/auth-context";
 import { useLibrary } from "@/lib/context/library-context";
 import { useSubscription } from "@/lib/context/subscription-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { seriesService } from "@/services/api/seriesService";
+import { loginHref } from "@/lib/auth/return-to";
 import { formatDuration } from "@/lib/format";
 import { FALLBACK_COVER_URL, FALLBACK_POSTER_URL } from "@/lib/placeholder";
 import { cn } from "@/lib/utils";
@@ -43,6 +46,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
   const { data: similarMovies, isLoading: isSimilarLoading } = useSimilarMovies(id);
   const { isInWatchlist, toggleWatchlist } = useLibrary();
   const { isSubscribed } = useSubscription();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   // An episode's access is always governed by its parent series' own
   // accessType, never its own — this page must never gate an episode on
@@ -77,6 +81,11 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
 
   const accessType = movie.seriesId ? parentSeries?.accessType : movie.accessType;
   const hasAccess = accessType === "FREE" || isSubscribed;
+  // A guest can read the page but never watch — the CTA becomes "Sign in"
+  // whatever the access type, and the subscribe dialog (whose own queries
+  // need a session) never opens. Settled auth only, so a returning member's
+  // profile load doesn't flash the guest button first.
+  const isGuest = !isAuthenticated && !isAuthLoading;
   const inWatchlist = isInWatchlist(movie.id);
   const similarItems = (similarMovies ?? []).map((m) => movieToBrowseItem(m, formatDuration(m.duration)));
   // null when the runtime was never measured — the hero meta line skips it (dot included).
@@ -167,7 +176,21 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
               </div>
 
               <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                {hasAccess ? (
+                {isAuthLoading ? (
+                  // Auth is still settling: hold the slot so neither "Watch
+                  // now" nor "Sign in" flashes before we know who is looking.
+                  <span aria-hidden className="h-11 w-40 animate-pulse rounded-full bg-white/10" />
+                ) : isGuest ? (
+                  <Button
+                    variant="onArt"
+                    size="pill"
+                    render={<Link href={loginHref(`/movie/${movie.id}`)} />}
+                    nativeButton={false}
+                  >
+                    <LogIn className="size-4" />
+                    {t.movieDetail.signInToWatch}
+                  </Button>
+                ) : hasAccess ? (
                   <Button
                     variant="onArt"
                     size="pill"

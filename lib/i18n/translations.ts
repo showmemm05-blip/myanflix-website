@@ -93,6 +93,12 @@ const en = {
     addToWatchlist: "Add to watchlist",
     inWatchlist: "In your watchlist",
     episodeCount: (count: number) => (count === 1 ? "1 episode" : `${count} episodes`),
+    /** The catalogue request itself failed — distinct from "nothing matched". */
+    loadFailed: "We couldn't load the catalogue. Check your connection and try again.",
+    /** Books are members-only; guests see this in place of the shelf. */
+    booksSignInTitle: "Sign in to browse books",
+    booksSignInBody: "The library is for signed-in members. Sign in to see every book.",
+    signIn: "Sign in",
   },
   /** The /media section — All | Movies | Books | Music. */
   media: {
@@ -352,6 +358,8 @@ const en = {
     backToMovies: "Back to movies",
     watchNow: "Watch now",
     subscribeToWatch: "Subscribe to watch",
+    /** The guest CTA — replaces both Watch now and Subscribe to watch until they sign in. */
+    signInToWatch: "Sign in to watch",
     watchlist: "Watchlist",
     inWatchlist: "In watchlist",
     share: "Share",
@@ -641,6 +649,10 @@ const en = {
       lockedEpisodeBody: "Episodes are unlocked by an active subscription — one plan covers every episode.",
       lockedMovieBody: (title: string) => `${title} requires an active subscription to stream.`,
       subscribe: "Subscribe",
+      /** Guest wall — shown instead of the subscribe wall until there is a session. */
+      signInTitle: "Sign in to watch",
+      signInBody: "Streaming is for signed-in members. Sign in and we'll bring you right back here.",
+      signIn: "Sign in",
     },
     // Every accessible name on the video chrome. These are read aloud, so they
     // are full phrases, not the icon's name.
@@ -838,6 +850,7 @@ const en = {
     emptyDescription: "Save movies and series to find them again in one tap.",
     browse: "Browse titles",
     watch: "Watch",
+    signInToSave: "Sign in to save titles to your watchlist.",
     subscribeCta: "Subscribe",
     remove: "Remove",
   },
@@ -1045,6 +1058,10 @@ const mm = {
     addToWatchlist: "ကြည့်ရန်စာရင်းသို့ ထည့်ရန်",
     inWatchlist: "ကြည့်ရန်စာရင်းတွင် ရှိပြီး",
     episodeCount: (count: number) => `အပိုင်း ${count} ပိုင်း`,
+    loadFailed: "အကြောင်းအရာများကို ဖွင့်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းပါ။",
+    booksSignInTitle: "စာအုပ်များ ကြည့်ရှုရန် အကောင့်ဝင်ပါ",
+    booksSignInBody: "စာအုပ်စင်ကို အကောင့်ဝင်ထားသူများသာ ကြည့်ရှုနိုင်ပါသည်။ အကောင့်ဝင်ပြီး စာအုပ်အားလုံးကို ကြည့်ပါ။",
+    signIn: "ဝင်ရောက်ရန်",
   },
   media: {
     subtitle: "ရုပ်ရှင်၊ စာအုပ်နှင့် ဂီတ — တစ်နေရာတည်းတွင်။",
@@ -1296,6 +1313,7 @@ const mm = {
     backToMovies: "ရုပ်ရှင်များသို့ ပြန်သွားရန်",
     watchNow: "ယခုကြည့်ရန်",
     subscribeToWatch: "ကြည့်ရန် စာရင်းသွင်းပါ",
+    signInToWatch: "ကြည့်ရန် အကောင့်ဝင်ပါ",
     watchlist: "ကြည့်ရန်စာရင်း",
     inWatchlist: "စာရင်းတွင် ရှိပြီး",
     share: "မျှဝေရန်",
@@ -1468,7 +1486,7 @@ const mm = {
       explore: {
         kicker: "ဂိမ်းအလွန်",
         title: "နောက်ထပ် လေ့လာရန်",
-        locked: "ကြည့်ရှုရန် ဝင်ရောက်ပါ",
+        locked: "ကြည့်ရှုရန် အကောင့်ဝင်ပါ",
       },
       gameCopy: {
         "game-lacquer-city":
@@ -1524,6 +1542,9 @@ const mm = {
       lockedEpisodeBody: "အပိုင်းများကို စာရင်းသွင်းမှုဖြင့် ဖွင့်နိုင်ပါသည် — အစီအစဉ်တစ်ခုတည်းဖြင့် အပိုင်းအားလုံး ကြည့်နိုင်ပါသည်။",
       lockedMovieBody: (title: string) => `${title} ကို ကြည့်ရှုရန် စာရင်းသွင်းထားရန် လိုအပ်ပါသည်။`,
       subscribe: "စာရင်းသွင်းရန်",
+      signInTitle: "ကြည့်ရှုရန် အကောင့်ဝင်ပါ",
+      signInBody: "အကောင့်ဝင်ထားသူများသာ ကြည့်ရှုနိုင်ပါသည်။ အကောင့်ဝင်ပြီးနောက် ဤစာမျက်နှာသို့ ပြန်ရောက်ပါမည်။",
+      signIn: "ဝင်ရောက်ရန်",
     },
     controls: {
       play: "ဖွင့်ရန်",
@@ -1717,6 +1738,7 @@ const mm = {
     emptyDescription: "တစ်ချက်နှိပ်ရုံဖြင့် ပြန်တွေ့နိုင်ရန် ဇာတ်ကားနှင့် စီးရီးများကို သိမ်းထားပါ။",
     browse: "ဇာတ်ကားများ ကြည့်ရန်",
     watch: "ကြည့်ရန်",
+    signInToSave: "ကြည့်ရန်စာရင်းသို့ သိမ်းရန် အကောင့်ဝင်ပါ။",
     subscribeCta: "စာရင်းသွင်းရန်",
     remove: "ဖယ်ရှားရန်",
   },

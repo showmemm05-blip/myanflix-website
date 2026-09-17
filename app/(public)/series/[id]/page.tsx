@@ -3,6 +3,7 @@
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -14,6 +15,7 @@ import {
   Layers,
   ListVideo,
   Lock,
+  LogIn,
   Play,
   Tv,
   type LucideIcon,
@@ -24,8 +26,10 @@ import { SubscribeDialog } from "@/components/dialogs/SubscribeDialog";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { AccessBadge, Chip, chipClass, Kicker, SectionHeader, StatTile, Surface } from "@/components/system";
 import { seriesService } from "@/services/api/seriesService";
+import { useAuth } from "@/lib/context/auth-context";
 import { useSubscription } from "@/lib/context/subscription-context";
 import { useLanguage } from "@/lib/context/language-context";
+import { loginHref } from "@/lib/auth/return-to";
 import { formatDuration, UNKNOWN_DURATION } from "@/lib/format";
 import { FALLBACK_COVER_URL, FALLBACK_POSTER_URL } from "@/lib/placeholder";
 import { cn } from "@/lib/utils";
@@ -45,11 +49,21 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
     enabled: Boolean(id),
   });
   const { isSubscribed } = useSubscription();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const router = useRouter();
 
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [activeSeason, setActiveSeason] = useState<number | null>(null);
 
+  // A guest can read the page but never watch — the CTA and every episode
+  // row become "Sign in to watch" whatever the access type, and the
+  // subscribe dialog (whose own queries need a session) never opens.
+  // Settled auth only, so a returning member's profile load doesn't flash
+  // the guest state first.
+  const isGuest = !isAuthenticated && !isAuthLoading;
+  const signInHref = loginHref(`/series/${id}`);
   const hasAccess = Boolean(series && (series.accessType === "FREE" || isSubscribed));
+  const canWatch = hasAccess && !isGuest;
 
   const seasons = useMemo(() => {
     const map = new Map<number, Movie[]>();
@@ -140,7 +154,21 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
               </div>
 
               <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                {hasAccess ? (
+                {isAuthLoading ? (
+                  // Auth is still settling: hold the slot so neither "Watch
+                  // now" nor "Sign in" flashes before we know who is looking.
+                  <span aria-hidden className="h-11 w-40 animate-pulse rounded-full bg-white/10" />
+                ) : isGuest ? (
+                  <Button
+                    variant="onArt"
+                    size="pill"
+                    render={<Link href={signInHref} />}
+                    nativeButton={false}
+                  >
+                    <LogIn className="size-4" />
+                    {t.movieDetail.signInToWatch}
+                  </Button>
+                ) : hasAccess ? (
                   firstEpisode ? (
                     <Button
                       variant="onArt"
@@ -263,10 +291,11 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                 <EpisodeRow
                   key={episode.id}
                   episode={episode}
-                  hasAccess={hasAccess}
-                  lockedLabel={t.seriesDetail.lockedEpisode}
+                  hasAccess={canWatch}
+                  isGuest={isGuest}
+                  lockedLabel={isGuest ? t.movieDetail.signInToWatch : t.seriesDetail.lockedEpisode}
                   fallbackTitle={t.seriesDetail.episodeFallbackTitle}
-                  onLockedClick={() => setSubscribeOpen(true)}
+                  onLockedClick={() => (isGuest ? router.push(signInHref) : setSubscribeOpen(true))}
                 />
               ))}
             </div>
@@ -286,12 +315,15 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
 function EpisodeRow({
   episode,
   hasAccess,
+  isGuest,
   lockedLabel,
   fallbackTitle,
   onLockedClick,
 }: {
   episode: Movie;
   hasAccess: boolean;
+  /** Locked because there is no session (not because of the plan): neutral sign-in cue, not the gold padlock. */
+  isGuest: boolean;
   lockedLabel: string;
   fallbackTitle: (episode: number) => string;
   onLockedClick: () => void;
@@ -334,8 +366,13 @@ function EpisodeRow({
           </span>
         ) : (
           <span className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[1px]">
-            <span className="flex size-8 items-center justify-center rounded-full bg-black/60 text-premium ring-1 ring-premium/30 ring-inset">
-              <Lock className="size-3.5" />
+            <span
+              className={cn(
+                "flex size-8 items-center justify-center rounded-full bg-black/60 ring-1 ring-inset",
+                isGuest ? "text-white ring-white/30" : "text-premium ring-premium/30",
+              )}
+            >
+              {isGuest ? <LogIn className="size-3.5" /> : <Lock className="size-3.5" />}
             </span>
           </span>
         )}
@@ -356,9 +393,11 @@ function EpisodeRow({
 
       {/* Episodes never carry their own gate — access always comes from the parent series. */}
       {!hasAccess && (
-        <Chip tone="premium" size="lg" className="mr-1 font-semibold">
-          <Lock />
-          <span className="hidden sm:inline">{lockedLabel}</span>
+        <Chip tone={isGuest ? "neutral" : "premium"} size="lg" className="mr-1 font-semibold">
+          {isGuest ? <LogIn /> : <Lock />}
+          {/* Guests need the words on every width — a plain padlock reads as
+              "subscribe", and this label is the row's only sign-in cue. */}
+          <span className={cn(!isGuest && "hidden sm:inline")}>{lockedLabel}</span>
         </Chip>
       )}
     </Surface>
