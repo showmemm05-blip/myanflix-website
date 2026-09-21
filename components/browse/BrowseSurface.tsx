@@ -241,7 +241,7 @@ export function BrowseSurface({ mode = "search" }: { mode?: "media" | "search" }
       updateFilters(next);
       return;
     }
-    // Series carry no cast/director/country/age-rating/rating/duration —
+    // Series carry no cast/director/country/age-rating/duration filters —
     // apply only the fields their state has, rather than storing values the
     // query would silently ignore.
     const patch: Partial<SeriesFilterState> = {};

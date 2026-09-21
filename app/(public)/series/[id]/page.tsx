@@ -19,6 +19,7 @@ import {
   Play,
   Tv,
   type LucideIcon,
+  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty/EmptyState";
@@ -147,6 +148,13 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
               <h1 className="text-display max-w-3xl">{series.title}</h1>
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+                {/* Same chip as the movie page; 0 means "not rated" and shows nothing. */}
+                {series.rating > 0 && (
+                  <Chip tone="premium" className="font-semibold">
+                    <Star className="fill-current" />
+                    <span className="nums">{series.rating.toFixed(1)}</span>
+                  </Chip>
+                )}
                 <span className="text-muted-foreground nums">{series.releaseYear}</span>
                 <Dot />
                 <span className="text-muted-foreground">{series.language}</span>

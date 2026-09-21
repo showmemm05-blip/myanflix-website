@@ -17,7 +17,7 @@ export interface BrowseItem {
   posterUrl: string | null;
   coverUrl: string | null;
   accessType: AccessType;
-  /** Movies only — series carry no rating of their own. */
+  /** null = not rated (the API's 0), so the card shows no star. */
   rating: number | null;
   releaseYear: number;
   /**
@@ -57,7 +57,7 @@ export function seriesToBrowseItem(series: SeriesListItem, episodes: string): Br
     posterUrl: series.posterUrl,
     coverUrl: series.coverUrl,
     accessType: series.accessType,
-    rating: null,
+    rating: series.rating > 0 ? series.rating : null,
     releaseYear: series.releaseYear,
     meta: episodes,
     genre: series.genre,

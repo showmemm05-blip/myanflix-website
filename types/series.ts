@@ -2,8 +2,9 @@ import type { AccessType, FacetValue } from "./movie";
 
 /**
  * The series subset of the canonical sort vocabulary — no rating / mostViewed
- * / mostPurchased in v1: series carry no rating column and no per-series watch
- * aggregate, so the UI simply doesn't offer them.
+ * / mostPurchased in v1: the API offers no series sort by rating (the column
+ * only arrived on 2026-09-21) and there is no per-series watch aggregate, so
+ * the UI simply doesn't offer them.
  */
 export type SeriesSortOption =
   | "relevance"
@@ -41,6 +42,8 @@ export interface Series {
   genre: string;
   language: string;
   releaseYear: number;
+  /** Admin-set 0–10, same meaning as Movie.rating: 0 = not rated, shown as nothing. */
+  rating: number;
   /** One access type for the whole show — governs every season and episode, including future ones. */
   accessType: AccessType;
   categories: { id: string; name: string }[];
