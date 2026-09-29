@@ -1,5 +1,6 @@
 import * as React from "react";
 
+import { hasMyanmar } from "@/components/books/reader-settings";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,10 +26,22 @@ export function Kicker({
   tone = "muted",
   className,
   children,
+  style,
   ...props
 }: React.ComponentProps<"p"> & { tone?: keyof typeof TONE }) {
   return (
-    <p data-slot="kicker" className={cn("text-kicker", TONE[tone], className)} {...props}>
+    <p
+      data-slot="kicker"
+      className={cn("text-kicker", TONE[tone], className)}
+      // Tracking pulls a Burmese syllable's stacked marks apart — the same
+      // rule the step labels and filter headings already follow.
+      style={
+        typeof children === "string" && hasMyanmar(children)
+          ? { ...style, letterSpacing: 0 }
+          : style
+      }
+      {...props}
+    >
       {children}
     </p>
   );

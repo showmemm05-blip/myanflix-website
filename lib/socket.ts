@@ -45,7 +45,17 @@ async function recoverFromAuthRejection(instance: Socket): Promise<void> {
   // On success it writes tokenStore, whose onTokensChanged subscriber
   // (auth-context) calls connectSocket(next) — the call below then just
   // confirms the connection rather than starting a second one.
-  const nextToken = await refreshAccessToken();
+  let nextToken: string | null;
+  try {
+    nextToken = await refreshAccessToken();
+  } catch {
+    // H-20: the server could not be reached, which says nothing about the
+    // session — nothing is cleared. Let a later rejection try again; a REST
+    // call that refreshes successfully re-handshakes this socket through
+    // onTokensChanged in the meantime anyway.
+    if (socket === instance) recovering = false;
+    return;
+  }
 
   // Bail if the socket was torn down (logout) or replaced while we waited.
   if (socket !== instance) return;

@@ -30,7 +30,10 @@ export const seriesService = {
 
   async getSeriesById(id: string): Promise<Series | null> {
     try {
-      return await apiClient.get<Series>(`/series/${id}`);
+      const series = await apiClient.get<Series>(`/series/${id}`);
+      // The API always sends the cast now, but a response cached before it
+      // existed would not — default rather than crash the detail page.
+      return { ...series, actors: series.actors ?? [] };
     } catch {
       return null;
     }

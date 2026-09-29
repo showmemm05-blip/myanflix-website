@@ -15,6 +15,13 @@ interface DepositUpdatedPayload {
   paymentMethod: string;
   reference: string;
   rejectionReason?: string | null;
+  /**
+   * What actually changed. "status" = approve/reject (user-facing);
+   * "receiving_account" = an admin edited the destination account of an
+   * already-approved deposit (admin bookkeeping only). Optional so an older
+   * backend that omits it is still treated as a status change.
+   */
+  change?: "status" | "receiving_account";
 }
 
 interface WithdrawalUpdatedPayload {
@@ -25,6 +32,14 @@ interface WithdrawalUpdatedPayload {
   accountName: string;
   accountNumber: string;
   rejectionReason?: string | null;
+  /**
+   * What actually changed. "status" = approve/reject (user-facing);
+   * "transfer_account" = an admin edited the account the money was sent
+   * from on an already-approved withdrawal (admin bookkeeping only).
+   * Optional so an older backend that omits it is still treated as a
+   * status change.
+   */
+  change?: "status" | "transfer_account";
 }
 
 interface WalletBalanceUpdatedPayload {
@@ -56,6 +71,13 @@ export function useRealtimeWallet() {
       queryClient.invalidateQueries({ queryKey: ["wallet-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["deposits"] });
 
+      // Only a real status change deserves a toast. An admin correcting the
+      // receiving account of an already-approved deposit re-emits the same
+      // event with status APPROVED, and the user must not be told "Deposit
+      // approved" again for that. A missing `change` means an older backend,
+      // which only ever emitted this event for status changes.
+      if (payload.change && payload.change !== "status") return;
+
       if (payload.status === "APPROVED") {
         toast.success(t.wallet.toastDepositApproved, {
           description: t.wallet.toastDepositApprovedBody,
@@ -70,6 +92,11 @@ export function useRealtimeWallet() {
     const handleWithdrawalUpdated = (payload: WithdrawalUpdatedPayload) => {
       queryClient.invalidateQueries({ queryKey: ["wallet-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["withdrawals"] });
+
+      // Same rule as deposits: an admin editing the transfer account of an
+      // already-approved withdrawal is bookkeeping, not a new approval, so
+      // no "Withdrawal approved" toast. Missing `change` = older backend.
+      if (payload.change && payload.change !== "status") return;
 
       if (payload.status === "APPROVED") {
         toast.success(t.wallet.toastWithdrawalApproved, {
@@ -87,12 +114,21 @@ export function useRealtimeWallet() {
       queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
     };
 
+    // An admin activated, deactivated, edited or removed one of our
+    // business accounts: the deposit picker must show the new list at once,
+    // not after the 60 s cache. Payload-free — the list is refetched.
+    const handlePaymentAccountsChanged = () => {
+      queryClient.invalidateQueries({ queryKey: ["payment-accounts"] });
+    };
+
     socket.on("wallet.balanceUpdated", handleBalanceUpdated);
     socket.on("deposit.updated", handleDepositUpdated);
     socket.on("withdrawal.updated", handleWithdrawalUpdated);
     socket.on("notification.created", handleNotificationCreated);
+    socket.on("payment-accounts.changed", handlePaymentAccountsChanged);
 
     return () => {
+      socket.off("payment-accounts.changed", handlePaymentAccountsChanged);
       socket.off("wallet.balanceUpdated", handleBalanceUpdated);
       socket.off("deposit.updated", handleDepositUpdated);
       socket.off("withdrawal.updated", handleWithdrawalUpdated);

@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty/EmptyState";
 import { SubscribeDialog } from "@/components/dialogs/SubscribeDialog";
 import { CommentsSection } from "@/components/comments/CommentsSection";
+import { CastRail } from "@/components/media/CastRail";
 import { AccessBadge, Chip, chipClass, Kicker, SectionHeader, StatTile, Surface } from "@/components/system";
 import { seriesService } from "@/services/api/seriesService";
 import { useAuth } from "@/lib/context/auth-context";
@@ -255,6 +256,11 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       </section>
+
+      {/* The show-level cast, in the same slot the movie page gives it: above
+          the pivot to the episode list, because who is in a show is a fact
+          about the show. CastRail renders nothing when there is no cast. */}
+      <CastRail actors={series.actors} className="mt-12" />
 
       {/* ── THE EPISODE LIST ─────────────────────────────────────────────── */}
       <section className="mx-auto mt-10 w-full max-w-[1600px] px-4 pb-20 sm:px-6 lg:px-8 lg:mt-14">

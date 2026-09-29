@@ -723,19 +723,21 @@ const en = {
     creatingAccountFor: (phone: string) => `Creating an account for ${phone}`,
     changePhone: "Change phone number",
     otpLabel: "Verification code",
-    otpSentVia: (channel: string, phone: string) =>
-      `We sent a 6-digit code by ${channel} to ${phone}.`,
+    // Sign-in codes are "requested", never "sent", and never name a channel:
+    // SMS delivery is not switched on yet (C-2), and the request carries no
+    // channel for the server to honour.
+    otpRequested: (phone: string) => `A 6-digit code was requested for ${phone}.`,
     verifyAndSignIn: "Verify & sign in",
     verifyAndCreate: "Verify & create account",
     otpChannelTitle: "Didn't get the code?",
-    otpChannelHint: "Choose an app, then tap Send.",
+    otpChannelHint: "Choose an app, then request a new code.",
     otpChannels: {
       sms: { name: "SMS", hint: "Messages app" },
       telegram: { name: "Telegram", hint: "Telegram app" },
       viber: { name: "Viber", hint: "Viber app" },
     },
-    otpSendVia: (channel: string) => `Send code by ${channel}`,
-    otpSending: "Sending…",
+    otpRequestAgain: "Request a new code",
+    otpRequesting: "Requesting…",
     resendIn: (seconds: number) => `You can get a new code in ${seconds}s`,
     noAccount: "Don't have an account?",
     createOne: "Create one",
@@ -746,6 +748,38 @@ const en = {
     or: "or",
     googleFailed: "Google sign-in didn't go through. Please try again.",
     googleNotConfigured: "Google sign-in isn't available right now. Please use your phone number.",
+    forgotPassword: "Forgot password?",
+    // The sign-in step token expired or no longer matches (H-6): back to the password step.
+    passwordAgain: "For your security, please enter your password again.",
+    // The backend's own sentences for these, in the reader's language.
+    errors: {
+      invalidCode: "That code is wrong or has expired. Check it, or request a new one.",
+      tooManyAttempts: "Too many wrong codes. Request a new code and try again.",
+      codeCooldown: "Please wait a minute before asking for another code.",
+      tooManyCodeRequests: "Too many codes were asked for this number. Please try again later.",
+      accountInactive: "This account can no longer be used.",
+      noAccountForPhone: "There's no account for this phone number.",
+    },
+    /**
+     * "Forgot password?" (H-8): phone → code → new password, then a normal
+     * sign-in. A code is "requested", never "sent": SMS delivery is not
+     * switched on yet (C-2), so nothing arrives on the phone.
+     */
+    reset: {
+      kicker: "Account help",
+      title: "Reset your password",
+      subtitle:
+        "Enter your account's phone number. A 6-digit code will be requested for it, then you choose a new password.",
+      requestCode: "Request code",
+      codeRequested: (phone: string) => `A 6-digit code was requested for ${phone}.`,
+      requestAgain: "Request a new code",
+      requesting: "Requesting…",
+      newPasswordLabel: "New password",
+      submit: "Save new password",
+      doneTitle: "Password changed",
+      doneBody: "You've been signed out on every device. Sign in with your new password.",
+      remembered: "Remembered your password?",
+    },
   },
   wallet: {
     eyebrow: "Finance",
@@ -793,7 +827,7 @@ const en = {
     accountNumberPlaceholder: "e.g. 09xxxxxxxxx",
     withdrawSummary: (amount: string) => `You are requesting to withdraw ${amount}.`,
     submitWithdraw: "Request withdrawal",
-    withdrawPending: "Withdrawal requested — your balance is deducted only once it's approved.",
+    withdrawPending: "Withdrawal requested — the amount is set aside from your balance now and returned if the request is rejected.",
     toastDepositApproved: "Deposit approved",
     toastDepositApprovedBody: "Your wallet has been credited.",
     toastDepositRejected: "Deposit rejected",
@@ -937,12 +971,154 @@ const en = {
     themeLabel: "Theme",
     themeDark: "Dark",
     themeDarkOnly: "Dark — the only mode. Cinema rules.",
+    privacySection: "Privacy",
+    privacyDescription: "What we collect about you and how we use it.",
+    privacyLink: "Read the privacy policy",
     dangerZone: "Danger zone",
     deleteAccount: "Delete account",
-    deleteAccountDescription: "Permanently removes your account and viewing data.",
+    deleteAccountDescription: "Close your account for good and remove your personal details.",
     deleteConfirmTitle: "Delete your account?",
-    deleteConfirmDescription: "This can't be undone. Your wallet balance and history will be lost.",
-    deleteStubNotice: "Account deletion isn't connected to the backend yet — you've been logged out.",
+    deleteConfirmDescription: "This can't be undone.",
+    deleteEffectsTitle: "What happens",
+    deleteEffects: [
+      "Your phone number, name, profile photo and Google sign-in are removed from the account.",
+      "You are signed out on every device, and nobody can sign in to this account again.",
+      "Titles you bought and any subscription time left are lost.",
+      "Records of your payments (deposits, withdrawals and purchases) are kept for accounting. The closed account they belong to no longer shows your name or phone number.",
+      "Those records still keep the payment details you gave. For a withdrawal: the name, number and bank of the account it was paid to (often your own name and phone number). For a deposit: the transfer reference, the sender's name if staff added the deposit for you, and any bank screenshot or bank message about the transfer, which can show the sender's name or number.",
+      "You can use the same phone number to create a new, empty account later.",
+    ],
+    deleteRequirementsTitle: "Before you delete",
+    deleteRequirements: [
+      "Your wallet must be empty — withdraw or spend what is left.",
+      "No deposit or withdrawal can be waiting for review.",
+    ],
+    deleteBalanceNotice: (amount: string) =>
+      `Your wallet shows ${amount}. Withdraw or spend it first, or the deletion will be refused.`,
+    deleteAcknowledge: "I understand that my account will be closed for good.",
+    deleteConfirmButton: "Delete my account",
+    deleteDone: "Your account has been deleted.",
+    // The three refusals DELETE /users/me can answer (409), and the staff one (403).
+    deleteRefusedBalance: "Your wallet still has money in it. Withdraw or spend it before deleting your account.",
+    deleteRefusedDeposit: "You have a deposit waiting for review. Wait until it is approved or rejected, then try again.",
+    deleteRefusedWithdrawal: "You have a withdrawal waiting for review. Wait until it is approved or rejected, then try again.",
+    deleteRefusedStaff: "Staff accounts can't be deleted here.",
+  },
+  /**
+   * THE PRIVACY POLICY (/privacy) — a DRAFT for the owner to review, written
+   * from what the app actually collects. Every sentence is one string (see
+   * the note on `home`); [bracketed] parts are for the owner to fill in.
+   */
+  privacy: {
+    kicker: "Legal",
+    title: "Privacy Policy",
+    subtitle: "What MyanFlix collects about you, why, and what you can do about it.",
+    draftTitle: "Draft — not approved yet",
+    draftBody:
+      "This policy is a draft, written from what the app collects today. MyanFlix has not reviewed or approved it yet, and it may change before it takes effect. Parts in [square brackets] are still to be filled in.",
+    lastUpdated: "Draft of 28 September 2026",
+    sections: [
+      {
+        heading: "Who we are",
+        paragraphs: [
+          "MyanFlix is a service for watching films and series and reading books. In this policy, \"we\" means MyanFlix.",
+          "To contact us about your privacy: [MyanFlix to add a support e-mail address or phone number].",
+        ],
+        bullets: [],
+      },
+      {
+        heading: "What we collect",
+        paragraphs: [],
+        bullets: [
+          "Account details: your phone number and the password you choose. We store the password only in a scrambled (hashed) form that we cannot read. If you set them, we also keep your display name and profile photo.",
+          "If you sign in with Google: the e-mail address and account ID Google shares with us.",
+          "Sign-in codes: when you sign in or reset your password, we create a one-time code for your phone number. Codes expire after a short time.",
+          "Payments: for each deposit, the amount, the payment method, the account you paid into and the 6-digit transaction reference you type in. For each withdrawal, the amount and the account type, name, number (and bank name, when needed) you want the money sent to. We also keep your wallet balance and a record of every top-up, purchase, subscription, refund and correction.",
+          "What you watch and read: how far you got in each film or episode (so you can resume), how long you watch, and your reading position in each book.",
+          "What you write: comments you post, feedback you send us, and what you search for.",
+          "Your device and connection: your IP address, the kind of device and browser (or our app) you use, and when you were last active.",
+        ],
+      },
+      {
+        heading: "What stays on your device",
+        paragraphs: [
+          "Your sign-in tokens, your language choice, your watchlist, your reader and subtitle settings, and the highlights, bookmarks and notes you make in books are stored only on your own device (in your browser or in the app). Your watchlist, highlights, bookmarks and notes are not sent to us.",
+        ],
+        bullets: [],
+      },
+      {
+        heading: "How we use it",
+        paragraphs: [],
+        bullets: [
+          "To create your account, keep it secure, sign you in and create your one-time sign-in codes.",
+          "To run your wallet: check and approve deposits, pay out withdrawals and keep correct money records.",
+          "To give you what you bought or subscribed to, and to let you continue where you left off.",
+          "To answer your feedback, moderate comments, and prevent fraud and misuse.",
+          "To see which titles are popular and to improve the service.",
+        ],
+      },
+      {
+        heading: "How we check deposits",
+        paragraphs: [
+          "To confirm a deposit, we compare the amount and reference you give with the payment records of our own receiving accounts (for example, the payment notifications our own mobile-money account receives). When two deposits share the same reference, a staff member reviews them; nothing is decided by guessing.",
+        ],
+        bullets: [],
+      },
+      {
+        heading: "Who can see your information",
+        paragraphs: [],
+        bullets: [
+          "MyanFlix staff see only what their role needs; for example, finance staff see deposits and withdrawals. Every change staff make is recorded in an internal log.",
+          "Other users see your display name (or username) and profile photo next to the comments you post.",
+          "[MyanFlix to list the outside companies that handle data for it — for example the SMS provider that will deliver sign-in codes, Google for \"Continue with Google\", and the hosting provider.]",
+          "[MyanFlix to confirm: we do not sell your personal information.]",
+        ],
+      },
+      {
+        heading: "How long we keep it",
+        paragraphs: [],
+        bullets: [
+          "Account details: while your account is open. They are removed as soon as you delete your account.",
+          "Payment records: kept after your account is deleted, because they are needed for accounting [MyanFlix to state for how long].",
+          "Watch, reading and search history, comments and feedback: [MyanFlix to state for how long].",
+        ],
+      },
+      {
+        heading: "Deleting your account",
+        paragraphs: [
+          "You can delete your account yourself in Settings. Your wallet must be empty, and no deposit or withdrawal can be waiting for review.",
+          "We then remove your phone number, name, profile photo, Google link and stored IP addresses, close the account and sign it out everywhere. Your watch and reading history and your comments stay with the closed account, which no longer shows your name.",
+          "Payment records (deposits, withdrawals and purchases) are kept for accounting, linked to the closed account. They still keep the payment details you gave. For a withdrawal: the name, number and bank of the account it was paid to (often your own name and phone number). For a deposit: the transfer reference, the sender's name if staff added the deposit for you, and any bank screenshot or bank message about the transfer, which can show the sender's name or number. The same details also stay in our internal log of staff actions.",
+        ],
+        bullets: [],
+      },
+      {
+        heading: "Your choices",
+        paragraphs: [
+          "You can change your display name, photo and password in your profile at any time. To ask for a copy of your information, or about anything in this policy, contact us: [MyanFlix to add contact details].",
+        ],
+        bullets: [],
+      },
+      {
+        heading: "Security",
+        paragraphs: [
+          "Signing in with your phone number needs both your password and a one-time code requested for that number. Changing or resetting your password signs out your other sessions. [MyanFlix to add how data is protected in transit once HTTPS is live.]",
+        ],
+        bullets: [],
+      },
+      {
+        heading: "Children",
+        paragraphs: ["[MyanFlix to state the minimum age for having an account.]"],
+        bullets: [],
+      },
+      {
+        heading: "Changes to this policy",
+        paragraphs: [
+          "When this policy changes, we will post the new version on this page and update the date at the top.",
+        ],
+        bullets: [],
+      },
+    ],
   },
   dialogs: {
     subscribeTitle: "Choose a plan",
@@ -1611,19 +1787,18 @@ const mm = {
     creatingAccountFor: (phone: string) => `${phone} အတွက် အကောင့်ဖွင့်နေသည်`,
     changePhone: "ဖုန်းနံပါတ် ပြောင်းရန်",
     otpLabel: "အတည်ပြုကုဒ်",
-    otpSentVia: (channel: string, phone: string) =>
-      `${phone} သို့ ${channel} ဖြင့် ဂဏန်း ၆ လုံးကုဒ် ပို့ပြီးပါပြီ။`,
+    otpRequested: (phone: string) => `${phone} အတွက် ဂဏန်း ၆ လုံးကုဒ် တောင်းဆိုပြီးပါပြီ။`,
     verifyAndSignIn: "အတည်ပြု၍ ဝင်ရောက်ရန်",
     verifyAndCreate: "အတည်ပြု၍ အကောင့်ဖွင့်ရန်",
     otpChannelTitle: "ကုဒ် မရသေးဘူးလား?",
-    otpChannelHint: "အက်ပ်တစ်ခု ရွေးပြီး ပို့ရန် ခလုတ်ကို နှိပ်ပါ။",
+    otpChannelHint: "အက်ပ်တစ်ခု ရွေးပြီး ကုဒ်အသစ် တောင်းဆိုပါ။",
     otpChannels: {
       sms: { name: "SMS", hint: "ဖုန်းစာတို" },
       telegram: { name: "Telegram", hint: "Telegram အက်ပ်" },
       viber: { name: "Viber", hint: "Viber အက်ပ်" },
     },
-    otpSendVia: (channel: string) => `${channel} ဖြင့် ကုဒ် ပို့ရန်`,
-    otpSending: "ပို့နေသည်…",
+    otpRequestAgain: "ကုဒ်အသစ် တောင်းဆိုရန်",
+    otpRequesting: "တောင်းဆိုနေသည်…",
     resendIn: (seconds: number) => `${seconds} စက္ကန့်အကြာတွင် ကုဒ်အသစ် ရယူနိုင်သည်`,
     noAccount: "အကောင့် မရှိသေးဘူးလား?",
     createOne: "အကောင့်ဖွင့်ရန်",
@@ -1634,6 +1809,31 @@ const mm = {
     or: "သို့မဟုတ်",
     googleFailed: "Google ဖြင့် ဝင်ရောက်ခြင်း မအောင်မြင်ပါ။ ထပ်စမ်းကြည့်ပါ။",
     googleNotConfigured: "Google ဖြင့် ဝင်ရောက်ခြင်းကို ယခု အသုံးပြု၍ မရသေးပါ။ ဖုန်းနံပါတ်ဖြင့် ဝင်ရောက်ပါ။",
+    forgotPassword: "စကားဝှက် မေ့နေပါသလား?",
+    passwordAgain: "လုံခြုံရေးအတွက် စကားဝှက်ကို ထပ်မံ ရိုက်ထည့်ပါ။",
+    errors: {
+      invalidCode: "ကုဒ် မှားနေသည် သို့မဟုတ် သက်တမ်းကုန်သွားပါပြီ။ ပြန်စစ်ကြည့်ပါ၊ သို့မဟုတ် ကုဒ်အသစ် တောင်းဆိုပါ။",
+      tooManyAttempts: "ကုဒ် မှားရိုက်မှု များလွန်းပါသည်။ ကုဒ်အသစ် တောင်းဆိုပြီး ထပ်စမ်းကြည့်ပါ။",
+      codeCooldown: "ကုဒ်အသစ် မတောင်းမီ တစ်မိနစ်ခန့် စောင့်ပေးပါ။",
+      tooManyCodeRequests: "ဤနံပါတ်အတွက် ကုဒ် တောင်းဆိုမှု များလွန်းပါသည်။ နောက်မှ ထပ်ကြိုးစားပါ။",
+      accountInactive: "ဤအကောင့်ကို အသုံးပြု၍ မရတော့ပါ။",
+      noAccountForPhone: "ဤဖုန်းနံပါတ်ဖြင့် ဖွင့်ထားသော အကောင့် မရှိပါ။",
+    },
+    reset: {
+      kicker: "အကောင့် အကူအညီ",
+      title: "စကားဝှက် ပြန်သတ်မှတ်ရန်",
+      subtitle:
+        "သင့်အကောင့်၏ ဖုန်းနံပါတ်ကို ထည့်ပါ။ ထိုနံပါတ်အတွက် ဂဏန်း ၆ လုံးကုဒ် တောင်းဆိုပေးပြီးနောက် စကားဝှက်အသစ် သတ်မှတ်နိုင်ပါသည်။",
+      requestCode: "ကုဒ် တောင်းဆိုရန်",
+      codeRequested: (phone: string) => `${phone} အတွက် ဂဏန်း ၆ လုံးကုဒ် တောင်းဆိုပြီးပါပြီ။`,
+      requestAgain: "ကုဒ်အသစ် တောင်းဆိုရန်",
+      requesting: "တောင်းဆိုနေသည်…",
+      newPasswordLabel: "စကားဝှက်အသစ်",
+      submit: "စကားဝှက်အသစ် သိမ်းရန်",
+      doneTitle: "စကားဝှက် ပြောင်းပြီးပါပြီ",
+      doneBody: "စက်အားလုံးမှ ထွက်ပေးထားပါသည်။ စကားဝှက်အသစ်ဖြင့် ပြန်ဝင်ပါ။",
+      remembered: "စကားဝှက်ကို သတိရပြီလား?",
+    },
   },
   wallet: {
     eyebrow: "ငွေကြေး",
@@ -1681,7 +1881,7 @@ const mm = {
     accountNumberPlaceholder: "ဥပမာ 09xxxxxxxxx",
     withdrawSummary: (amount: string) => `${amount} ထုတ်ယူရန် တောင်းဆိုနေပါသည်။`,
     submitWithdraw: "ငွေထုတ် တောင်းဆိုရန်",
-    withdrawPending: "ငွေထုတ်တောင်းဆိုပြီးပါပြီ — အတည်ပြုပြီးမှသာ လက်ကျန်ငွေမှ နုတ်ယူပါမည်။",
+    withdrawPending: "ငွေထုတ်တောင်းဆိုပြီးပါပြီ — ထိုပမာဏကို လက်ကျန်ငွေမှ ယခုပင် ဖယ်ထားပြီး တောင်းဆိုမှု ငြင်းပယ်ခံရပါက ပြန်ထည့်ပေးပါမည်။",
     toastDepositApproved: "ငွေဖြည့်မှု အတည်ပြုပြီးပါပြီ",
     toastDepositApprovedBody: "သင့်ပိုက်ဆံအိတ်ထဲ ငွေထည့်ပြီးပါပြီ။",
     toastDepositRejected: "ငွေဖြည့်မှု ငြင်းပယ်ခံရသည်",
@@ -1825,12 +2025,148 @@ const mm = {
     themeLabel: "အသွင်အပြင်",
     themeDark: "မှောင်",
     themeDarkOnly: "မှောင် — တစ်ခုတည်းသော mode။",
+    privacySection: "ကိုယ်ရေးအချက်အလက်",
+    privacyDescription: "သင့်အကြောင်း ကျွန်ုပ်တို့ စုဆောင်းသော အချက်အလက်များနှင့် ၎င်းတို့ကို အသုံးပြုပုံ။",
+    privacyLink: "ကိုယ်ရေးကိုယ်တာမူဝါဒကို ဖတ်ရန်",
     dangerZone: "အန္တရာယ်ဇုန်",
     deleteAccount: "အကောင့် ဖျက်ရန်",
-    deleteAccountDescription: "သင့်အကောင့်နှင့် ကြည့်ရှုမှုအချက်အလက်များ အပြီးအပိုင် ဖျက်ပစ်သည်။",
+    deleteAccountDescription: "သင့်အကောင့်ကို အပြီးတိုင် ပိတ်ပြီး ကိုယ်ရေးအချက်အလက်များကို ဖယ်ရှားပါမည်။",
     deleteConfirmTitle: "အကောင့်ကို ဖျက်မလား?",
-    deleteConfirmDescription: "ပြန်ပြင်၍မရပါ။ ပိုက်ဆံအိတ်လက်ကျန်နှင့် မှတ်တမ်းများ ဆုံးရှုံးပါမည်။",
-    deleteStubNotice: "အကောင့်ဖျက်ခြင်းသည် backend နှင့် မချိတ်ဆက်ရသေးပါ — သင့်အား ထွက်ပေးလိုက်ပါပြီ။",
+    deleteConfirmDescription: "ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍ မရပါ။",
+    deleteEffectsTitle: "ဖြစ်ပေါ်မည့်အရာများ",
+    deleteEffects: [
+      "သင့်ဖုန်းနံပါတ်၊ အမည်၊ ပရိုဖိုင်ဓာတ်ပုံနှင့် Google ချိတ်ဆက်မှုကို အကောင့်မှ ဖယ်ရှားပါမည်။",
+      "စက်အားလုံးမှ ထွက်ပေးမည်ဖြစ်ပြီး ဤအကောင့်သို့ မည်သူမျှ ထပ်မံ ဝင်ရောက်၍ မရတော့ပါ။",
+      "ဝယ်ယူထားသော ဇာတ်ကားများနှင့် ကျန်ရှိနေသော စာရင်းသွင်းကာလ ဆုံးရှုံးပါမည်။",
+      "ငွေပေးချေမှု မှတ်တမ်းများ (ငွေသွင်း၊ ငွေထုတ်နှင့် ဝယ်ယူမှုများ) ကို စာရင်းကိုင်ရန်အတွက် ဆက်လက် သိမ်းထားပါမည်။ ထိုမှတ်တမ်းများ ချိတ်ဆက်ထားသော ပိတ်ထားသည့် အကောင့်တွင် သင့်အမည်နှင့် ဖုန်းနံပါတ်ကို မပြတော့ပါ။",
+      "ထိုမှတ်တမ်းများတွင် သင်ပေးခဲ့သော ငွေပေးချေမှု အချက်အလက်များ ဆက်လက် ပါရှိနေပါမည်။ ငွေထုတ်မှုအတွက် — ငွေလက်ခံခဲ့သော အကောင့်၏ အမည်၊ နံပါတ်နှင့် ဘဏ်အမည် (များသောအားဖြင့် သင့်ကိုယ်ပိုင် အမည်နှင့် ဖုန်းနံပါတ်)။ ငွေသွင်းမှုအတွက် — ငွေလွှဲအမှတ်၊ ဝန်ထမ်းက သင့်ကိုယ်စား ငွေသွင်းမှု ထည့်ပေးခဲ့ပါက ငွေလွှဲသူ၏ အမည်နှင့် ငွေလွှဲမှုဆိုင်ရာ ဘဏ် ဖန်သားပြင်ဓာတ်ပုံ (screenshot) သို့မဟုတ် ဘဏ် အကြောင်းကြားချက် (ငွေလွှဲသူ၏ အမည် သို့မဟုတ် နံပါတ် ပါနိုင်သည်)။",
+      "နောက်ပိုင်းတွင် ထိုဖုန်းနံပါတ်ဖြင့် အကောင့်အသစ်တစ်ခု ပြန်ဖွင့်နိုင်ပါသည်။",
+    ],
+    deleteRequirementsTitle: "မဖျက်မီ လိုအပ်ချက်များ",
+    deleteRequirements: [
+      "ပိုက်ဆံအိတ်ထဲတွင် ငွေ မကျန်ရပါ — ကျန်ငွေကို ထုတ်ယူပါ သို့မဟုတ် သုံးစွဲပါ။",
+      "စစ်ဆေးရန် စောင့်ဆိုင်းနေသော ငွေသွင်း သို့မဟုတ် ငွေထုတ် တောင်းဆိုမှု မရှိရပါ။",
+    ],
+    deleteBalanceNotice: (amount: string) =>
+      `သင့်ပိုက်ဆံအိတ်တွင် ${amount} ကျန်နေပါသည်။ ၎င်းကို အရင် ထုတ်ယူပါ သို့မဟုတ် သုံးစွဲပါ၊ မဟုတ်ပါက အကောင့်ဖျက်ခြင်းကို ငြင်းပယ်ပါမည်။`,
+    deleteAcknowledge: "ကျွန်ုပ်၏ အကောင့်ကို အပြီးတိုင် ပိတ်မည်ဖြစ်ကြောင်း နားလည်ပါသည်။",
+    deleteConfirmButton: "ကျွန်ုပ်၏ အကောင့်ကို ဖျက်ရန်",
+    deleteDone: "သင့်အကောင့်ကို ဖျက်ပြီးပါပြီ။",
+    deleteRefusedBalance: "သင့်ပိုက်ဆံအိတ်တွင် ငွေကျန်နေသေးသည်။ အကောင့်မဖျက်မီ ၎င်းကို ထုတ်ယူပါ သို့မဟုတ် သုံးစွဲပါ။",
+    deleteRefusedDeposit: "စစ်ဆေးရန် စောင့်ဆိုင်းနေသော ငွေသွင်းမှု ရှိနေပါသည်။ အတည်ပြုခြင်း သို့မဟုတ် ငြင်းပယ်ခြင်း ပြီးမှ ထပ်ကြိုးစားပါ။",
+    deleteRefusedWithdrawal: "စစ်ဆေးရန် စောင့်ဆိုင်းနေသော ငွေထုတ်မှု ရှိနေပါသည်။ အတည်ပြုခြင်း သို့မဟုတ် ငြင်းပယ်ခြင်း ပြီးမှ ထပ်ကြိုးစားပါ။",
+    deleteRefusedStaff: "ဝန်ထမ်းအကောင့်များကို ဤနေရာမှ ဖျက်၍ မရပါ။",
+  },
+  privacy: {
+    kicker: "ဥပဒေဆိုင်ရာ",
+    title: "ကိုယ်ရေးကိုယ်တာမူဝါဒ",
+    subtitle: "MyanFlix က သင့်အကြောင်း ဘာတွေ စုဆောင်းသလဲ၊ ဘာကြောင့်လဲ၊ သင် ဘာလုပ်နိုင်သလဲ။",
+    draftTitle: "မူကြမ်း — အတည်မပြုရသေးပါ",
+    draftBody:
+      "ဤမူဝါဒသည် အက်ပ်က ယနေ့ စုဆောင်းနေသော အချက်အလက်များကို အခြေခံ၍ ရေးထားသော မူကြမ်းဖြစ်ပါသည်။ MyanFlix က ပြန်လည်စစ်ဆေး အတည်ပြုခြင်း မပြုရသေးသဖြင့် အသက်မဝင်မီ ပြောင်းလဲနိုင်ပါသည်။ [လေးထောင့်ကွင်း] အတွင်းရှိ အပိုင်းများကို ဖြည့်စွက်ရန် ကျန်ပါသေးသည်။",
+    lastUpdated: "၂၀၂၆ ခုနှစ် စက်တင်ဘာ ၂၈ ရက်နေ့ မူကြမ်း",
+    sections: [
+      {
+        heading: "ကျွန်ုပ်တို့ အကြောင်း",
+        paragraphs: [
+          "MyanFlix သည် ရုပ်ရှင်၊ ဇာတ်လမ်းတွဲများ ကြည့်ရှုရန်နှင့် စာအုပ်များ ဖတ်ရှုရန် ဝန်ဆောင်မှု ဖြစ်ပါသည်။ ဤမူဝါဒတွင် \"ကျွန်ုပ်တို့\" ဟူသည် MyanFlix ကို ဆိုလိုပါသည်။",
+          "ကိုယ်ရေးကိုယ်တာဆိုင်ရာ ကိစ္စများအတွက် ဆက်သွယ်ရန် — [MyanFlix မှ အကူအညီ အီးမေးလ်လိပ်စာ သို့မဟုတ် ဖုန်းနံပါတ် ထည့်ရန်]။",
+        ],
+        bullets: [],
+      },
+      {
+        heading: "ကျွန်ုပ်တို့ စုဆောင်းသော အချက်အလက်များ",
+        paragraphs: [],
+        bullets: [
+          "အကောင့်အချက်အလက် — သင့်ဖုန်းနံပါတ်နှင့် သင်ရွေးချယ်သော စကားဝှက်။ စကားဝှက်ကို ကျွန်ုပ်တို့ ဖတ်၍မရနိုင်သော ကုဒ်ပြောင်းထားသည့် (hash) ပုံစံဖြင့်သာ သိမ်းဆည်းပါသည်။ သင် သတ်မှတ်ထားပါက ပြသမည့်အမည်နှင့် ပရိုဖိုင်ဓာတ်ပုံကိုလည်း သိမ်းထားပါသည်။",
+          "Google ဖြင့် ဝင်ရောက်ပါက — Google က ကျွန်ုပ်တို့ထံ မျှဝေသော အီးမေးလ်လိပ်စာနှင့် အကောင့် ID။",
+          "ဝင်ရောက်ရန်ကုဒ်များ — သင် ဝင်ရောက်သည့်အခါ သို့မဟုတ် စကားဝှက် ပြန်သတ်မှတ်သည့်အခါ သင့်ဖုန်းနံပါတ်အတွက် တစ်ကြိမ်သုံးကုဒ်တစ်ခု ထုတ်ပေးပါသည်။ ကုဒ်များသည် အချိန်အနည်းငယ်အကြာတွင် သက်တမ်းကုန်ပါသည်။",
+          "ငွေပေးချေမှုများ — ငွေသွင်းတိုင်းအတွက် ပမာဏ၊ ငွေပေးချေနည်း၊ သင် ငွေလွှဲခဲ့သော အကောင့်နှင့် သင်ရိုက်ထည့်သော ဂဏန်း ၆ လုံး ငွေလွှဲအမှတ်။ ငွေထုတ်တိုင်းအတွက် ပမာဏနှင့် ငွေလက်ခံမည့် အကောင့်အမျိုးအစား၊ အမည်၊ နံပါတ် (လိုအပ်ပါက ဘဏ်အမည်)။ ထို့အပြင် ပိုက်ဆံအိတ် လက်ကျန်ငွေနှင့် ငွေဖြည့်ခြင်း၊ ဝယ်ယူခြင်း၊ စာရင်းသွင်းခြင်း၊ ငွေပြန်အမ်းခြင်းနှင့် ပြင်ဆင်ခြင်း တစ်ခုချင်းစီ၏ မှတ်တမ်းကိုလည်း သိမ်းထားပါသည်။",
+          "သင် ကြည့်ရှု၊ ဖတ်ရှုသည့်အရာများ — ရုပ်ရှင် သို့မဟုတ် အပိုင်းတစ်ခုချင်းစီတွင် မည်မျှ ကြည့်ပြီးပြီလဲ (ဆက်ကြည့်နိုင်ရန်)၊ ကြည့်ရှုသည့်ကြာချိန်နှင့် စာအုပ်တစ်အုပ်ချင်းစီတွင် ဖတ်ထားသည့်နေရာ။",
+          "သင် ရေးသားသည့်အရာများ — သင်တင်သော မှတ်ချက်များ၊ ကျွန်ုပ်တို့ထံ ပို့သော အကြံပြုချက်များနှင့် သင်ရှာဖွေသော စကားလုံးများ။",
+          "သင့်စက်နှင့် ချိတ်ဆက်မှု — သင့် IP လိပ်စာ၊ သင်အသုံးပြုသော စက်နှင့် browser အမျိုးအစား (သို့မဟုတ် ကျွန်ုပ်တို့၏ အက်ပ်) နှင့် နောက်ဆုံး အသုံးပြုခဲ့သည့်အချိန်။",
+        ],
+      },
+      {
+        heading: "သင့်စက်ပေါ်တွင်သာ ရှိနေသော အချက်အလက်များ",
+        paragraphs: [
+          "သင့် ဝင်ရောက်မှု token များ၊ ရွေးချယ်ထားသော ဘာသာစကား၊ ကြည့်ရန်စာရင်း၊ စာဖတ်ခြင်းနှင့် စာတန်းထိုး ဆက်တင်များ၊ စာအုပ်များတွင် သင်ပြုလုပ်သော အမှတ်အသား၊ bookmark နှင့် မှတ်စုများကို သင့်ကိုယ်ပိုင် စက်ပေါ်တွင်သာ (browser သို့မဟုတ် အက်ပ်ထဲတွင်) သိမ်းထားပါသည်။ ကြည့်ရန်စာရင်း၊ အမှတ်အသား၊ bookmark နှင့် မှတ်စုများကို ကျွန်ုပ်တို့ထံ မပို့ပါ။",
+        ],
+        bullets: [],
+      },
+      {
+        heading: "အသုံးပြုပုံ",
+        paragraphs: [],
+        bullets: [
+          "သင့်အကောင့်ကို ဖွင့်ပေးရန်၊ လုံခြုံအောင် ထိန်းသိမ်းရန်၊ ဝင်ရောက်ခွင့်ပေးရန်နှင့် တစ်ကြိမ်သုံး ဝင်ရောက်ရန်ကုဒ်များ ထုတ်ပေးရန်။",
+          "သင့်ပိုက်ဆံအိတ်ကို လည်ပတ်စေရန် — ငွေသွင်းမှုများကို စစ်ဆေးအတည်ပြုရန်၊ ငွေထုတ်မှုများကို ပေးချေရန်နှင့် ငွေစာရင်းများကို မှန်ကန်စွာ ထိန်းသိမ်းရန်။",
+          "သင် ဝယ်ယူထားသော သို့မဟုတ် စာရင်းသွင်းထားသော အရာများကို ပေးရန်နှင့် ရပ်ခဲ့သည့်နေရာမှ ဆက်ကြည့်နိုင်စေရန်။",
+          "သင့်အကြံပြုချက်များကို ပြန်ဖြေရန်၊ မှတ်ချက်များကို စီမံရန်နှင့် လိမ်လည်မှု၊ အလွဲသုံးစားမှုများကို တားဆီးရန်။",
+          "မည်သည့်ဇာတ်ကားများ လူကြိုက်များသည်ကို သိရှိပြီး ဝန်ဆောင်မှုကို ပိုကောင်းအောင် ပြုလုပ်ရန်။",
+        ],
+      },
+      {
+        heading: "ငွေသွင်းမှုများကို စစ်ဆေးပုံ",
+        paragraphs: [
+          "ငွေသွင်းမှုတစ်ခုကို အတည်ပြုရန် သင်ပေးသော ပမာဏနှင့် ငွေလွှဲအမှတ်ကို ကျွန်ုပ်တို့၏ ကိုယ်ပိုင် ငွေလက်ခံအကောင့်များ၏ ငွေပေးချေမှုမှတ်တမ်းများ (ဥပမာ — ကျွန်ုပ်တို့၏ mobile-money အကောင့်သို့ ရောက်လာသော ငွေလက်ခံ အကြောင်းကြားချက်များ) နှင့် တိုက်စစ်ပါသည်။ ငွေသွင်းမှု နှစ်ခုတွင် ငွေလွှဲအမှတ် တူနေပါက ဝန်ထမ်းတစ်ဦးက စစ်ဆေးပါသည်၊ ခန့်မှန်း၍ မဆုံးဖြတ်ပါ။",
+        ],
+        bullets: [],
+      },
+      {
+        heading: "သင့်အချက်အလက်များကို မြင်နိုင်သူများ",
+        paragraphs: [],
+        bullets: [
+          "MyanFlix ဝန်ထမ်းများသည် ၎င်းတို့၏ တာဝန်အတွက် လိုအပ်သည်များကိုသာ မြင်နိုင်ပါသည်၊ ဥပမာ — ငွေစာရင်းဝန်ထမ်းများက ငွေသွင်း၊ ငွေထုတ်များကို မြင်ရပါသည်။ ဝန်ထမ်းများ ပြုလုပ်သော ပြောင်းလဲမှုတိုင်းကို အတွင်းပိုင်း မှတ်တမ်းတွင် မှတ်သားထားပါသည်။",
+          "သင်တင်သော မှတ်ချက်များဘေးတွင် သင့်ပြသမည့်အမည် (သို့မဟုတ် အသုံးပြုသူအမည်) နှင့် ပရိုဖိုင်ဓာတ်ပုံကို အခြားအသုံးပြုသူများ မြင်ရပါသည်။",
+          "[MyanFlix အတွက် အချက်အလက်များကို ကိုင်တွယ်ပေးသော ပြင်ပကုမ္ပဏီများကို MyanFlix မှ ဖော်ပြရန် — ဥပမာ ဝင်ရောက်ရန်ကုဒ်များ ပို့ပေးမည့် SMS ဝန်ဆောင်မှု၊ \"Google ဖြင့် ဆက်လုပ်ရန်\" အတွက် Google နှင့် hosting ဝန်ဆောင်မှု။]",
+          "[MyanFlix မှ အတည်ပြုရန် — သင့်ကိုယ်ရေးအချက်အလက်များကို ကျွန်ုပ်တို့ မရောင်းချပါ။]",
+        ],
+      },
+      {
+        heading: "သိမ်းဆည်းထားမည့် ကာလ",
+        paragraphs: [],
+        bullets: [
+          "အကောင့်အချက်အလက် — သင့်အကောင့် ဖွင့်ထားသရွေ့။ အကောင့်ကို ဖျက်လိုက်သည်နှင့် ချက်ချင်း ဖယ်ရှားပါသည်။",
+          "ငွေပေးချေမှု မှတ်တမ်းများ — စာရင်းကိုင်ရန် လိုအပ်သဖြင့် အကောင့်ဖျက်ပြီးနောက်တွင်လည်း သိမ်းထားပါသည် [ကာလကို MyanFlix မှ ဖော်ပြရန်]။",
+          "ကြည့်ရှုမှု၊ ဖတ်ရှုမှုနှင့် ရှာဖွေမှု မှတ်တမ်းများ၊ မှတ်ချက်များနှင့် အကြံပြုချက်များ — [ကာလကို MyanFlix မှ ဖော်ပြရန်]။",
+        ],
+      },
+      {
+        heading: "သင့်အကောင့်ကို ဖျက်ခြင်း",
+        paragraphs: [
+          "ဆက်တင်များတွင် သင့်အကောင့်ကို ကိုယ်တိုင် ဖျက်နိုင်ပါသည်။ ပိုက်ဆံအိတ်ထဲတွင် ငွေ မကျန်ရဘဲ စစ်ဆေးရန် စောင့်ဆိုင်းနေသော ငွေသွင်း သို့မဟုတ် ငွေထုတ် မရှိရပါ။",
+          "ထို့နောက် သင့်ဖုန်းနံပါတ်၊ အမည်၊ ပရိုဖိုင်ဓာတ်ပုံ၊ Google ချိတ်ဆက်မှုနှင့် သိမ်းထားသော IP လိပ်စာများကို ဖယ်ရှားပြီး အကောင့်ကို ပိတ်ကာ စက်အားလုံးမှ ထွက်ပေးပါသည်။ ကြည့်ရှုမှု၊ ဖတ်ရှုမှု မှတ်တမ်းများနှင့် မှတ်ချက်များသည် သင့်အမည် မပြတော့သော ပိတ်ထားသည့် အကောင့်နှင့်အတူ ကျန်ရှိနေပါမည်။",
+          "ငွေပေးချေမှု မှတ်တမ်းများ (ငွေသွင်း၊ ငွေထုတ်နှင့် ဝယ်ယူမှုများ) ကို စာရင်းကိုင်ရန်အတွက် ပိတ်ထားသည့် အကောင့်နှင့် ချိတ်ဆက်လျက် ဆက်လက် သိမ်းထားပါသည်။ ထိုမှတ်တမ်းများတွင် သင်ပေးခဲ့သော ငွေပေးချေမှု အချက်အလက်များ ဆက်လက် ပါရှိနေပါသည်။ ငွေထုတ်မှုအတွက် — ငွေလက်ခံခဲ့သော အကောင့်၏ အမည်၊ နံပါတ်နှင့် ဘဏ်အမည် (များသောအားဖြင့် သင့်ကိုယ်ပိုင် အမည်နှင့် ဖုန်းနံပါတ်)။ ငွေသွင်းမှုအတွက် — ငွေလွှဲအမှတ်၊ ဝန်ထမ်းက သင့်ကိုယ်စား ငွေသွင်းမှု ထည့်ပေးခဲ့ပါက ငွေလွှဲသူ၏ အမည်နှင့် ငွေလွှဲမှုဆိုင်ရာ ဘဏ် ဖန်သားပြင်ဓာတ်ပုံ (screenshot) သို့မဟုတ် ဘဏ် အကြောင်းကြားချက် (ငွေလွှဲသူ၏ အမည် သို့မဟုတ် နံပါတ် ပါနိုင်သည်)။ ထိုအချက်အလက်များသည် ဝန်ထမ်းများ၏ လုပ်ဆောင်ချက်များကို မှတ်သားထားသော ကျွန်ုပ်တို့၏ အတွင်းပိုင်း မှတ်တမ်းတွင်လည်း ကျန်ရှိနေပါသည်။",
+        ],
+        bullets: [],
+      },
+      {
+        heading: "သင် ရွေးချယ်နိုင်သည့်အရာများ",
+        paragraphs: [
+          "ပြသမည့်အမည်၊ ဓာတ်ပုံနှင့် စကားဝှက်ကို ပရိုဖိုင်တွင် အချိန်မရွေး ပြောင်းလဲနိုင်ပါသည်။ သင့်အချက်အလက်များ၏ မိတ္တူကို တောင်းဆိုရန် သို့မဟုတ် ဤမူဝါဒနှင့် ပတ်သက်၍ မေးမြန်းရန် ဆက်သွယ်ပါ — [MyanFlix မှ ဆက်သွယ်ရန် အချက်အလက် ထည့်ရန်]။",
+        ],
+        bullets: [],
+      },
+      {
+        heading: "လုံခြုံရေး",
+        paragraphs: [
+          "ဖုန်းနံပါတ်ဖြင့် ဝင်ရောက်ရန် သင့်စကားဝှက်နှင့် ထိုနံပါတ်အတွက် တောင်းဆိုထားသော တစ်ကြိမ်သုံးကုဒ် နှစ်ခုစလုံး လိုအပ်ပါသည်။ စကားဝှက် ပြောင်းသည့်အခါ သို့မဟုတ် ပြန်သတ်မှတ်သည့်အခါ အခြားစက်များမှ ထွက်ပေးပါသည်။ [HTTPS စတင်အသုံးပြုပြီးနောက် ပေးပို့နေစဉ် အချက်အလက်များကို ကာကွယ်ပုံကို MyanFlix မှ ထည့်ရန်။]",
+        ],
+        bullets: [],
+      },
+      {
+        heading: "ကလေးများ",
+        paragraphs: ["[အကောင့်ဖွင့်ရန် အနည်းဆုံး အသက်ကို MyanFlix မှ ဖော်ပြရန်။]"],
+        bullets: [],
+      },
+      {
+        heading: "ဤမူဝါဒ ပြောင်းလဲခြင်း",
+        paragraphs: [
+          "ဤမူဝါဒ ပြောင်းလဲပါက ဗားရှင်းအသစ်ကို ဤစာမျက်နှာတွင် တင်ပြီး ထိပ်ဆုံးရှိ ရက်စွဲကို ပြင်ဆင်ပါမည်။",
+        ],
+        bullets: [],
+      },
+    ],
   },
   dialogs: {
     subscribeTitle: "အစီအစဉ် ရွေးပါ",

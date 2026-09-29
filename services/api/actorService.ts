@@ -6,8 +6,10 @@ export interface Actor {
   id: string;
   name: string;
   imageUrl: string | null;
-  /** How many titles this person appears in — counted from the join server-side. */
+  /** Standalone films only (episode credits excluded) — counted server-side. Not shown in the picker. */
   movieCount: number;
+  /** Distinct series this person appears in, on the show itself or on any episode. */
+  seriesCount: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, Pencil, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ArrowUpRight, Pencil, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { ConfirmDialog } from "@/components/modals/ConfirmDialog";
+import { DeleteAccountDialog } from "@/components/dialogs/DeleteAccountDialog";
 import { ErrorState } from "@/components/empty/ErrorState";
 import { SectionHeader, Surface } from "@/components/system";
 import { AccountShell } from "@/components/views/AccountShell";
@@ -28,11 +29,12 @@ export interface SettingsViewProps {
   prefsError: boolean;
   onRetryPrefs: () => void;
   onUpdatePref: (key: keyof NotificationPreferences, value: boolean) => void;
-  /** Stub — the page fires the localized "not connected" toast. */
-  /** Stub — the page fires the localized "not connected" toast. */
+  /** Delete account (DELETE /users/me) — the page owns the call and its outcome. */
   deleteOpen: boolean;
   onDeleteOpenChange: (open: boolean) => void;
   isDeleting: boolean;
+  /** The server's refusal (or a failure), already translated; null when none. */
+  deleteError: string | null;
   onConfirmDelete: () => void;
 }
 
@@ -89,6 +91,7 @@ export function SettingsView({
   deleteOpen,
   onDeleteOpenChange,
   isDeleting,
+  deleteError,
   onConfirmDelete,
 }: SettingsViewProps) {
   const { t, language, setLanguage } = useLanguage();
@@ -222,6 +225,21 @@ export function SettingsView({
           </div>
         </SettingsPanel>
 
+        <SettingsPanel
+          title={t.settings.privacySection}
+          description={t.settings.privacyDescription}
+        >
+          <Button
+            variant="outline"
+            className="h-11 w-fit rounded-full px-6"
+            render={<Link href="/privacy" />}
+            nativeButton={false}
+          >
+            {t.settings.privacyLink}
+            <ArrowUpRight className="size-4" />
+          </Button>
+        </SettingsPanel>
+
         {/* The one panel that breaks the quiet-glass rule on purpose. */}
         <Surface
           as="section"
@@ -249,14 +267,12 @@ export function SettingsView({
         </Surface>
       </div>
 
-      <ConfirmDialog
+      <DeleteAccountDialog
         open={deleteOpen}
         onOpenChange={onDeleteOpenChange}
-        title={t.settings.deleteConfirmTitle}
-        description={t.settings.deleteConfirmDescription}
-        confirmLabel={t.settings.deleteAccount}
-        variant="destructive"
-        loading={isDeleting}
+        walletBalance={user.walletBalance}
+        isDeleting={isDeleting}
+        error={deleteError}
         onConfirm={onConfirmDelete}
       />
     </AccountShell>

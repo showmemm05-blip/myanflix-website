@@ -46,7 +46,7 @@ export function Footer() {
         { href: "#", label: t.footer.helpCenter },
         { href: "#", label: t.footer.contactUs },
         { href: "#", label: t.footer.termsOfService },
-        { href: "#", label: t.footer.privacyPolicy },
+        { href: "/privacy", label: t.footer.privacyPolicy },
       ],
     },
   ];

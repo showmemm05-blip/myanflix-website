@@ -80,6 +80,10 @@ export default function WalletPage() {
     queryKey: ["payment-accounts"],
     queryFn: () => paymentAccountService.getAccounts(),
     enabled: depositOpen,
+    // Always fresh when the dialog opens: an account the admin deactivated
+    // a minute ago must not be offered from the 60 s app-wide cache. The
+    // socket event above covers the dialog while it is open.
+    staleTime: 0,
   });
 
   // Also powers the withdrawal form's "Account Type" picker and the deposit/
@@ -256,6 +260,11 @@ export default function WalletPage() {
         withdrawRequiresBankName ? withdrawBankName.trim() : undefined,
       );
       queryClient.invalidateQueries({ queryKey: ["withdrawals", "mine"] });
+      // The amount leaves the balance the moment the request is made (C-4).
+      // Refetch it here too, so the new balance shows even when the socket's
+      // wallet.balanceUpdated push doesn't arrive.
+      queryClient.invalidateQueries({ queryKey: ["wallet-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["wallet-transactions"] });
       setWithdrawOpen(false);
       resetWithdrawForm();
       toast.success(t.wallet.withdrawPending);

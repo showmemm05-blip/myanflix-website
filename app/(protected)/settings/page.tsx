@@ -6,7 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { SettingsView, SettingsViewSkeleton } from "@/components/views/SettingsView";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
-import { profileService } from "@/services/api/profileService";
+import { ApiError } from "@/services/api/apiClient";
+import { ACCOUNT_DELETE_REFUSALS, profileService } from "@/services/api/profileService";
 import type { NotificationPreferences } from "@/types/user";
 import { toast } from "sonner";
 
@@ -16,6 +17,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const {
     data: prefs,
@@ -40,19 +42,37 @@ export default function SettingsPage() {
     }
   };
 
+  const handleDeleteOpenChange = (open: boolean) => {
+    // A reopened dialog never shows the last attempt's refusal.
+    if (open) setDeleteError(null);
+    setDeleteOpen(open);
+  };
+
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
+    setDeleteError(null);
     try {
       await profileService.deleteAccount();
-      logout();
-      router.push("/");
-      toast.info(t.settings.deleteStubNotice);
-    } catch {
-      toast.error(t.common.somethingWentWrong);
-    } finally {
+    } catch (err) {
+      // The dialog stays open on a refusal, saying why in the reader's
+      // language: money still in the wallet, or a deposit/withdrawal
+      // waiting for review (409), or a staff account (403).
+      const key =
+        err instanceof ApiError
+          ? ACCOUNT_DELETE_REFUSALS[err.message as keyof typeof ACCOUNT_DELETE_REFUSALS]
+          : undefined;
+      setDeleteError(key ? t.settings[key] : t.common.somethingWentWrong);
       setIsDeleting(false);
-      setDeleteOpen(false);
+      return;
     }
+    // The server has already signed every session out; this clears the
+    // local one. Signed out on a protected page, RequireAuth sends the
+    // browser to /login — go there directly rather than race it.
+    setIsDeleting(false);
+    setDeleteOpen(false);
+    toast.success(t.settings.deleteDone);
+    logout();
+    router.replace("/login");
   };
 
   return (
@@ -63,8 +83,9 @@ export default function SettingsPage() {
       onRetryPrefs={() => refetch()}
       onUpdatePref={updatePref}
       deleteOpen={deleteOpen}
-      onDeleteOpenChange={setDeleteOpen}
+      onDeleteOpenChange={handleDeleteOpenChange}
       isDeleting={isDeleting}
+      deleteError={deleteError}
       onConfirmDelete={handleDeleteAccount}
     />
   );

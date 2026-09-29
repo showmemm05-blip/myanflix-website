@@ -80,10 +80,11 @@ interface OtpChannelPickerProps {
 
 /**
  * Three equal tiles — icon, app name, one-line hint — behaving as a radio
- * group: tapping one only SELECTS it; the parent's "Send code by …" button
- * is what actually asks for a code, so nobody gets a code they didn't mean
- * to request. Where the CURRENT code went is stated once, in the identity
- * row above the code field — the tiles deliberately carry no second marker.
+ * group: tapping one only SELECTS it; the parent's "Request a new code"
+ * button is what actually asks for a code, so nobody gets a code they didn't
+ * mean to request. The app picked for the CURRENT code is shown once, as the
+ * icon in the identity row above the code field — the tiles deliberately
+ * carry no second marker.
  */
 export function OtpChannelPicker({
   value,

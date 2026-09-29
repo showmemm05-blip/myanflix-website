@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Hls from "hls.js";
 import {
@@ -65,6 +65,7 @@ import { usePlayerHotkeys } from "@/lib/hooks/use-player-hotkeys";
 import type { PrefetchStatusDisplay, SubtitleTrackOption } from "@/components/player/PlayerControls";
 import { formatDuration, formatTimecode } from "@/lib/format";
 import { FALLBACK_COVER_URL } from "@/lib/placeholder";
+import { parseStartSeconds, START_PARAM, usableStartSeconds } from "@/lib/player/resume";
 import { cn } from "@/lib/utils";
 
 const AUTO_HIDE_MS = 3000;
@@ -128,6 +129,7 @@ function subtitleTrackAt(video: HTMLVideoElement, index: number): TextTrack | nu
 export default function PlayerPage({ params }: { params: Promise<{ movieId: string }> }) {
   const { movieId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLanguage();
   const { data: movie, isLoading } = useMovie(movieId);
   const { data: similarMovies, isLoading: isSimilarLoading } = useSimilarMovies(movieId);
@@ -176,6 +178,20 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
    * instead of the start.
    */
   const resumePositionRef = useRef<number | null>(null);
+  /**
+   * H-27: the second "Resume" / "Continue watching" asked playback to start
+   * at (`?t=`, the backend's saved position), unless that is already in the
+   * last 5%. Taken ONCE, by the first player built for this title; the
+   * expired-link rebuild goes by resumePositionRef instead.
+   */
+  const requestedStart = parseStartSeconds(searchParams.get(START_PARAM));
+  const requestedStartRef = useRef<number | null>(null);
+  const movieDurationSeconds = movie?.duration ? movie.duration * 60 : null;
+  // Declared before the player effect below so, in a commit where both
+  // run, the start is already in place when the player is built.
+  useEffect(() => {
+    requestedStartRef.current = usableStartSeconds(requestedStart, movieDurationSeconds);
+  }, [movieId, requestedStart, movieDurationSeconds]);
 
   // Shares its query key with EpisodeRail's own fetch, so this adds no extra
   // network round trip — just lets the page itself know what comes next.
@@ -328,9 +344,13 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
         { beforeSeconds: PREFETCH_BEFORE_SECONDS, afterSeconds: PREFETCH_AFTER_SECONDS },
         { maxConcurrentDownloads: 3, maxCacheEntries: 60 },
       );
-      // Set only by the 403/410 recovery below; -1 is hls.js's own "from the start".
-      const startPosition = resumePositionRef.current ?? -1;
+      // The 403/410 recovery below sets resumePositionRef (the second
+      // playback had reached); otherwise a "Resume" link's saved second
+      // (H-27); -1 is hls.js's own "from the start".
+      const isLinkRecovery = resumePositionRef.current !== null;
+      const startPosition = resumePositionRef.current ?? requestedStartRef.current ?? -1;
       resumePositionRef.current = null;
+      requestedStartRef.current = null;
       // One fresh-link attempt per player instance (see the ERROR handler).
       let linkRecoveryTried = false;
       const hls = new Hls({
@@ -357,8 +377,9 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
         prefetchRef.current = prefetchSystem.attach(hls, video);
         // A rebuild after link recovery: the viewer was mid-sitting, so pick
         // up playing rather than sitting paused at the remembered second.
-        // (No autoplay on first load — that stays a click.)
-        if (startPosition >= 0) void video.play().catch(() => undefined);
+        // (No autoplay on first load — a resumed title waits at its saved
+        // second for the click, like any other.)
+        if (isLinkRecovery) void video.play().catch(() => undefined);
       });
       hls.on(Hls.Events.FRAG_LOADED, () => {
         loadedFragmentCountRef.current += 1;
@@ -434,6 +455,14 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
     }
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // H-27 on Safari's native engine: there is no startPosition to hand
+      // over, so seek once the duration is known.
+      const startAt = requestedStartRef.current;
+      requestedStartRef.current = null;
+      const seekToStart = () => {
+        if (startAt !== null && startAt < video.duration) video.currentTime = startAt;
+      };
+      if (startAt !== null) video.addEventListener("loadedmetadata", seekToStart, { once: true });
       video.src = playlistUrl;
 
       // No hls.js instance to ask on this path — the same manifest renditions
@@ -453,6 +482,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
       textTracks.addEventListener("change", syncTextTracks);
 
       return () => {
+        video.removeEventListener("loadedmetadata", seekToStart);
         textTracks.removeEventListener("addtrack", syncTextTracks);
         textTracks.removeEventListener("removetrack", syncTextTracks);
         textTracks.removeEventListener("change", syncTextTracks);
@@ -494,8 +524,10 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const saveProgress = useCallback(
     (force = false) => {
       // PATCH /videos/:id/watch-progress is 401 for a guest — and there is
-      // no history to write to anyway.
-      if (!isAuthenticated || !movie || durationSeconds === 0) return;
+      // no history to write to anyway. Nothing is recorded until playback
+      // has actually started on this visit: opening a title and leaving
+      // again must never overwrite its saved position (H-27).
+      if (!isAuthenticated || !movie || durationSeconds === 0 || !hasStarted) return;
       const now = Date.now();
       if (!force && now - lastSavedAt.current < PROGRESS_SAVE_INTERVAL_MS) return;
       lastSavedAt.current = now;
@@ -503,7 +535,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
       const percent = Math.min(100, Math.round((time / durationSeconds) * 100));
       historyService.updateProgress(movie.id, percent, Math.round(time)).catch(() => {});
     },
-    [isAuthenticated, movie, durationSeconds],
+    [isAuthenticated, movie, durationSeconds, hasStarted],
   );
 
   useEffect(() => {

@@ -13,6 +13,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 import { tokenStore, notifyUnauthorized } from "@/lib/auth/token-store";
+import { isRefreshRefusal } from "@/lib/auth/session-errors";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api";
@@ -107,12 +108,33 @@ axiosClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 let refreshPromise: Promise<string | null> | null = null;
 
+/** What a caller sees when the refresh could not reach a verdict (H-20). */
+const SERVER_UNREACHABLE_MESSAGE =
+  "Couldn't reach MyanFlix. Check your connection and try again.";
+
+/** Any thrown value as the ApiError every caller of this client expects. */
+function toApiError(err: unknown): ApiError {
+  if (err instanceof ApiError) return err;
+  if (axios.isAxiosError(err)) {
+    return new ApiError(
+      err.response?.data?.message ?? err.message,
+      err.response?.status ?? 0,
+    );
+  }
+  return new ApiError("Request failed", 0);
+}
+
 /**
  * Single-flight access-token refresh. Shared by the 401 retry path below and
  * by lib/socket.ts when the gateway rejects a handshake with an expired JWT —
  * both racing at once still make exactly one POST /auth/refresh. Resolves
  * with the new access token (already written to tokenStore, which notifies
- * onTokensChanged subscribers) or null when the session cannot be renewed.
+ * onTokensChanged subscribers) or null when the server REFUSED the session.
+ *
+ * H-20: when the server could not be reached at all (offline, timeout, DNS,
+ * 429, a 5xx during a deploy) it REJECTS with a status-0 ApiError instead,
+ * and the stored tokens are left exactly as they were — that is not a dead
+ * session, and the next attempt may well succeed.
  */
 export function refreshAccessToken(): Promise<string | null> {
   refreshPromise ??= performRefresh().finally(() => {
@@ -152,13 +174,25 @@ async function performRefresh(): Promise<string | null> {
     const nextRefreshToken: string | undefined =
       response.data?.data?.refreshToken;
     if (!nextAccessToken || !nextRefreshToken) {
-      return tokenRotatedByAnotherTab(refreshToken);
+      // A 2xx with no token pair is not the backend refusing anything (it
+      // answers a refusal with 401) — typically a captive portal's HTML
+      // page. No verdict, so the session is kept.
+      const rotated = tokenRotatedByAnotherTab(refreshToken);
+      if (rotated) return rotated;
+      throw new ApiError(SERVER_UNREACHABLE_MESSAGE, 0);
     }
 
     tokenStore.setTokens(nextAccessToken, nextRefreshToken);
     return nextAccessToken;
-  } catch {
-    return tokenRotatedByAnotherTab(refreshToken);
+  } catch (err) {
+    // Whatever went wrong here, a pair another tab stored meanwhile is the
+    // answer — it is newer than the token this request sent.
+    const rotated = tokenRotatedByAnotherTab(refreshToken);
+    if (rotated) return rotated;
+    // Only the server refusing the refresh token ends the session.
+    const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+    if (isRefreshRefusal(status)) return null;
+    throw new ApiError(SERVER_UNREACHABLE_MESSAGE, 0);
   }
 }
 
@@ -198,11 +232,7 @@ async function request<T>(
       err.response?.status !== 401 ||
       options.skipAuth
     ) {
-      const message = axios.isAxiosError(err)
-        ? (err.response?.data?.message ?? err.message)
-        : "Request failed";
-      const status = axios.isAxiosError(err) ? (err.response?.status ?? 0) : 0;
-      throw new ApiError(message, status);
+      throw toApiError(err);
     }
 
     // A guest hitting a members-only endpoint is not an expired session:
@@ -218,6 +248,8 @@ async function request<T>(
       throw new ApiError("Sign in required.", 401);
     }
 
+    // Rejects (status 0) when the refresh never reached a verdict — the
+    // tokens are kept and the caller (React Query) simply retries later.
     const newToken = await refreshAccessToken();
 
     if (!newToken) {
@@ -226,11 +258,19 @@ async function request<T>(
       throw new ApiError("Your session has expired. Please log in again.", 401);
     }
 
-    const retryResponse = await axiosClient.request({
-      url: path,
-      ...options,
-      headers: { ...options.headers, Authorization: `Bearer ${newToken}` },
-    });
+    let retryResponse;
+    try {
+      retryResponse = await axiosClient.request({
+        url: path,
+        ...options,
+        headers: { ...options.headers, Authorization: `Bearer ${newToken}` },
+      });
+    } catch (retryErr) {
+      if (axios.isCancel(retryErr)) throw retryErr;
+      // Same contract as the first attempt: callers get an ApiError with the
+      // server's message (a 409 refusal, say), never a raw AxiosError.
+      throw toApiError(retryErr);
+    }
     if (retryResponse.data?.success === false) {
       throw new ApiError(
         retryResponse.data.message ?? "Request failed",

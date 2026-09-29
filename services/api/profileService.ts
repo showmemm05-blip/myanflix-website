@@ -88,7 +88,8 @@ export const profileService = {
   /**
    * Real self-service password change. A wrong current password comes back as
    * a 400 ApiError carrying the backend's message, which the caller surfaces on
-   * the current-password field. Existing sessions stay signed in by design.
+   * the current-password field. Every OTHER session of the account is signed
+   * out; this one stays signed in (its next request refreshes once).
    */
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     await apiClient.patch<{ changed: boolean }>("/users/me/password", {
@@ -108,8 +109,25 @@ export const profileService = {
     return Promise.resolve(notificationPreferences);
   },
 
-  deleteAccount(): Promise<void> {
-    // No backend endpoint yet for self-service account deletion.
-    return Promise.resolve();
+  /**
+   * DELETE /users/me (H-16/H-25): closes the account for good — personal
+   * details removed, every session signed out, money records kept. Refused
+   * with a 409 while the wallet holds money or a deposit/withdrawal is
+   * waiting for review (see ACCOUNT_DELETE_REFUSALS), and with a 403 for a
+   * staff account.
+   */
+  async deleteAccount(): Promise<void> {
+    await apiClient.delete<{ deleted: boolean }>("/users/me");
   },
 };
+
+/** The backend's refusals for DELETE /users/me, by exact message → i18n key under `t.settings`. */
+export const ACCOUNT_DELETE_REFUSALS = {
+  "Your wallet still has money in it. Withdraw or spend it before deleting your account.":
+    "deleteRefusedBalance",
+  "You have a deposit waiting for review. Wait until it is approved or rejected before deleting your account.":
+    "deleteRefusedDeposit",
+  "You have a withdrawal waiting for review. Wait until it is approved or rejected before deleting your account.":
+    "deleteRefusedWithdrawal",
+  "Staff accounts cannot be deleted here. Ask a Super Admin.": "deleteRefusedStaff",
+} as const;

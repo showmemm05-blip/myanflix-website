@@ -34,3 +34,23 @@ export const createPasswordSchema = z
     path: ["confirmPassword"],
   });
 export type CreatePasswordValues = z.infer<typeof createPasswordSchema>;
+
+/**
+ * Forgot password (H-8): the code that was sent, plus the new password — the
+ * same rules as signup, plus the 72-character cap POST /auth/password/reset
+ * enforces (so a longer one is caught here, not as a raw server error).
+ */
+export const resetPasswordSchema = z
+  .object({
+    code: otpCodeSchema.shape.code,
+    password: createPasswordSchema.shape.password.max(
+      72,
+      "Password must be 72 characters or fewer",
+    ),
+    confirmPassword: createPasswordSchema.shape.confirmPassword,
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
+export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;

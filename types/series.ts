@@ -1,4 +1,4 @@
-import type { AccessType, FacetValue } from "./movie";
+import type { AccessType, FacetValue, MovieActorRef } from "./movie";
 
 /**
  * The series subset of the canonical sort vocabulary — no rating / mostViewed
@@ -47,6 +47,11 @@ export interface Series {
   /** One access type for the whole show — governs every season and episode, including future ones. */
   accessType: AccessType;
   categories: { id: string; name: string }[];
+  /**
+   * The show-level cast, same shape as a film's. Always sent (possibly empty)
+   * since 2026-09-24; an episode's own cast lives on the episode row.
+   */
+  actors: MovieActorRef[];
   createdAt: string;
   updatedAt: string;
 }

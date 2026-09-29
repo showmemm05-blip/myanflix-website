@@ -11,6 +11,7 @@ import { useLanguage } from "@/lib/context/language-context";
 import { useContinueWatching } from "@/hooks/use-movies";
 import { formatDuration } from "@/lib/format";
 import { FALLBACK_POSTER_URL } from "@/lib/placeholder";
+import { resumeHref } from "@/lib/player/resume";
 import { cn } from "@/lib/utils";
 import type { WatchHistoryEntry } from "@/types/movie";
 
@@ -108,9 +109,9 @@ function ContinueCard({ entry }: { entry: WatchHistoryEntry }) {
         </p>
       </div>
 
-      {/* Whole card resumes playback — the same destination the row has always had. */}
+      {/* Whole card resumes playback — at the saved second (H-27). */}
       <Link
-        href={`/player/${entry.movieId}`}
+        href={resumeHref(entry.movieId, entry.progressPercent, entry.lastPositionSeconds)}
         aria-label={`${t.watchHistory.resume}: ${entry.movieTitle}`}
         className="absolute inset-0 z-[1] rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       />

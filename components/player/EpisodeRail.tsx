@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { formatDuration, UNKNOWN_DURATION } from "@/lib/format";
 import { FALLBACK_COVER_URL } from "@/lib/placeholder";
+import { resumeHref } from "@/lib/player/resume";
 import { cn } from "@/lib/utils";
 import type { PlayerEpisode } from "@/types/series";
 
@@ -51,7 +52,14 @@ function EpisodeRow({
   return (
     <Link
       ref={rowRef}
-      href={`/player/${episode.id}`}
+      // A half-watched episode picks up where it was left (H-27). The row
+      // for the episode already playing keeps the plain link — its saved
+      // second is older than where the viewer is now.
+      href={
+        isInProgress && !isCurrent
+          ? resumeHref(episode.id, progressPercent, episode.watchProgress?.lastPositionSeconds ?? 0)
+          : `/player/${episode.id}`
+      }
       aria-current={isCurrent ? "true" : undefined}
       className={cn(
         "group flex gap-3 rounded-2xl p-2 outline-none transition-colors duration-150 ease-out",

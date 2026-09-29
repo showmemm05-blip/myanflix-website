@@ -1,5 +1,6 @@
 export type UserRole = "SUPER_ADMIN" | "ADMIN" | "USER";
-export type UserStatus = "ACTIVE" | "SUSPENDED" | "BANNED";
+/** CLOSED: the owner deleted the account (DELETE /users/me) — terminal, it can never sign in again. */
+export type UserStatus = "ACTIVE" | "SUSPENDED" | "BANNED" | "CLOSED";
 
 export interface AppUser {
   id: string;

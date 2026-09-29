@@ -10,6 +10,7 @@ import { Surface } from "@/components/system/Surface";
 import { useLanguage } from "@/lib/context/language-context";
 import { formatRelativeDate } from "@/lib/format";
 import { FALLBACK_POSTER_URL } from "@/lib/placeholder";
+import { RESUME_COMPLETE_PERCENT, resumeHref } from "@/lib/player/resume";
 import { cn } from "@/lib/utils";
 import type { WatchHistoryEntry } from "@/types/movie";
 
@@ -20,7 +21,7 @@ import type { WatchHistoryEntry } from "@/types/movie";
  */
 export function WatchHistoryCard({ entry }: { entry: WatchHistoryEntry }) {
   const { t } = useLanguage();
-  const isComplete = entry.progressPercent >= 95;
+  const isComplete = entry.progressPercent >= RESUME_COMPLETE_PERCENT;
   const barWidth = Math.min(100, Math.max(0, entry.progressPercent));
 
   return (
@@ -82,7 +83,16 @@ export function WatchHistoryCard({ entry }: { entry: WatchHistoryEntry }) {
                 variant="onArt"
                 size="pill-sm"
                 className="shrink-0"
-                render={<Link href={`/player/${entry.movieId}`} />}
+                // H-27: resume at the saved second, not 0:00.
+                render={
+                  <Link
+                    href={resumeHref(
+                      entry.movieId,
+                      entry.progressPercent,
+                      entry.lastPositionSeconds,
+                    )}
+                  />
+                }
                 nativeButton={false}
               >
                 <Play className="size-3.5 fill-current" />

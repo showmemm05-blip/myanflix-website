@@ -38,6 +38,7 @@ import { SelectionAnnotator, wrapBlockRange } from "./SelectionAnnotator";
 import { ReaderSearch } from "./ReaderSearch";
 import type { ReaderSearchMatch } from "./reader-search";
 import { composeChapterDoc, sectionIdAtDepth } from "./chapter-sections";
+import { savedChapterDepth } from "./saved-depth";
 import { useFullscreen } from "./use-fullscreen";
 import { useWakeLock } from "./use-wake-lock";
 import { ShortcutsHelp } from "./reader-shortcuts";
@@ -185,37 +186,63 @@ export function ChapterReader({
   );
   const [jumpTick, setJumpTick] = useState(0);
 
+  /** Flips once the opening place has been decided (see the effect below). */
+  const openingResolved = useRef(false);
   /**
-   * Resolve the opening chapter once: an explicit ?chapter= wins, then the
-   * saved bookmark, then the first chapter. Waiting for the progress query
-   * is what makes "continue reading" actually resume — including the DEPTH
-   * within the chapter, recovered from the whole-book % the save wrote.
+   * True while the saved depth is queued but has not landed on screen yet.
+   * No progress is saved until it has (H-31): the chapter opens at its top
+   * first, and saving that would overwrite the bookmark — the one the other
+   * device saved too — with "the top of the chapter".
+   */
+  const restorePending = useRef(false);
+
+  /**
+   * Resolve the opening place once: an explicit ?chapter= wins (it already
+   * seeded chapterId), then the saved bookmark, then the first chapter.
+   * Waiting for the progress query is what makes "continue reading"
+   * actually resume — including the DEPTH within the chapter, recovered from
+   * the whole-book % the save wrote. The depth applies whenever the opening
+   * chapter IS the bookmarked one, so the book page's Continue button (which
+   * always names that chapter in ?chapter=) resumes mid-chapter too; only a
+   * ?section= link, which chose its own landing, goes without it.
    */
   useEffect(() => {
-    if (chapterId || chapters.length === 0) return;
+    if (openingResolved.current || chapters.length === 0) return;
     // Until AuthProvider has resolved the profile, `user` is null and a
     // signed-in reader would be opened at chapter 1 instead of their
     // bookmark.
     if (authLoading) return;
     if (isAuthed && loadingProgress) return;
+    openingResolved.current = true;
     const savedId = savedProgress?.chapterId;
     const saved = savedId && chapters.some((c) => c.id === savedId);
-    const id = saved ? savedId! : chapters[0].id;
-    if (saved && typeof savedProgress?.progress === "number") {
-      // progress = perChapter * (index + depth)  ⇒  invert for depth.
-      const perChapter = 100 / chapters.length;
-      const idx = chapters.findIndex((c) => c.id === savedId);
-      const depth = Math.min(
-        1,
-        Math.max(0, savedProgress.progress / perChapter - idx),
+    const id = chapterId ?? (saved ? savedId! : chapters[0].id);
+    if (
+      saved &&
+      id === savedId &&
+      !initialSectionId &&
+      !pendingJump.current &&
+      typeof savedProgress?.progress === "number"
+    ) {
+      const depth = savedChapterDepth(
+        savedProgress.progress,
+        chapters.findIndex((c) => c.id === savedId),
+        chapters.length,
       );
-      if (depth > 0.01 && depth < 0.99) {
+      if (depth !== null) {
         pendingJump.current = { chapterId: id, kind: "depth", depth };
         paginatorSeedDepth.current = depth;
+        restorePending.current = true;
       }
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setChapterId(id);
+    if (!chapterId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setChapterId(id);
+    } else if (restorePending.current) {
+      // ?chapter= opened the chapter before the bookmark arrived — its text
+      // may already be on screen, so ask the jump below to run again.
+      setJumpTick((n) => n + 1);
+    }
   }, [
     chapterId,
     chapters,
@@ -223,6 +250,7 @@ export function ChapterReader({
     isAuthed,
     loadingProgress,
     savedProgress,
+    initialSectionId,
   ]);
 
   const index = chapters.findIndex((c) => c.id === chapterId);
@@ -274,6 +302,9 @@ export function ChapterReader({
   const saveProgress = useCallback(
     (force = false) => {
       if (!isAuthed || !chapterId) return;
+      // Not before the opening place is decided and, if there is a saved
+      // depth, not before it has landed — see restorePending.
+      if (!openingResolved.current || restorePending.current) return;
       const now = Date.now();
       if (!force && now - lastSavedAt.current < PROGRESS_SAVE_INTERVAL_MS)
         return;
@@ -374,6 +405,10 @@ export function ChapterReader({
       // overwrite this correct save with 0%. The reset belongs in the effect
       // that sets up for the new chapter, which runs after that cleanup.
       saveProgress(true);
+      // The reader chose a place themselves: that supersedes the saved
+      // one, whether it has landed, is still queued, or is still loading.
+      openingResolved.current = true;
+      restorePending.current = false;
       paginatorSeedDepth.current = 0;
       setChapterId(id);
       setContentsOpen(false);
@@ -448,6 +483,8 @@ export function ChapterReader({
         // its own landing depth back.
         if (jump.kind === "depth") paginatorSeedDepth.current = jump.depth;
       } else {
+        // Same rule as goTo: the reader's own jump wins over the bookmark.
+        openingResolved.current = true;
         setContentsOpen(false);
         setJumpTick((n) => n + 1);
       }
@@ -510,6 +547,9 @@ export function ChapterReader({
     const jump = pendingJump.current;
     if (!jump || !contentReady || jump.chapterId !== chapterId) return;
     pendingJump.current = null;
+    // Whatever lands now — the restored depth, or a jump the reader made
+    // before it could — is the reader's place: saving may resume.
+    restorePending.current = false;
     const container = contentWrapRef.current;
 
     const land = (el: Element | null) => {
@@ -519,6 +559,9 @@ export function ChapterReader({
     };
 
     if (jump.kind === "depth") {
+      // The place is known now; the scroll event after the landing refines
+      // it, but a save in between must not record the chapter's top.
+      scrollDepth.current = jump.depth;
       if (paginated) {
         // If the paginator has already measured this corrects immediately;
         // if not, the seed depth it mounted with lands the same place.

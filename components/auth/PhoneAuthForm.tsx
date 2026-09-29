@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,6 +18,8 @@ import {
 } from "@/components/auth/OtpChannelPicker";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
+import { authErrorMessage, isStepTokenRefusal } from "@/lib/auth/auth-errors";
+import { handedOffPhoneOrEmpty, handOffPhone } from "@/lib/auth/phone-handoff";
 import { ApiError } from "@/services/api/apiClient";
 import { hasMyanmar } from "@/components/books/reader-settings";
 import { cn } from "@/lib/utils";
@@ -31,18 +34,20 @@ import {
   type CreatePasswordValues,
 } from "@/lib/validation/auth";
 
-const RESEND_COOLDOWN_SECONDS = 60;
+export const RESEND_COOLDOWN_SECONDS = 60;
 
-const fieldClasses = "h-11 rounded-xl border-white/10 bg-white/[0.04] px-3.5";
+// Exported so the forgot-password form (ForgotPasswordForm) wears the same
+// fields as this one.
+export const fieldClasses = "h-11 rounded-xl border-white/10 bg-white/[0.04] px-3.5";
 /** Same field, with room carved out for the leading affordance icon. */
-const iconFieldClasses = cn(fieldClasses, "pl-10");
-const iconClasses =
+export const iconFieldClasses = cn(fieldClasses, "pl-10");
+export const iconClasses =
   "pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground";
-const submitClasses = "mt-1 h-11 w-full rounded-full text-sm font-semibold";
+export const submitClasses = "mt-1 h-11 w-full rounded-full text-sm font-semibold";
 // The negative margin keeps the comfortable tap area from stretching the row.
-const linkButtonClasses =
+export const linkButtonClasses =
   "focus-ring -my-1 shrink-0 rounded-md px-1 py-2 text-xs font-medium text-muted-foreground underline-offset-4 transition-colors duration-150 ease-out hover:text-foreground hover:underline";
-const errorTextClasses = "text-xs text-destructive";
+export const errorTextClasses = "text-xs text-destructive";
 
 /**
  * Three segments: completed reads violet, the current one carries the aurora
@@ -122,16 +127,21 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
   // Only meaningful for a new account — carried forward to the final OTP
   // verify call, since that's the moment the account actually gets created.
   const [pendingPassword, setPendingPassword] = useState("");
+  // Only meaningful for an existing account (H-6): the proof, handed out by
+  // the password step, that the code step must send — the server refuses
+  // the code without it. Memory only, never stored; valid 10 minutes.
+  const stepTokenRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
-  // Where the current code went out — SMS by default, or the chat app the
-  // user picked on the code step. UI only for now: the backend still sends
-  // the code its own way, so nothing about the channel is put on the wire
-  // (the API rejects fields it doesn't know). When the backend learns about
+  // The app picked for the current code — SMS by default, or the chat app
+  // the user picked on the code step. UI only for now: nothing about the
+  // channel is put on the wire (the API rejects fields it doesn't know), and
+  // no code is delivered yet (C-2), so the text only ever says a code was
+  // requested and never names the app. When the backend learns about
   // channels, pass `channel` into requestOtp inside sendCode below.
   const [channel, setChannel] = useState<OtpChannel>("sms");
-  // The tile the user has picked on the code step. Picking never sends —
-  // only the "Send code by …" button does — so this can differ from
+  // The tile the user has picked on the code step. Picking never requests —
+  // only the "Request a new code" button does — so this can differ from
   // `channel` until they confirm.
   const [pickedChannel, setPickedChannel] = useState<OtpChannel>("sms");
   const [sendingChannel, setSendingChannel] = useState<OtpChannel | null>(null);
@@ -152,6 +162,8 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
 
   const phoneForm = useForm<PhoneValues>({
     resolver: zodResolver(phoneSchema),
+    // Back from "Forgot password?": the number is already known.
+    defaultValues: { phone: handedOffPhoneOrEmpty() },
   });
   const loginPasswordForm = useForm<LoginPasswordValues>({
     resolver: zodResolver(loginPasswordSchema),
@@ -202,7 +214,7 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
       setIsNewAccount(!exists);
       setStep("password");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.auth.genericError);
+      setError(authErrorMessage(err, t));
     }
   };
 
@@ -211,12 +223,12 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
     try {
       await requestOtp(phone);
       setChannel(via);
-      setAnnounce(t.auth.otpSentVia(t.auth.otpChannels[via].name, phone));
+      setAnnounce(t.auth.otpRequested(phone));
       setStep("code");
       startCooldown();
       codeForm.reset();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.auth.genericError);
+      setError(authErrorMessage(err, t));
     } finally {
       setSendingChannel(null);
     }
@@ -225,10 +237,18 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
   const onSubmitLoginPassword = async (values: LoginPasswordValues) => {
     setError(null);
     try {
-      await verifyPassword(phone, values.password);
+      stepTokenRef.current = await verifyPassword(phone, values.password);
+      // Sent back here from the code step (the step token ran out): the code
+      // already on its way is still good while the resend cooldown runs, and
+      // asking for another inside it would only be refused — so go straight
+      // back to typing it.
+      if (cooldown > 0) {
+        setStep("code");
+        return;
+      }
       await sendCode();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.auth.genericError);
+      setError(authErrorMessage(err, t));
     }
   };
 
@@ -250,11 +270,24 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
       await verifyOtp(
         phone,
         values.code,
-        isNewAccount ? pendingPassword : undefined,
+        isNewAccount
+          ? { password: pendingPassword }
+          : { stepToken: stepTokenRef.current ?? undefined },
       );
       router.push(returnTo ?? "/");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.auth.genericError);
+      if (!isNewAccount && isStepTokenRefusal(err)) {
+        // H-6: the proof of the password step expired (10 minutes) or no
+        // longer matches (the password changed meanwhile). The server
+        // checked it before the code, so the code was not spent — redo the
+        // password and come back.
+        stepTokenRef.current = null;
+        loginPasswordForm.reset();
+        setStep("password");
+        setError(t.auth.passwordAgain);
+        return;
+      }
+      setError(authErrorMessage(err, t));
     }
   };
 
@@ -295,6 +328,7 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
     setError(null);
     setCooldown(0);
     setPendingPassword("");
+    stepTokenRef.current = null;
     setChannel("sms");
     setPickedChannel("sms");
     setAnnounce("");
@@ -472,7 +506,22 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
       >
         {identityRow(t.auth.signingInAs(phone))}
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="password">{t.auth.passwordLabel}</Label>
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="password">{t.auth.passwordLabel}</Label>
+            {/* H-8: the way out for a forgotten password — the same code
+                service as sign-in, on its own page, number carried over. */}
+            <Link
+              href={
+                returnTo
+                  ? `/forgot-password?next=${encodeURIComponent(returnTo)}`
+                  : "/forgot-password"
+              }
+              onClick={() => handOffPhone(phone)}
+              className={linkButtonClasses}
+            >
+              {t.auth.forgotPassword}
+            </Link>
+          </div>
           <div className="relative">
             <Lock aria-hidden className={iconClasses} />
             <Input
@@ -507,11 +556,11 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
   } else {
     form = (
       <form
-        onSubmit={codeForm.handleSubmit(onSubmitCode)}
+        onSubmit={(event) => codeForm.handleSubmit(onSubmitCode)(event)}
         className="flex flex-col gap-4"
       >
         {identityRow(
-          t.auth.otpSentVia(t.auth.otpChannels[channel].name, phone),
+          t.auth.otpRequested(phone),
           <OtpChannelIcon
             channel={channel}
             className="size-5 [&>svg]:size-3"
@@ -592,9 +641,7 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
                 className="size-5 [&>svg]:size-3"
               />
             )}
-            {sendingChannel
-              ? t.auth.otpSending
-              : t.auth.otpSendVia(t.auth.otpChannels[pickedChannel].name)}
+            {sendingChannel ? t.auth.otpRequesting : t.auth.otpRequestAgain}
           </Button>
           {/* Always rendered so the card doesn't jump when the countdown
               ends. It ticks every second, so it is deliberately NOT a live
@@ -606,7 +653,7 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
             {cooldown > 0 && !sendingChannel ? t.auth.resendIn(cooldown) : ""}
           </p>
           <span aria-live="polite" className="sr-only">
-            {sendingChannel ? t.auth.otpSending : announce}
+            {sendingChannel ? t.auth.otpRequesting : announce}
           </span>
         </div>
       </form>
