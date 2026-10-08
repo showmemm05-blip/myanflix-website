@@ -6,30 +6,34 @@ import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
-import {
-  Bookmark as BookmarkIcon,
-  BookOpen,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  GalleryThumbnails,
-  Maximize,
-  Minimize,
-  Settings2,
-  X,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty/EmptyState";
 import {
+  ChapterTurnCards,
+  CloseBookLink,
   ContentsDrawer,
   ContentsToggle,
+  PanelOverline,
   ReaderBar,
   ReaderButton,
   ReaderDimOverlay,
   useReaderChrome,
 } from "./ReaderChrome";
+import {
+  BackIcon,
+  BookGlyph,
+  CloudOffReaderIcon,
+  CollapseIcon,
+  DeviceIcon,
+  ExpandIcon,
+  FirstIcon,
+  ForwardChevronIcon,
+  LastIcon,
+  PagesStripIcon,
+  RibbonIcon,
+  TrashIcon,
+  TypeSettingsIcon,
+} from "./reader-icons";
 import { ReaderSettingsPanel } from "./ReaderSettingsPanel";
 import { ShortcutsHelp } from "./reader-shortcuts";
 import {
@@ -42,7 +46,6 @@ import {
   DEFAULT_READER_SETTINGS,
   PAGE_BACKGROUND_VALUE,
   READER_THEME_CLASS,
-  hasMyanmar,
   loadBookView,
   loadReaderSettings,
   saveBookView,
@@ -66,6 +69,9 @@ import { PageThumbnails } from "./PageThumbnails";
 import { sectionIdAtPage } from "./chapter-sections";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import { playText } from "@/lib/i18n/sections/play";
+import { languageLabel } from "@/lib/books/languages";
 import {
   readingProgressKey,
   useBookChapters,
@@ -132,6 +138,7 @@ export function PageReader({
 }) {
   const { t } = useLanguage();
   const r = t.book.reader;
+  const p = useSection(playText);
   const { user, isLoading: authLoading } = useAuth();
   const isAuthed = Boolean(user);
   const uid = user?.id;
@@ -244,7 +251,7 @@ export function PageReader({
   const restored = useRef(false);
   const pageRefs = useRef(new Map<number, HTMLElement>());
 
-  const { data: pages, error } = useBookPages(book.id, edition.id, chapterId);
+  const { data: pages, error, refetch: refetchPages } = useBookPages(book.id, edition.id, chapterId);
 
   const total = pages?.length ?? 0;
 
@@ -786,22 +793,17 @@ export function PageReader({
           key={c.id}
           type="button"
           onClick={() => goToChapter(c.id)}
-          className="focus-ring flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors"
-          style={{
-            background: current
-              ? "color-mix(in oklab, var(--ink) 8%, transparent)"
-              : "transparent",
-            color: current ? "var(--ink)" : "var(--ink-soft)",
-          }}
+          aria-current={current ? "true" : undefined}
+          className={cn(
+            "focus-ring flex w-full cursor-pointer items-center gap-3 rounded-[10px] border-0 p-2 text-left transition-colors",
+            current ? "bg-crimson/12" : "bg-transparent hover:bg-tonal-ghost",
+          )}
         >
           {c.imageUrl ? (
             <span
-              className="relative block size-12 shrink-0 overflow-hidden rounded"
-              style={{
-                background: "#ffffff",
-                outline: "1px solid var(--rule)",
-                outlineOffset: "-1px",
-              }}
+              className="relative block size-12 shrink-0 overflow-hidden rounded-badge"
+              // A chapter cover is a scan — white stock whatever the theme.
+              style={{ background: "#ffffff" }}
             >
               <Image
                 src={c.imageUrl}
@@ -813,26 +815,21 @@ export function PageReader({
               />
             </span>
           ) : (
-            <span
-              className="flex size-12 shrink-0 items-center justify-center rounded text-sm nums"
-              style={{
-                background:
-                  "color-mix(in oklab, var(--ink) 7%, transparent)",
-                color: "var(--ink-faint)",
-              }}
-            >
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-badge bg-raised text-[13px] font-bold text-fg-faint tabular-nums">
               {label}
             </span>
           )}
           <span className="min-w-0 flex-1">
-            <span className="font-reading block truncate text-[0.95rem] leading-snug">
+            <span
+              className={cn(
+                "block truncate text-[15px] leading-[21px] font-semibold",
+                current ? "text-link" : "text-fg",
+              )}
+            >
               {c.title}
             </span>
             {c.pageCount > 0 && (
-              <span
-                className="mt-0.5 block text-xs nums"
-                style={{ color: "var(--ink-faint)" }}
-              >
+              <span className="mt-0.5 block text-[12px] leading-4 text-fg-faint tabular-nums">
                 {t.book.chapterPages(c.pageCount)}
               </span>
             )}
@@ -843,87 +840,58 @@ export function PageReader({
 
     // Until the numbered tree arrives, the flat list — exactly as before.
     if (!contents) {
-      return (
-        <nav className="space-y-0.5">
-          {chapters.map((c, i) => chapterRow(c, String(i + 1)))}
-        </nav>
-      );
+      return <nav>{chapters.map((c, i) => chapterRow(c, String(i + 1)))}</nav>;
     }
 
     /** A chapter and, indented beneath it, its sections as page anchors. */
     const chapterBlock = (c: BookChapterSummary) => (
       <div key={c.id}>
         {chapterRow(c, c.number)}
-        {(c.sections ?? []).length > 0 && (
-          <div className="space-y-0.5 pb-1">
-            {c.sections.map((sec) => {
-              const page = sec.startPage ?? 1;
-              return (
-                <button
-                  key={sec.id}
-                  type="button"
-                  title={r.jumpToSection}
-                  onClick={() => {
-                    if (c.id === chapterId) {
-                      goToPage(page);
-                      setContentsOpen(false);
-                      return;
-                    }
-                    // Another chapter: wait for its pages, then land.
-                    pendingJump.current = { chapterId: c.id, page };
-                    goToChapter(c.id);
-                  }}
-                  className="focus-ring flex w-full items-baseline gap-3 rounded-lg py-1.5 pr-2 pl-[4.25rem] text-left transition-colors"
-                  style={{ color: "var(--ink-soft)" }}
-                >
-                  <span
-                    className="shrink-0 text-[11px] nums"
-                    style={{ color: "var(--ink-faint)" }}
-                  >
-                    {sec.number}
+        {(c.sections ?? []).length > 0 &&
+          c.sections.map((sec) => {
+            const page = sec.startPage ?? 1;
+            return (
+              <button
+                key={sec.id}
+                type="button"
+                title={r.jumpToSection}
+                onClick={() => {
+                  if (c.id === chapterId) {
+                    goToPage(page);
+                    setContentsOpen(false);
+                    return;
+                  }
+                  // Another chapter: wait for its pages, then land.
+                  pendingJump.current = { chapterId: c.id, page };
+                  goToChapter(c.id);
+                }}
+                className="focus-ring flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-[10px] border-0 bg-transparent pr-2 pl-[4.25rem] text-left transition-colors hover:bg-tonal-ghost"
+              >
+                <span className="shrink-0 text-[13px] leading-[18px] text-fg-faint tabular-nums">{sec.number}</span>
+                <span className="min-w-0 flex-1 truncate text-sm leading-5 text-fg-body">{sec.title}</span>
+                {sec.startPage !== null && (
+                  <span className="shrink-0 text-[12px] leading-4 text-fg-faint tabular-nums">
+                    {t.book.pageRange(sec.startPage, sec.endPage ?? sec.startPage)}
                   </span>
-                  <span className="font-reading min-w-0 flex-1 truncate text-sm leading-snug">
-                    {sec.title}
-                  </span>
-                  {sec.startPage !== null && (
-                    <span
-                      className="shrink-0 text-[11px] nums"
-                      style={{ color: "var(--ink-faint)" }}
-                    >
-                      {t.book.pageRange(sec.startPage, sec.endPage ?? sec.startPage)}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
+                )}
+              </button>
+            );
+          })}
       </div>
     );
 
     return (
-      <nav className="space-y-0.5">
+      <nav>
         {/* Unparted chapters read before the first part, under no heading. */}
         {contents.chapters.map(chapterBlock)}
-        {contents.parts.map((part) => {
-          const label = `${r.partLabel(part.number)} · ${part.title}`;
-          return (
-            <div key={part.id}>
-              <p
-                className="px-2 pt-4 pb-1 text-[11px] font-semibold uppercase"
-                style={{
-                  color: "var(--ink-faint)",
-                  // Tracking is the point of this kicker in Latin — and what
-                  // Myanmar script must never get.
-                  letterSpacing: hasMyanmar(label) ? 0 : "0.18em",
-                }}
-              >
-                {label}
-              </p>
-              {part.chapters.map(chapterBlock)}
-            </div>
-          );
-        })}
+        {contents.parts.map((part) => (
+          <div key={part.id}>
+            <PanelOverline className="mx-2 mt-2.5 mb-1">
+              {`${r.partLabel(part.number)} · ${part.title}`}
+            </PanelOverline>
+            {part.chapters.map(chapterBlock)}
+          </div>
+        ))}
       </nav>
     );
   }, [chapters, contents, chapterId, goToChapter, goToPage, t, r]);
@@ -931,34 +899,31 @@ export function PageReader({
   /** Bookmarks tab — page bookmarks for THIS edition, newest last. */
   const bookmarksTab = useMemo(
     () => (
-      <div className="flex min-h-full flex-col">
+      <div>
+        <p className="mx-2 mt-1 mb-1.5 flex items-center gap-2 text-[13px] leading-[18px] text-fg-faint">
+          <DeviceIcon size={16} className="shrink-0" />
+          {r.annotationsLocal}
+        </p>
         {editionBookmarks.length === 0 ? (
-          <p className="px-2 py-3 text-sm" style={{ color: "var(--ink-faint)" }}>
-            {r.noBookmarks}
-          </p>
+          <p className="mx-2 py-3 text-sm text-fg-faint">{r.noBookmarks}</p>
         ) : (
-          <ul className="space-y-0.5">
+          <ul className="m-0 list-none p-0">
             {editionBookmarks.map((b) => {
               const bookmarkChapter = chapters.find(
                 (c) => c.id === b.chapterId,
               );
               return (
-                <li key={b.id} className="flex items-center gap-1">
+                <li
+                  key={b.id}
+                  className="flex items-center gap-3 px-2 py-3 shadow-[inset_0_-1px_0_var(--mq-hairline)]"
+                >
+                  <RibbonIcon filled size={18} className="shrink-0 text-crimson" />
                   <button
                     type="button"
                     onClick={() => jumpToBookmark(b)}
-                    className="focus-ring min-w-0 flex-1 rounded-lg p-2 text-left transition-colors"
+                    className="focus-ring flex min-w-0 flex-1 cursor-pointer flex-col rounded-[8px] border-0 bg-transparent p-0 text-left"
                   >
-                    <span
-                      className="font-reading block truncate text-sm leading-snug"
-                      style={{ color: "var(--ink)" }}
-                    >
-                      {bookmarkChapter?.title ?? r.bookmark}
-                    </span>
-                    <span
-                      className="mt-0.5 block text-xs nums"
-                      style={{ color: "var(--ink-faint)" }}
-                    >
+                    <span className="text-[12px] leading-4 font-bold text-fg-faint tabular-nums">
                       {b.pageNumber
                         ? `${r.pageOfShort(
                             b.pageNumber,
@@ -967,24 +932,24 @@ export function PageReader({
                         : ""}
                       {new Date(b.createdAt).toLocaleDateString()}
                     </span>
+                    <span className="mt-0.5 truncate text-sm leading-5 text-fg-body">
+                      {bookmarkChapter?.title ?? r.bookmark}
+                    </span>
                   </button>
-                  <ReaderButton
-                    label={r.removeBookmark}
+                  <button
+                    type="button"
+                    aria-label={r.removeBookmark}
+                    title={r.removeBookmark}
                     onClick={() => removeBookmark(b.id)}
+                    className="focus-ring flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-fg-muted transition-colors hover:bg-tonal-ghost hover:text-fg"
                   >
-                    <X className="size-3.5" />
-                  </ReaderButton>
+                    <TrashIcon size={18} />
+                  </button>
                 </li>
               );
             })}
           </ul>
         )}
-        <p
-          className="mt-auto px-2 pt-3 text-[11px]"
-          style={{ color: "var(--ink-faint)" }}
-        >
-          {r.annotationsLocal}
-        </p>
       </div>
     ),
     [editionBookmarks, chapters, jumpToBookmark, removeBookmark, r],
@@ -996,40 +961,18 @@ export function PageReader({
    * reachable from where the last page ends — not only from the contents.
    */
   const chapterTurn = (
-    <div
-      className="mx-auto mt-10 flex max-w-4xl items-center justify-between gap-4 pt-6"
-      style={{ borderTop: "1px solid var(--rule)" }}
-    >
-      {previousChapter ? (
-        <ReaderButton
-          label={r.previousChapter}
-          onClick={() => goToChapter(previousChapter.id)}
-          className="min-w-0 flex-1 justify-start text-left"
-        >
-          <ChevronLeft className="size-4 shrink-0" />
-          <span className="min-w-0 truncate">{previousChapter.title}</span>
-        </ReaderButton>
-      ) : (
-        <span className="flex-1" />
-      )}
-      {nextChapter ? (
-        <ReaderButton
-          label={r.nextChapter}
-          onClick={() => goToChapter(nextChapter.id)}
-          className="min-w-0 flex-1 justify-end text-right"
-        >
-          <span className="min-w-0 truncate">{nextChapter.title}</span>
-          <ChevronRight className="size-4 shrink-0" />
-        </ReaderButton>
-      ) : (
-        <p
-          className="font-reading flex-1 text-right text-sm italic"
-          style={{ color: "var(--ink-faint)" }}
-        >
-          {r.finished}
-        </p>
-      )}
-    </div>
+    <ChapterTurnCards
+      className="mx-auto mt-10 max-w-4xl"
+      previous={
+        previousChapter
+          ? { title: previousChapter.title, onClick: () => goToChapter(previousChapter.id) }
+          : null
+      }
+      next={nextChapter ? { title: nextChapter.title, onClick: () => goToChapter(nextChapter.id) } : null}
+      previousLabel={r.previousChapter}
+      nextLabel={r.nextChapter}
+      finishedLabel={r.finished}
+    />
   );
 
   // Nothing to open at all — a book whose language has no chapters yet.
@@ -1037,18 +980,16 @@ export function PageReader({
   // below, so its neighbours stay one tap away.
   if (!loadingChapters && chapters.length === 0) {
     return (
-      <div className="mx-auto max-w-[1600px] px-4 py-24 sm:px-6 lg:px-8">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-ground px-gutter py-24">
         <EmptyState
-          icon={BookOpen}
+          icon={BookGlyph}
           title={book.title}
           description={r.emptyBook}
+          headingLevel="h2"
           action={
-            <Button
-              render={<Link href={`/books/${book.id}`} />}
-              nativeButton={false}
-            >
+            <Link href={`/books/${book.id}`} className={buttonVariants({ variant: "play", size: "cta" })}>
               {r.backToBook}
-            </Button>
+            </Link>
           }
         />
       </div>
@@ -1071,6 +1012,13 @@ export function PageReader({
     fit: fitSetting,
   };
 
+  // How far through the book, for the crimson line on the page bar — the
+  // same measure the progress save sends.
+  const bookPercent =
+    chapters.length > 0 && index >= 0 && total > 0
+      ? Math.min(100, (100 / chapters.length) * (index + currentPage / total))
+      : 0;
+
   return (
     <div
       className={cn(
@@ -1085,53 +1033,41 @@ export function PageReader({
     >
       {/* Top bar — floats over the pages and fades while reading. */}
       <ReaderBar visible={chromeVisible}>
-        <div className="mx-auto flex h-12 w-full max-w-[1600px] items-center gap-1 px-3 sm:gap-2 sm:px-5">
-          <Link
-            href={`/books/${book.id}`}
-            aria-label={r.close}
-            title={r.close}
-            className="focus-ring inline-flex items-center justify-center rounded-lg px-2.5 py-1.5"
-            style={{ color: "var(--ink-soft)" }}
-          >
-            <X className="size-4" />
-          </Link>
-          <ContentsToggle onClick={() => setContentsOpen(true)} />
+        <div className="mx-auto flex h-16 w-full items-center gap-1 px-[clamp(8px,2vw,24px)]">
+          <CloseBookLink bookId={book.id} />
+          <ContentsToggle expanded={contentsOpen} onClick={() => setContentsOpen(true)} />
 
           {/* Book above, chapter below: in a serialised title the chapter is
               what tells you where you are. */}
-          <div className="min-w-0 flex-1 text-center">
-            <p
-              className="font-reading truncate text-sm leading-tight"
-              style={{ color: "var(--ink-soft)" }}
-            >
+          <div className="min-w-0 flex-1 text-center max-desk:hidden">
+            <p className="m-0 truncate text-[15px] leading-5 font-extrabold" style={{ color: "var(--ink)" }}>
               {book.title}
             </p>
             {chapter && (
               <p
-                className="truncate text-[0.7rem] leading-tight"
+                className="m-0 truncate text-[12px] leading-[17px] font-semibold"
                 style={{ color: "var(--ink-faint)" }}
               >
-                {chapter.title}
+                {index >= 0 ? `${r.chapterLabel(index + 1)} · ${chapter.title}` : chapter.title}
               </p>
             )}
           </div>
+          <span aria-hidden className="flex-1 desk:hidden" />
 
           <ReaderButton
             label={r.thumbnails}
             active={thumbsOpen}
             onClick={() => setThumbsOpen((open) => !open)}
           >
-            <GalleryThumbnails className="size-4" />
+            <PagesStripIcon size={21} />
           </ReaderButton>
           <ReaderButton
             label={currentBookmark ? r.removeBookmark : r.addBookmark}
-            active={Boolean(currentBookmark)}
+            pressed={Boolean(currentBookmark)}
             onClick={toggleBookmark}
+            style={currentBookmark ? { color: "var(--mq-crimson)" } : undefined}
           >
-            <BookmarkIcon
-              className="size-4"
-              fill={currentBookmark ? "currentColor" : "none"}
-            />
+            <RibbonIcon size={21} filled={Boolean(currentBookmark)} />
           </ReaderButton>
           {/* Trigger + panel share a wrapper so the panel's outside-press
               dismissal treats the trigger as inside. */}
@@ -1166,12 +1102,9 @@ export function PageReader({
               label={fs.active ? r.exitFullscreen : r.fullscreen}
               active={fs.active}
               onClick={fs.toggle}
+              className="max-desk:hidden"
             >
-              {fs.active ? (
-                <Minimize className="size-4" />
-              ) : (
-                <Maximize className="size-4" />
-              )}
+              {fs.active ? <CollapseIcon size={19} /> : <ExpandIcon size={19} />}
             </ReaderButton>
           )}
         </div>
@@ -1194,33 +1127,64 @@ export function PageReader({
       ) : (
         <div
           ref={containerRef}
-          className="mx-auto w-full max-w-[1600px] px-3 pt-16 pb-20 sm:px-6"
+          className="mx-auto w-full max-w-[1600px] px-3 pt-20 pb-24 desk:px-6"
         >
           {waiting ? (
-            /* Ink-coloured rather than the app's white-on-dark Skeleton,
+            /* Ink-coloured rather than the app's white-on-dark skeleton,
                which is invisible against paper. */
-            <div className="mx-auto max-w-3xl space-y-5">
-              {[0, 1].map((i) => (
-                <div
-                  key={i}
-                  className="aspect-[3/4] w-full animate-pulse rounded-sm"
-                  style={{
-                    background:
-                      "color-mix(in oklab, var(--ink) 7%, transparent)",
-                  }}
-                />
-              ))}
+            <div aria-busy="true" className="flex justify-center">
+              <p role="status" className="sr-only">
+                {p.loadingPages}
+              </p>
+              <span
+                aria-hidden
+                className="block aspect-[350/500] w-full max-w-[560px] animate-mq-pulse rounded-[3px]"
+                style={{
+                  background:
+                    "color-mix(in oklab, var(--ink) 10%, transparent)",
+                }}
+              />
             </div>
-          ) : error || total === 0 ? (
+          ) : error ? (
             /* This chapter alone — it may still be converting while the rest
                of the book is readable, which is the whole point of publishing
                an edition on its first ready chapter. */
-            <div className="mx-auto max-w-2xl py-10">
-              <EmptyState
-                icon={BookOpen}
-                title={chapter?.title ?? book.title}
-                description={error ? r.loadError : r.emptyChapter}
-              />
+            <div role="status" className="flex flex-col items-center py-16 text-center font-sans">
+              <span aria-hidden className="flex size-16 items-center justify-center rounded-full bg-danger/14 text-danger">
+                <CloudOffReaderIcon size={28} />
+              </span>
+              <p className="mt-[18px] text-lg leading-[26px] font-extrabold" style={{ color: "var(--ink)" }}>
+                {r.loadError}
+              </p>
+              {chapter && (
+                <p className="mt-1.5 text-[15px] leading-[22px]" style={{ color: "var(--ink-faint)" }}>
+                  {chapter.title}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void refetchPages()}
+                className="focus-ring mt-5 h-12 cursor-pointer rounded-[12px] border-0 px-7 text-base font-extrabold transition-[opacity,transform] hover:opacity-[0.88] active:scale-[0.97]"
+                style={{ background: "var(--ink)", color: "var(--paper)" }}
+              >
+                {t.common.retry}
+              </button>
+            </div>
+          ) : total === 0 ? (
+            <div className="flex flex-col items-center py-16 text-center font-sans">
+              <span
+                aria-hidden
+                className="flex size-16 items-center justify-center rounded-full"
+                style={{ background: "var(--rule)", color: "var(--ink-faint)" }}
+              >
+                <BookGlyph size={28} />
+              </span>
+              <p className="mt-[18px] text-lg leading-[26px] font-extrabold" style={{ color: "var(--ink)" }}>
+                {chapter?.title ?? book.title}
+              </p>
+              <p className="mt-1.5 text-[15px] leading-[22px]" style={{ color: "var(--ink-faint)" }}>
+                {r.emptyChapter}
+              </p>
             </div>
           ) : (
             /* Zoom widens the whole column past the viewport; this wrapper
@@ -1264,7 +1228,7 @@ export function PageReader({
         </div>
       )}
 
-      {/* Thumbnail strip — overlays just above the bottom bar. */}
+      {/* Thumbnail strip — overlays just above the page bar. */}
       <PageThumbnails
         open={thumbsOpen && !waiting && !error && total > 0}
         pages={pages ?? []}
@@ -1273,15 +1237,15 @@ export function PageReader({
       />
 
       {/* Page bar */}
-      <ReaderBar visible={chromeVisible} position="bottom">
-        <div className="mx-auto flex h-11 w-full max-w-[1600px] items-center justify-center gap-1.5 px-4 sm:gap-3">
+      <ReaderBar visible={chromeVisible} position="bottom" progress={bookPercent}>
+        <div className="mx-auto flex h-16 w-full items-center justify-center gap-1 px-[clamp(8px,2vw,24px)]">
           <ReaderButton
             label={r.firstPage}
             disabled={currentPage <= 1}
             onClick={() => goToPage(1)}
-            className="hidden sm:inline-flex"
+            className="max-desk:hidden"
           >
-            <ChevronsLeft className="size-4" />
+            <FirstIcon size={20} />
           </ReaderButton>
           <ReaderButton
             label={r.previousPage}
@@ -1292,11 +1256,11 @@ export function PageReader({
             }
             onClick={prevPage}
           >
-            <ChevronLeft className="size-4" />
+            <BackIcon size={20} />
           </ReaderButton>
 
-          <form onSubmit={handleJump} className="flex items-center gap-2">
-            <Input
+          <form onSubmit={handleJump} className="mx-1.5 flex items-center gap-2">
+            <input
               value={jumpValue}
               onChange={(e) =>
                 setJumpValue(e.target.value.replace(/[^0-9]/g, ""))
@@ -1304,17 +1268,17 @@ export function PageReader({
               placeholder={String(currentPage)}
               aria-label={r.jumpToPage}
               inputMode="numeric"
-              className="h-7 w-14 border-0 text-center text-sm nums placeholder:text-[color:var(--ink-faint)] focus-visible:ring-[color:var(--accent)]/40"
+              className="h-9 w-14 rounded-[10px] border-0 p-0 text-center text-[15px] font-bold tabular-nums outline-none placeholder:text-[color:var(--ink)] focus:shadow-[inset_0_0_0_1.5px_var(--mq-crimson)]"
               style={{
-                background: "color-mix(in oklab, var(--ink) 7%, transparent)",
+                background: "var(--rule)",
                 color: "var(--ink)",
               }}
             />
-            <span className="text-sm nums" style={{ color: "var(--ink-faint)" }}>
+            <span className="text-sm leading-5 font-semibold tabular-nums" style={{ color: "var(--ink-faint)" }}>
               / {total}
             </span>
             <span
-              className="hidden text-xs nums sm:inline"
+              className="ml-1.5 text-[13px] leading-[18px] tabular-nums max-desk:hidden"
               style={{ color: "var(--ink-faint)" }}
             >
               {Math.round(zoom * 100)}%
@@ -1326,15 +1290,15 @@ export function PageReader({
             disabled={currentPage >= total && (!stageActive || !nextChapter)}
             onClick={nextPage}
           >
-            <ChevronRight className="size-4" />
+            <ForwardChevronIcon size={20} />
           </ReaderButton>
           <ReaderButton
             label={r.lastPage}
             disabled={currentPage >= total}
             onClick={() => goToPage(total)}
-            className="hidden sm:inline-flex"
+            className="max-desk:hidden"
           >
-            <ChevronsRight className="size-4" />
+            <LastIcon size={20} />
           </ReaderButton>
         </div>
       </ReaderBar>
@@ -1345,6 +1309,7 @@ export function PageReader({
         bookId={book.id}
         title={book.title}
         author={book.author}
+        readingIn={languageLabel(edition.language)}
         tabs={[
           { id: "contents", label: r.contents, content: contentsList },
           { id: "bookmarks", label: r.bookmarks, content: bookmarksTab },
@@ -1387,9 +1352,10 @@ function SettingsSlot({
       <ReaderButton
         label={label}
         active={open}
+        expanded={open}
         onClick={() => onOpenChange(!open)}
       >
-        <Settings2 className="size-4" />
+        <TypeSettingsIcon size={22} />
       </ReaderButton>
       {children(wrapRef)}
     </div>
@@ -1438,12 +1404,12 @@ function PageSlot({
         // bar; zoom multiplies the fitted size, same as everywhere else.
         maxWidth:
           fit === "screen"
-            ? `calc((100dvh - 8rem) * ${d.w} / ${d.h} * ${zoom})`
+            ? `calc((100dvh - 10rem) * ${d.w} / ${d.h} * ${zoom})`
             : undefined,
         // The top bar floats over the pages, so a page scrolled to with
         // scrollIntoView would tuck its first lines underneath it. This is
-        // the bar's height plus the notch.
-        scrollMarginTop: "calc(3.5rem + env(safe-area-inset-top, 0px))",
+        // the 64px bar plus a little air, plus the notch.
+        scrollMarginTop: "calc(4.5rem + env(safe-area-inset-top, 0px))",
         // A scanned page is a sheet lying on the reading surface: white
         // stock, a hairline edge and a soft drop shadow. Without this the
         // scan's own white bleeds into the paper background and the page

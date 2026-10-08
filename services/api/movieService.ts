@@ -101,7 +101,20 @@ export const movieService = {
   async getSimilarMovies(movieId: string, limit = 8): Promise<Movie[]> {
     const movie = await movieService.getMovieById(movieId);
     if (!movie) return [];
-    const res = await movieService.getMovies({ genre: movie.genre, limit: limit + 1 });
+    return movieService.getSimilarByGenre(movieId, movie.genre, limit);
+  },
+
+  /**
+   * "More like this" when the caller already has the movie (and so its
+   * genre): one list call, no second GET /movies/:id first.
+   */
+  async getSimilarByGenre(
+    movieId: string,
+    genre: string,
+    limit = 8,
+    options: RequestSignalOptions = {},
+  ): Promise<Movie[]> {
+    const res = await movieService.getMovies({ genre, limit: limit + 1 }, options);
     return res.items.filter((m) => m.id !== movieId).slice(0, limit);
   },
 
@@ -120,25 +133,4 @@ export const movieService = {
     const res = await movieService.getMovies({ sort: "rating", limit });
     return res.items;
   },
-
-  async getMyanmarMovies(limit = 12): Promise<Movie[]> {
-    // "Myanmar" is defined as language === "Burmese" — now a server param.
-    const res = await movieService.getMovies({ languages: ["Burmese"], limit });
-    return res.items;
-  },
-
-  async getInternationalMovies(limit = 12): Promise<Movie[]> {
-    // THE one documented client-side exception: "not Burmese" has no server
-    // param (the query vocabulary has no not-in), so this home rail filters a
-    // fetched page locally. It is a rail, not a counted result list — no
-    // total is ever shown from it.
-    const res = await movieService.getMovies({ limit: 40 });
-    return res.items.filter((m) => !m.isMyanmar).slice(0, limit);
-  },
-
-  async getByGenre(genre: string, limit = 12): Promise<Movie[]> {
-    const res = await movieService.getMovies({ genre, limit });
-    return res.items;
-  },
-
 };

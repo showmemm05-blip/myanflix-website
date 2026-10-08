@@ -1,10 +1,12 @@
 import { cn } from "@/lib/utils"
 
+/** Loading block: raised #1C1C23, pulse 1.4s (stops under reduced motion). Never a spinner for rows. */
 function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="skeleton"
-      className={cn("animate-pulse rounded-lg bg-white/6 ring-1 ring-white/5 ring-inset", className)}
+      aria-hidden
+      className={cn("mq-skeleton rounded-[6px]", className)}
       {...props}
     />
   )

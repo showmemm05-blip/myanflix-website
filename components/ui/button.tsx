@@ -3,47 +3,79 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * MARQUEE BUTTONS (DesignSystem "Buttons", SHELL.md §12).
+ *
+ * Radius 12. Hover: opacity 0.88 (tonal fills step to 24% white). Press:
+ * scale 0.97. Focus: 2px #FF4D55 ring, 2px offset. Disabled: 40% opacity.
+ *
+ * Roles — pick by meaning, not by look:
+ *   play    white, ink text — the ONE Play per screen
+ *   commit  crimson — Continue, Save, Confirm, Show N results, Deposit
+ *           (`default` is the same thing, kept for older call sites)
+ *   tonal   16% white — secondary actions (My List, Cancel, Clear all)
+ *   gold    Subscribe and Premium only
+ *   danger  destructive actions only (Delete account)
+ *   text    crimson text link look (See all, Clear, Retry-as-link)
+ *   ghost   no fill until hover — icon buttons in bars and lists
+ *
+ * Sizes: hero 52 · cta 48 · toolbar 40 · block (full width, 52) ·
+ * icon-hero 52 square · icon-round 44 disc · icon-play 64 disc.
+ * The older names (default/sm/lg/pill/pill-sm/icon*) are kept for pages that
+ * have not been rebuilt yet; they now render on the Marquee shapes.
+ *
+ * `busy` swaps the label for three white dots at 60% opacity, sets
+ * aria-busy and disables the button (keep the label for screen readers via
+ * `busyLabel`, defaults to the children text).
+ */
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-xl border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all duration-200 ease-out outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button relative inline-flex shrink-0 items-center justify-center rounded-[12px] border-0 bg-clip-padding font-bold whitespace-nowrap outline-none select-none transition-[opacity,transform,background-color,color] duration-150 ease-[cubic-bezier(.2,.8,.2,1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link active:not-disabled:scale-[0.97] aria-disabled:pointer-events-none aria-disabled:opacity-40 disabled:pointer-events-none disabled:opacity-40 aria-invalid:outline-2 aria-invalid:outline-danger [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-e1 hover:bg-primary/85",
-        // Quiet glass rather than a solid slab — an outline button sits *on*
-        // the artwork, so it borrows the page instead of covering it.
-        outline:
-          "border-white/12 bg-white/5 backdrop-blur-md hover:bg-white/10 hover:text-foreground aria-expanded:bg-white/10 aria-expanded:text-foreground",
-        secondary:
-          "bg-secondary/70 text-secondary-foreground backdrop-blur-md hover:bg-secondary aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
-        ghost:
-          "hover:bg-white/8 hover:text-foreground aria-expanded:bg-white/8 aria-expanded:text-foreground",
-        // THE CTA THAT SITS ON ARTWORK — "Watch now", "Play", "Browse media".
-        // White on a photograph is the one fill that stays legible over any
-        // frame of any poster, so the app has exactly one of them; pair it with
-        // the `pill`/`pill-sm` sizes so every hero and card CTA is the same
-        // object at the same two heights.
-        onArt:
-          "rounded-full bg-white font-semibold text-black shadow-e2 hover:bg-white/90 active:scale-[0.98]",
-        destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
-        link: "text-primary underline-offset-4 hover:underline",
+        commit: "bg-crimson font-extrabold text-white hover:opacity-[.88]",
+        default: "bg-crimson font-extrabold text-white hover:opacity-[.88]",
+        play: "bg-play font-extrabold text-ink hover:opacity-[.88]",
+        onArt: "bg-play font-extrabold text-ink hover:opacity-[.88]",
+        tonal: "bg-tonal text-white hover:bg-tonal-hover aria-expanded:bg-tonal-hover",
+        outline: "bg-tonal-soft text-white hover:bg-tonal-hover aria-expanded:bg-tonal-hover",
+        secondary: "bg-raised text-white hover:bg-raised-hover aria-expanded:bg-raised-hover",
+        ghost: "bg-transparent text-white hover:bg-tonal-faint aria-expanded:bg-tonal-faint",
+        gold: "bg-gold font-extrabold text-gold-ink hover:opacity-[.88]",
+        danger: "bg-danger-fill font-extrabold text-white hover:opacity-[.88]",
+        destructive: "bg-danger-fill font-extrabold text-white hover:opacity-[.88]",
+        text: "h-auto rounded-md bg-transparent px-0 text-link hover:text-link-hover hover:underline hover:underline-offset-3 active:not-disabled:scale-100",
+        link: "h-auto rounded-md bg-transparent px-0 text-link hover:text-link-hover hover:underline hover:underline-offset-3 active:not-disabled:scale-100",
       },
       size: {
-        default:
-          "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        /** Hero / detail CTA: a thumb-sized pill. */
-        pill: "h-11 gap-2 rounded-full px-6 text-sm",
-        /** The same pill inside a card or row. */
-        "pill-sm": "h-10 gap-1.5 rounded-full px-4 text-[13px]",
-        icon: "size-8",
-        "icon-xs":
-          "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm":
-          "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
-        "icon-lg": "size-9",
+        /** 52 — hero Play, sign-in, sheets. */
+        hero: "h-[52px] gap-2.5 px-7 text-[17px] [&_svg:not([class*='size-'])]:size-5",
+        /** 48 — the default Marquee button. */
+        cta: "h-12 gap-2 px-6 text-base",
+        /** 40 — toolbars, cards, small actions. */
+        toolbar: "h-10 gap-2 px-4 text-sm [&_svg:not([class*='size-'])]:size-[18px]",
+        /** Full width, 52 — sign-in forms, bottom sheets. */
+        block: "flex h-[52px] w-full gap-2 px-6 text-base",
+        /** 52 square — the More-info button next to a hero Play. */
+        "icon-hero": "size-[52px] [&_svg:not([class*='size-'])]:size-[22px]",
+        /** 44 disc — Share and friends. */
+        "icon-round": "size-11 rounded-full",
+        /** 64 disc — the big round Play. */
+        "icon-play": "size-16 rounded-full [&_svg:not([class*='size-'])]:size-7",
+        /** 40 disc — top-bar icon buttons, dialog close. */
+        "icon-bar": "size-10 rounded-full [&_svg:not([class*='size-'])]:size-[22px]",
+
+        // Older names, now on Marquee shapes.
+        default: "h-10 gap-2 px-4 text-sm [&_svg:not([class*='size-'])]:size-[18px]",
+        xs: "h-7 gap-1 rounded-[8px] px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3.5",
+        sm: "h-9 gap-1.5 rounded-[10px] px-3 text-[13px] [&_svg:not([class*='size-'])]:size-4",
+        lg: "h-11 gap-2 px-5 text-[15px]",
+        pill: "h-12 gap-2 px-6 text-base",
+        "pill-sm": "h-10 gap-2 px-4 text-sm [&_svg:not([class*='size-'])]:size-[18px]",
+        icon: "size-9 rounded-full",
+        "icon-xs": "size-7 rounded-full [&_svg:not([class*='size-'])]:size-3.5",
+        "icon-sm": "size-8 rounded-full [&_svg:not([class*='size-'])]:size-4",
+        "icon-lg": "size-10 rounded-full",
       },
     },
     defaultVariants: {
@@ -53,19 +85,54 @@ const buttonVariants = cva(
   }
 )
 
+type ButtonProps = ButtonPrimitive.Props &
+  VariantProps<typeof buttonVariants> & {
+    /** Shows the three-dot busy state, sets aria-busy and disables the button. */
+    busy?: boolean
+    /** What a screen reader hears while busy (defaults to nothing extra). */
+    busyLabel?: string
+  }
+
+function BusyDots() {
+  return (
+    <span aria-hidden className="flex items-center gap-1.5">
+      <span className="size-1.5 rounded-full bg-current" />
+      <span className="size-1.5 rounded-full bg-current" />
+      <span className="size-1.5 rounded-full bg-current" />
+    </span>
+  )
+}
+
 function Button({
   className,
   variant = "default",
   size = "default",
+  busy = false,
+  busyLabel,
+  disabled,
+  children,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonProps) {
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      data-busy={busy || undefined}
+      aria-busy={busy || undefined}
+      disabled={disabled || busy}
+      className={cn(buttonVariants({ variant, size }), busy && "disabled:opacity-60", className)}
       {...props}
-    />
+    >
+      {busy ? (
+        <>
+          <BusyDots />
+          {busyLabel && <span className="sr-only">{busyLabel}</span>}
+        </>
+      ) : (
+        children
+      )}
+    </ButtonPrimitive>
   )
 }
 
-export { Button, buttonVariants }
+export { Button, buttonVariants, BusyDots }
+export type { ButtonProps }

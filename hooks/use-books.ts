@@ -1,7 +1,8 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery, type InfiniteData } from "@tanstack/react-query";
 import { bookService } from "@/services/api/bookService";
 import { SEARCH_STALE_TIME_MS } from "@/hooks/use-search-term";
-import type { BookQuery } from "@/types/book";
+import type { PaginatedResponse } from "@/types/api";
+import type { Book, BookQuery } from "@/types/book";
 
 /**
  * The one place this key is spelled. Both readers write the PATCH response
@@ -32,6 +33,50 @@ export function useBooks(
     // caller that can render to a guest passes `enabled: isAuthenticated`
     // and never fires the request at all.
     enabled,
+  });
+}
+
+/** Exported so anything (prefetch, invalidation) can address the infinite shelf's cache entries. */
+export const booksInfiniteKey = (query: BookQuery) => ["books", "infinite", query] as const;
+
+export type BooksInfiniteData = InfiniteData<PaginatedResponse<Book>, number>;
+
+/**
+ * The paged library — the books counterpart of `useMoviesInfinite`, for the
+ * hub's "All books" shelf, so every book can be reached by scrolling instead
+ * of the shelf stopping at one fixed page. `pages[0].total` is the server's
+ * real count for the whole filtered set. Members only, like `useBooks`:
+ * pass `enabled: isAuthenticated` where a guest could render it.
+ *
+ * `initialData` (optional, read only when the cache entry is first created)
+ * lets a caller seed page 1 from data it already holds, e.g. the hub's pool.
+ */
+export function useBooksInfinite(
+  query: BookQuery = {},
+  {
+    enabled = true,
+    initialData,
+    initialDataUpdatedAt,
+  }: {
+    enabled?: boolean;
+    initialData?: () => BooksInfiniteData | undefined;
+    initialDataUpdatedAt?: () => number | undefined;
+  } = {},
+) {
+  return useInfiniteQuery({
+    queryKey: booksInfiniteKey(query),
+    queryFn: ({ pageParam, signal }) =>
+      bookService.getBooks({ ...query, page: pageParam }, { signal }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, pages) => {
+      const loaded = pages.reduce((n, p) => n + p.items.length, 0);
+      return loaded < lastPage.total ? lastPage.page + 1 : undefined;
+    },
+    placeholderData: keepPreviousData,
+    staleTime: SEARCH_STALE_TIME_MS,
+    enabled,
+    initialData,
+    initialDataUpdatedAt,
   });
 }
 

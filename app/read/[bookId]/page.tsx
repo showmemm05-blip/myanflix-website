@@ -2,16 +2,28 @@
 
 import { use, useMemo } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import { BookOpen } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty/EmptyState";
+import { BookGlyph } from "@/components/books/reader-icons";
 import { PageLoader } from "@/components/loading/Spinner";
-import { ChapterReader } from "@/components/books/ChapterReader";
-import { PageReader } from "@/components/books/PageReader";
 import { useLanguage } from "@/lib/context/language-context";
 import { useBook, useBookChapters } from "@/hooks/use-books";
 import { loadPreferredLanguage, pickEdition } from "@/lib/books/languages";
+
+// Each book opens only ONE of the two readers, so each is its own download:
+// a PDF book never fetches the text reader's editor engine (TipTap /
+// ProseMirror, ~136 KB gzipped), and a text book never fetches the page
+// reader. The same spinner covers the moment the reader's code arrives.
+const ChapterReader = dynamic(
+  () => import("@/components/books/ChapterReader").then((mod) => mod.ChapterReader),
+  { loading: () => <PageLoader /> },
+);
+const PageReader = dynamic(
+  () => import("@/components/books/PageReader").then((mod) => mod.PageReader),
+  { loading: () => <PageLoader /> },
+);
 
 /**
  * The reader route decides three things and nothing else: WHICH LANGUAGE,
@@ -94,15 +106,17 @@ export default function ReadBookPage({
 
   if (!book || !edition) {
     return (
-      <div className="mx-auto max-w-[1600px] px-4 py-24 sm:px-6 lg:px-8">
+      // The reader has no app shell, so this sits on the plain ground.
+      <div className="flex min-h-[100dvh] items-center justify-center bg-ground px-gutter py-24">
         <EmptyState
-          icon={BookOpen}
+          icon={BookGlyph}
           title={t.book.notFoundTitle}
           description={t.book.notFoundBody}
+          headingLevel="h2"
           action={
-            <Button render={<Link href="/media/books" />} nativeButton={false}>
+            <Link href="/media/books" className={buttonVariants({ variant: "play", size: "cta" })}>
               {t.book.backToLibrary}
-            </Button>
+            </Link>
           }
         />
       </div>

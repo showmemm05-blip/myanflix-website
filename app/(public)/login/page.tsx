@@ -1,33 +1,23 @@
 "use client";
 
 import { Suspense } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AuthLayout } from "@/components/auth/AuthLayout";
+import { AuthCrossLink, AuthLayout } from "@/components/auth/AuthLayout";
 import { PhoneAuthForm } from "@/components/auth/PhoneAuthForm";
 import { useLanguage } from "@/lib/context/language-context";
 import { safeReturnTo } from "@/lib/auth/return-to";
 
+/** Sign in (Login + LoginCode boards): phone → password → "Get your code" → code. */
 export default function LoginPage() {
   const { t } = useLanguage();
 
   return (
     <AuthLayout
-      kicker={t.nav.signIn}
-      title={t.auth.signInTitle}
-      subtitle={t.auth.signInSubtitle}
       footer={
         <>
           {t.auth.noAccount}{" "}
           <Suspense
-            fallback={
-              <Link
-                href="/register"
-                className="focus-ring rounded-md font-medium text-primary hover:underline"
-              >
-                {t.auth.createOne}
-              </Link>
-            }
+            fallback={<AuthCrossLink href="/register">{t.auth.createOne}</AuthCrossLink>}
           >
             <RegisterLink label={t.auth.createOne} />
           </Suspense>
@@ -36,7 +26,7 @@ export default function LoginPage() {
     >
       {/* useSearchParams needs its own Suspense boundary so the rest of the
           page can still be prerendered. */}
-      <Suspense fallback={<PhoneAuthForm />}>
+      <Suspense fallback={<PhoneAuthForm mode="signIn" />}>
         <LoginForm />
       </Suspense>
     </AuthLayout>
@@ -47,7 +37,7 @@ export default function LoginPage() {
 function LoginForm() {
   const searchParams = useSearchParams();
   const returnTo = safeReturnTo(searchParams.get("next"));
-  return <PhoneAuthForm returnTo={returnTo} />;
+  return <PhoneAuthForm mode="signIn" returnTo={returnTo} />;
 }
 
 /** Carries `?next=` across to /register so switching forms never loses the destination. */
@@ -57,12 +47,5 @@ function RegisterLink({ label }: { label: string }) {
   const href = returnTo
     ? `/register?next=${encodeURIComponent(returnTo)}`
     : "/register";
-  return (
-    <Link
-      href={href}
-      className="focus-ring rounded-md font-medium text-primary hover:underline"
-    >
-      {label}
-    </Link>
-  );
+  return <AuthCrossLink href={href}>{label}</AuthCrossLink>;
 }

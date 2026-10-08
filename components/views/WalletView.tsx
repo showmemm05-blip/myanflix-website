@@ -1,50 +1,43 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import {
-  ArrowDownLeft,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  ArrowUpRight,
-  Check,
-  Copy,
-  Loader2,
-  ReceiptText,
-  RotateCcw,
-  TrendingDown,
-  TrendingUp,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { formatKyat } from "@/lib/currency";
-import { formatRelativeDate } from "@/lib/format";
-import { useLanguage } from "@/lib/context/language-context";
-import { PageHeader } from "@/components/shared/PageHeader";
-import { chipClass, Kicker, SectionHeader, StatTile, Surface } from "@/components/system";
-import { AccountShell } from "@/components/views/AccountShell";
-import { LedgerRow, LedgerRowSkeletons } from "@/components/wallet/LedgerRow";
-import { TransactionRow } from "@/components/wallet/TransactionRow";
-import { MethodTileGrid, type MethodTileOption } from "@/components/wallet/MethodTileGrid";
+import { useTopBarOverHero } from "@/components/layout/shell-context";
+import { SETTINGS_SECTION_IDS } from "@/components/views/AccountShell";
+import { ChevronRightIcon, CloudOffIcon } from "@/components/system";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty/EmptyState";
 import { ErrorState } from "@/components/empty/ErrorState";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
+import { LedgerRow, LedgerRowSkeletons, MASKED_FIGURE, figure } from "@/components/wallet/LedgerRow";
+import { TransactionRow, transactionKind } from "@/components/wallet/TransactionRow";
+import { MethodLogo, type MethodTileOption } from "@/components/wallet/MethodTileGrid";
+import { DepositDialog, type DepositDialogProps } from "@/components/wallet/DepositDialog";
+import { WithdrawDialog, type WithdrawDialogProps } from "@/components/wallet/WithdrawDialog";
+import { WalletHeroArt } from "@/components/wallet/WalletHeroArt";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import type { WalletSummary, FinanceSettings } from "@/services/api/paymentService";
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ClockIcon,
+  EyeIcon,
+  EyeOffIcon,
+  ReceiptLineIcon,
+  RetryIcon,
+  ShieldIcon,
+  TrendDownIcon,
+  TrendUpIcon,
+} from "@/components/wallet/icons";
+import { dayKey, dayLabel, maskAccountNumber, moneyTime } from "@/components/wallet/format";
+import { useLanguage } from "@/lib/context/language-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import { shellText } from "@/lib/i18n/sections/shell";
+import { walletText } from "@/lib/i18n/sections/wallet";
+import { formatKyat } from "@/lib/currency";
+import { formatLockTime, lockEndFromIso } from "@/lib/withdrawal-code";
+import { cn } from "@/lib/utils";
+import type { WalletSummary } from "@/services/api/paymentService";
+import type { WithdrawalCodeStatus } from "@/services/api/withdrawalCodeService";
 import type { Transaction, Deposit, Withdrawal } from "@/types/transaction";
 import type { PaymentAccount, PaymentAccountType } from "@/types/payment-account";
-
-const QUICK_AMOUNTS = [5000, 10000, 20000, 50000];
 
 // paymentMethod is a free-typed label, sometimes with " - <bank name>"
 // appended (see the wallet page's methodLabel() helper) — so an exact match
@@ -54,7 +47,7 @@ function findLogo(paymentMethod: string, types: PaymentAccountType[]): string | 
   return types.find((t) => paymentMethod === t.label || paymentMethod.startsWith(`${t.label} - `))?.logoUrl ?? null;
 }
 
-export interface WalletViewProps {
+export interface WalletViewProps extends DepositDialogProps, WithdrawDialogProps {
   // Balance summary
   summary: WalletSummary | undefined;
   isSummaryLoading: boolean;
@@ -75,650 +68,622 @@ export interface WalletViewProps {
   isWithdrawalsError: boolean;
   onRetryWithdrawals: () => void;
 
-  paymentAccountTypes: PaymentAccountType[] | undefined;
-  financeSettings: FinanceSettings | undefined;
+  /** Money set aside for the user's PENDING withdrawals (the hero's amber line). */
+  onHold: { amount: number; count: number } | null;
 
-  // Deposit dialog
-  depositOpen: boolean;
-  onDepositOpenChange: (open: boolean) => void;
-  /** Close without resetting the form (the Cancel button's historical behavior). */
-  onCloseDeposit: () => void;
-  amount: string;
-  onAmountChange: (value: string) => void;
-  isAccountsLoading: boolean;
-  methodTypes: MethodTileOption[];
-  effectiveType: string | null;
-  onSelectType: (type: string) => void;
-  accountsForType: PaymentAccount[];
-  selectedAccount: PaymentAccount | null;
-  onSelectAccount: (accountId: string) => void;
-  copiedAccountId: string | null;
-  onCopyAccountNumber: (accountId: string, accountNumber: string) => void;
-  reference: string;
-  onReferenceChange: (value: string) => void;
-  referenceError: string | null;
-  isDepositing: boolean;
-  onSubmitDeposit: () => void;
+  /** "Ways to deposit": the methods with an account to send to, and who receives. */
+  depositWays: { method: MethodTileOption; accounts: PaymentAccount[] }[];
+  isDepositWaysLoading: boolean;
+  /** Opens Deposit with this method already picked. */
+  onDepositWith: (type: string) => void;
 
-  // Withdraw dialog
-  withdrawOpen: boolean;
-  onWithdrawOpenChange: (open: boolean) => void;
-  /** Close without resetting the form (the Cancel button's historical behavior). */
-  onCloseWithdraw: () => void;
-  withdrawAmount: string;
-  onWithdrawAmountChange: (value: string) => void;
-  withdrawAmountNumber: number;
-  availableBalance: number;
-  withdrawAccountType: string | null;
-  onSelectWithdrawType: (type: string) => void;
-  withdrawRequiresBankName: boolean;
-  withdrawBankName: string;
-  onWithdrawBankNameChange: (value: string) => void;
-  withdrawAccountName: string;
-  onWithdrawAccountNameChange: (value: string) => void;
-  withdrawAccountNumber: string;
-  onWithdrawAccountNumberChange: (value: string) => void;
-  withdrawError: string | null;
-  isWithdrawing: boolean;
-  onSubmitWithdraw: () => void;
+  /** The "Withdrawal code" card (undefined while loading or on error). */
+  withdrawalCodeStatus: WithdrawalCodeStatus | undefined;
 }
 
+type Tab = "all" | "dep" | "wd";
+
 /**
- * The money screen. One idea per region, top to bottom: what you have (the
- * balance hero, in finance emerald with the two quick actions docked to it),
- * what it adds up to (stat tiles), then the three ledgers.
+ * The money screen (Wallet.dc.html). A full-bleed lantern picture runs under
+ * the clear top bar: the title, the balance in big white figures with an
+ * eye button that hides every amount, the amber "on hold" line and the
+ * three action tiles (Deposit white, Withdraw and History frosted). Below,
+ * two columns: "Recent transactions" with All / Deposits / Withdrawals tabs
+ * on the left; totals, ways to deposit and the withdrawal-code card on the
+ * right.
  *
  * The hero is rendered unconditionally so Deposit and Withdraw are reachable
  * even while the summary is loading or has failed — only the figure itself
  * swaps to a skeleton or an inline retry.
  */
 export function WalletView(props: WalletViewProps) {
-  const { t } = useLanguage();
+  useTopBarOverHero();
+  const { t, language } = useLanguage();
+  const w = useSection(walletText);
+  const shell = useSection(shellText);
   const types = props.paymentAccountTypes ?? [];
+  const [hidden, setHidden] = useState(false);
+  const [tab, setTab] = useState<Tab>("all");
+  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ all: null, dep: null, wd: null });
 
+  const TABS: { id: Tab; label: string }[] = [
+    { id: "all", label: w.tabAll },
+    { id: "dep", label: t.transactions.typeDeposit },
+    { id: "wd", label: t.transactions.typeWithdrawal },
+  ];
+  const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const delta = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    const jump = event.key === "Home" ? 0 : event.key === "End" ? TABS.length - 1 : null;
+    if (!delta && jump === null) return;
+    event.preventDefault();
+    const next = TABS[jump ?? (index + delta + TABS.length) % TABS.length].id;
+    setTab(next);
+    tabRefs.current[next]?.focus();
+  };
+
+  const balance = props.summary?.balance ?? 0;
   const withdrawalTypeLabel = (withdrawal: Withdrawal) =>
     types.find((x) => x.value === withdrawal.accountType)?.label ?? withdrawal.accountType;
+  const dayWords = { today: w.today, yesterday: w.yesterday };
 
-  return (
-    <AccountShell className="lg:gap-10">
-      <PageHeader eyebrow={t.wallet.eyebrow} title={t.wallet.title} subtitle={t.wallet.subtitle} />
+  /** Pending first under "Awaiting approval" (every tab), then one group per day. */
+  function groupRows<T extends { id: string; createdAt: string; status: string }>(
+    items: T[],
+  ): { key: string; label: string; awaiting: boolean; items: T[] }[] {
+    const groups: { key: string; label: string; awaiting: boolean; items: T[] }[] = [];
+    const pending = items.filter((i) => i.status === "PENDING");
+    if (pending.length) groups.push({ key: "awaiting", label: w.awaitingApproval, awaiting: true, items: pending });
+    for (const item of items) {
+      if (item.status === "PENDING") continue;
+      const key = dayKey(item.createdAt);
+      const last = groups[groups.length - 1];
+      if (last && !last.awaiting && last.key === key) last.items.push(item);
+      else groups.push({ key, label: dayLabel(item.createdAt, language, dayWords), awaiting: false, items: [item] });
+    }
+    return groups;
+  }
 
-      {/* ── Balance hero + quick actions ─────────────────────────────── */}
-      <Surface tone="raised" radius="2xl" className="isolate overflow-hidden p-6 sm:p-8">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-finance/22 via-finance/6 to-transparent"
-        />
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
-          <div className="min-w-0">
-            <Kicker tone="finance">{t.wallet.currentBalance}</Kicker>
-            {props.isSummaryLoading ? (
-              <Skeleton className="mt-3 h-10 w-56 max-w-full sm:h-12" />
-            ) : props.isSummaryError ? (
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <p className="text-sm text-muted-foreground">{t.common.somethingWentWrong}</p>
-                <Button
-                  variant="outline"
-                  className="h-9 rounded-full px-4"
-                  onClick={props.onRetrySummary}
-                >
-                  <RotateCcw className="size-4" />
-                  {t.common.retry}
-                </Button>
-              </div>
-            ) : (
-              <p className="mt-2 font-heading text-4xl font-bold tracking-tight text-finance nums sm:text-5xl">
-                {formatKyat(props.summary?.balance ?? 0)}
-              </p>
-            )}
-          </div>
+  const rowDivider = "[&+&]:shadow-[inset_0_1px_0_var(--mq-tonal-ghost)]";
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <Button
-              variant="outline"
-              className="h-11 rounded-full px-5 text-sm font-semibold"
-              onClick={() => props.onWithdrawOpenChange(true)}
-            >
-              <ArrowUpFromLine className="size-4" />
-              {t.wallet.withdraw}
-            </Button>
-            <Button
-              className="h-11 rounded-full px-6 text-sm font-semibold"
-              onClick={() => props.onDepositOpenChange(true)}
-            >
-              <ArrowDownToLine className="size-4" />
-              {t.wallet.deposit}
-            </Button>
-          </div>
-        </div>
-      </Surface>
-
-      {/* ── Where you stand on the membership ladder ─────────────────── */}
-
-      {/* ── What it adds up to ───────────────────────────────────────── */}
-      {!props.isSummaryError && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {props.isSummaryLoading ? (
-            <>
-              <Skeleton className="h-[92px] rounded-2xl" />
-              <Skeleton className="h-[92px] rounded-2xl" />
-            </>
+  const renderGroups = <T extends { id: string; createdAt: string; status: string }>(
+    groups: { key: string; label: string; awaiting: boolean; items: T[] }[],
+    row: (item: T) => ReactNode,
+  ) => (
+    <div className="mq-rise">
+      {groups.map((group) => (
+        <section key={group.key} aria-label={group.label}>
+          {group.awaiting ? (
+            <h3 className="flex items-center gap-2 pt-3.5 pb-1 text-[13px] leading-[18px] font-extrabold text-pending">
+              <span aria-hidden className="size-[7px] rounded-full bg-pending" />
+              {group.label}
+            </h3>
           ) : (
-            <>
-              <StatTile
-                icon={TrendingUp}
-                tone="success"
-                label={t.wallet.totalDeposited}
-                value={formatKyat(props.summary?.totalDeposited ?? 0)}
-              />
-              <StatTile
-                icon={TrendingDown}
-                tone="neutral"
-                label={t.wallet.totalSpent}
-                value={formatKyat(props.summary?.totalSpent ?? 0)}
-              />
-            </>
+            <h3 className="pt-[18px] pb-1 text-[13px] leading-[18px] font-bold text-fg-faint nums">{group.label}</h3>
           )}
-        </div>
-      )}
+          <ul className="m-0 list-none p-0">{group.items.map(row)}</ul>
+        </section>
+      ))}
+    </div>
+  );
 
-      {/* ── Recent transactions ──────────────────────────────────────── */}
-      <Panel
-        title={t.wallet.recentTransactions}
-        action={
-          <Link
-            href="/transactions"
-            className="rounded-full text-sm font-semibold text-primary underline-offset-4 transition-colors outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            {t.wallet.viewAll}
-          </Link>
-        }
-      >
-        {props.isTxnLoading ? (
-          <LedgerRowSkeletons />
-        ) : props.isTxnError ? (
-          <ErrorState onRetry={props.onRetryTransactions} className="py-10" />
-        ) : props.transactions && props.transactions.length > 0 ? (
-          props.transactions.map((transaction) => (
-            <TransactionRow
-              key={transaction.id}
-              transaction={transaction}
-              meta={formatRelativeDate(transaction.createdAt)}
-            />
-          ))
-        ) : (
+  const listState = (
+    loading: boolean,
+    error: boolean,
+    retry: () => void,
+    empty: boolean,
+    emptyNode: ReactNode,
+    ready: () => ReactNode,
+  ) =>
+    loading ? (
+      <div aria-busy="true">
+        <LedgerRowSkeletons />
+        <p role="status" className="sr-only">
+          {w.loadingTransactions}
+        </p>
+      </div>
+    ) : error ? (
+      <ErrorState onRetry={retry} title={w.listError} description={shell.errorBody} className="[&>div]:py-10" />
+    ) : empty ? (
+      emptyNode
+    ) : (
+      ready()
+    );
+
+  const depositAction = (
+    <Button variant="play" size="cta" onClick={() => props.onDepositOpenChange(true)} aria-haspopup="dialog">
+      <ArrowDownIcon size={18} />
+      {t.wallet.deposit}
+    </Button>
+  );
+
+  const panelBody =
+    tab === "all"
+      ? listState(
+          props.isTxnLoading,
+          props.isTxnError,
+          props.onRetryTransactions,
+          !props.transactions?.length,
           <EmptyState
-            icon={ReceiptText}
+            icon={ReceiptLineIcon}
             title={t.wallet.noTransactions}
             description={t.wallet.noTransactionsDescription}
+            action={depositAction}
             className="py-10"
-          />
-        )}
-      </Panel>
-
-      {/* ── Deposit / withdrawal history ─────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title={t.wallet.depositHistory}>
-          {props.isDepositsLoading ? (
-            <LedgerRowSkeletons />
-          ) : props.isDepositsError ? (
-            <ErrorState onRetry={props.onRetryDeposits} className="py-10" />
-          ) : props.deposits && props.deposits.length > 0 ? (
-            props.deposits.map((deposit) => {
-              const logoUrl = findLogo(deposit.paymentMethod, types);
+          />,
+          () =>
+            renderGroups(groupRows(props.transactions ?? []), (transaction) => {
+              const kind = transactionKind(transaction.type, t);
+              const time = moneyTime(transaction.createdAt, language);
               return (
-                <LedgerRow
-                  key={deposit.id}
-                  leading={
-                    logoUrl ? (
-                      <Image src={logoUrl} alt="" width={40} height={40} className="size-full object-cover" unoptimized />
-                    ) : (
-                      <ArrowDownLeft className="size-4 text-finance" />
-                    )
-                  }
-                  title={deposit.paymentMethod}
-                  meta={`${t.wallet.ref(deposit.reference)} · ${formatRelativeDate(deposit.createdAt)}`}
-                  amount={deposit.amount}
-                  credit
-                  status={deposit.status}
-                  note={deposit.status === "REJECTED" ? deposit.rejectionReason : null}
+                <TransactionRow
+                  key={transaction.id}
+                  as="li"
+                  className={rowDivider}
+                  transaction={transaction}
+                  masked={hidden}
+                  meta={transaction.movieTitle ? `${kind.label} · ${time}` : time}
                 />
               );
-            })
-          ) : (
+            }),
+        )
+      : tab === "dep"
+        ? listState(
+            props.isDepositsLoading,
+            props.isDepositsError,
+            props.onRetryDeposits,
+            !props.deposits?.length,
             <EmptyState
-              icon={ArrowDownLeft}
+              icon={ArrowDownIcon}
               title={t.wallet.noDeposits}
               description={t.wallet.noDepositsDescription}
+              action={depositAction}
               className="py-10"
-            />
-          )}
-        </Panel>
-
-        <Panel title={t.wallet.withdrawalHistory}>
-          {props.isWithdrawalsLoading ? (
-            <LedgerRowSkeletons />
-          ) : props.isWithdrawalsError ? (
-            <ErrorState onRetry={props.onRetryWithdrawals} className="py-10" />
-          ) : props.withdrawals && props.withdrawals.length > 0 ? (
-            props.withdrawals.map((withdrawal) => {
-              const logoUrl = types.find((x) => x.value === withdrawal.accountType)?.logoUrl ?? null;
-              const label = withdrawalTypeLabel(withdrawal);
-              return (
-                <LedgerRow
-                  key={withdrawal.id}
-                  leading={
-                    logoUrl ? (
-                      <Image src={logoUrl} alt="" width={40} height={40} className="size-full object-cover" unoptimized />
-                    ) : (
-                      <ArrowUpRight className="size-4 text-warning" />
-                    )
-                  }
-                  title={withdrawal.accountName}
-                  meta={`${withdrawal.bankName ? `${label} · ${withdrawal.bankName}` : label} · ${withdrawal.accountNumber}`}
-                  amount={withdrawal.amount}
-                  credit={false}
-                  status={withdrawal.status}
-                  note={withdrawal.status === "REJECTED" ? withdrawal.rejectionReason : null}
-                />
-              );
-            })
-          ) : (
+            />,
+            () =>
+              renderGroups(groupRows(props.deposits ?? []), (deposit) => {
+                const logoUrl = findLogo(deposit.paymentMethod, types);
+                return (
+                  <LedgerRow
+                    key={deposit.id}
+                    as="li"
+                    className={rowDivider}
+                    tone={logoUrl ? "logo" : "inflow"}
+                    leading={
+                      logoUrl ? (
+                        <MethodLogo logoUrl={logoUrl} label={deposit.paymentMethod} size={44} />
+                      ) : (
+                        <ArrowDownIcon size={20} />
+                      )
+                    }
+                    title={deposit.paymentMethod}
+                    meta={`${t.wallet.ref(deposit.reference)} · ${moneyTime(deposit.createdAt, language)}`}
+                    amount={deposit.amount}
+                    credit
+                    status={deposit.status}
+                    note={deposit.status === "REJECTED" ? deposit.rejectionReason : null}
+                    masked={hidden}
+                  />
+                );
+              }),
+          )
+        : listState(
+            props.isWithdrawalsLoading,
+            props.isWithdrawalsError,
+            props.onRetryWithdrawals,
+            !props.withdrawals?.length,
             <EmptyState
-              icon={ArrowUpRight}
+              icon={ArrowUpIcon}
               title={t.wallet.noWithdrawals}
               description={t.wallet.noWithdrawalsDescription}
               className="py-10"
+            />,
+            () =>
+              renderGroups(groupRows(props.withdrawals ?? []), (withdrawal) => {
+                const type = types.find((x) => x.value === withdrawal.accountType);
+                const label = withdrawalTypeLabel(withdrawal);
+                return (
+                  <LedgerRow
+                    key={withdrawal.id}
+                    as="li"
+                    className={rowDivider}
+                    tone={type?.logoUrl ? "logo" : "outflow"}
+                    leading={
+                      type?.logoUrl ? (
+                        <MethodLogo logoUrl={type.logoUrl} label={label} size={44} />
+                      ) : (
+                        <ArrowUpIcon size={20} />
+                      )
+                    }
+                    title={withdrawal.accountName}
+                    meta={`${withdrawal.bankName ? `${label} · ${withdrawal.bankName}` : label} · ${maskAccountNumber(
+                      withdrawal.accountNumber,
+                    )} · ${moneyTime(withdrawal.createdAt, language)}`}
+                    amount={withdrawal.amount}
+                    credit={false}
+                    status={withdrawal.status}
+                    note={withdrawal.status === "REJECTED" ? withdrawal.rejectionReason : null}
+                    masked={hidden}
+                  />
+                );
+              }),
+          );
+
+  return (
+    <>
+      {/* ── Hero: the picture under the clear bar, balance and the three tiles ── */}
+      <section
+        aria-labelledby="wallet-title"
+        className="under-bar relative flex min-h-[clamp(460px,38vw,540px)] items-end overflow-hidden max-desk:min-h-0"
+      >
+        <WalletHeroArt className="mq-settle absolute inset-0" />
+        <div aria-hidden className="absolute inset-0" style={{ background: "var(--mq-scrim-left)" }} />
+        <div aria-hidden className="absolute inset-x-0 top-0 h-[200px]" style={{ background: "var(--mq-scrim-top)" }} />
+        <div aria-hidden className="absolute inset-x-0 bottom-0 h-1/2" style={{ background: "var(--mq-scrim-bottom)" }} />
+
+        <div className="mq-rise relative mx-auto w-full max-w-[calc(1120px+2*var(--mq-gutter))] px-gutter pt-[calc(var(--shell-bar-h)+48px)] pb-[clamp(28px,3.6vw,48px)]">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-12 gap-y-7 mq-stack">
+            <div className="min-w-0">
+              <h1
+                id="wallet-title"
+                className="text-[clamp(32px,3vw,44px)] leading-[1.1] font-black tracking-[-0.03em] text-fg [&:lang(my)]:tracking-normal"
+              >
+                {t.wallet.title}
+              </h1>
+
+              {props.isSummaryLoading ? (
+                <div className="mt-[22px]">
+                  <div aria-hidden>
+                    <span className="mq-skeleton block h-3.5 w-[140px] rounded-[5px]" />
+                    <span className="mq-skeleton mt-4 block h-[72px] w-[min(360px,80%)] rounded-[12px]" />
+                    <span className="mq-skeleton mt-4 block h-3 w-[220px] rounded-[5px]" />
+                  </div>
+                  <p role="status" className="sr-only">
+                    {w.loadingBalance}
+                  </p>
+                </div>
+              ) : props.isSummaryError ? (
+                <div className="mt-[22px]">
+                  <p className="text-[15px] leading-[22px] font-semibold text-fg-body">{w.availableBalance}</p>
+                  <div role="alert" className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-3">
+                    <span className="flex items-center gap-2.5 text-[22px] leading-7 font-extrabold text-fg">
+                      <CloudOffIcon size={24} className="shrink-0 text-danger" />
+                      {w.balanceError}
+                    </span>
+                    <Button variant="tonal" size="toolbar" onClick={props.onRetrySummary}>
+                      <RetryIcon size={18} />
+                      {t.common.retry}
+                    </Button>
+                  </div>
+                  <p className="mt-2.5 text-[14px] leading-5 text-fg-faint">{w.balanceErrorHint}</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-4 flex items-center gap-1.5">
+                    <span id="wallet-balance-label" className="text-[15px] leading-[22px] font-semibold text-fg-body">
+                      {w.availableBalance}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setHidden((h) => !h)}
+                      aria-pressed={hidden}
+                      aria-label={hidden ? w.showBalance : w.hideBalance}
+                      className="on-art flex size-9 items-center justify-center rounded-full text-fg outline-none transition-colors hover:bg-tonal-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+                    >
+                      {hidden ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
+                    </button>
+                  </div>
+                  <p
+                    aria-live="polite"
+                    aria-describedby="wallet-balance-label"
+                    className="mt-1.5 flex items-baseline gap-3 nums"
+                  >
+                    <span className="text-[clamp(60px,6.6vw,96px)] leading-none font-black tracking-[-0.04em] text-fg">
+                      {figure(balance, hidden)}
+                    </span>
+                    <span className="text-[clamp(22px,2vw,30px)] leading-[1.2] font-extrabold text-fg-muted">Ks</span>
+                  </p>
+                  {props.onHold && props.onHold.count > 0 && (
+                    <p className="mt-3.5 flex items-center gap-2 text-[14px] leading-5 font-medium text-fg-body nums">
+                      <span aria-hidden className="size-[7px] shrink-0 rounded-full bg-pending" />
+                      {w.holdLine(hidden ? `${MASKED_FIGURE} Ks` : formatKyat(props.onHold.amount), props.onHold.count)}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="grid grid-cols-[repeat(3,136px)] gap-2.5 max-desk:w-full max-desk:grid-cols-3">
+              <HeroTile
+                onClick={() => props.onDepositOpenChange(true)}
+                icon={<ArrowDownIcon size={24} />}
+                label={t.wallet.deposit}
+                primary
+              />
+              <HeroTile
+                onClick={() => props.onWithdrawOpenChange(true)}
+                icon={<ArrowUpIcon size={24} />}
+                label={t.wallet.withdraw}
+              />
+              <Link
+                href="/transactions"
+                className="mq-press on-art flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-[12px] p-2.5 text-center text-fg outline-none hover:bg-tonal-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+              >
+                <ClockIcon size={24} />
+                <span className="text-[15px] leading-5 font-extrabold">{w.history}</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Two columns: the ledger, and totals / ways / code ── */}
+      <div className="mx-auto mt-[clamp(28px,3vw,44px)] w-full max-w-[calc(1120px+2*var(--mq-gutter))] px-gutter">
+        <div className="grid grid-cols-[minmax(0,1.65fr)_minmax(300px,1fr)] items-start gap-5 mq-stack">
+          <section
+            aria-labelledby="wallet-recent"
+            className="min-w-0 rounded-[20px] bg-surface px-6 pt-5 pb-3.5 max-desk:px-4"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <h2 id="wallet-recent" className="text-section-title text-fg">
+                {t.wallet.recentTransactions}
+              </h2>
+              <Link
+                href="/transactions"
+                aria-label={w.seeAllTransactions}
+                className="mq-link inline-flex items-center gap-0.5 rounded-md text-[15px] leading-5 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+              >
+                {shell.seeAll}
+                <ChevronRightIcon size={16} />
+              </Link>
+            </div>
+            <div role="tablist" aria-label={w.showLabel} className="mt-3.5 flex flex-wrap gap-2">
+              {TABS.map((item, index) => {
+                const on = tab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    ref={(el) => {
+                      tabRefs.current[item.id] = el;
+                    }}
+                    type="button"
+                    role="tab"
+                    id={`wallet-tab-${item.id}`}
+                    aria-selected={on}
+                    aria-controls="wallet-recent-panel"
+                    tabIndex={on ? 0 : -1}
+                    onClick={() => setTab(item.id)}
+                    onKeyDown={(e) => onTabKey(e, index)}
+                    className={cn(
+                      "h-9 rounded-full px-4 text-[14px] outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link",
+                      on ? "bg-play font-extrabold text-ink" : "bg-raised font-semibold text-fg hover:bg-raised-hover",
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              id="wallet-recent-panel"
+              role="tabpanel"
+              aria-labelledby={`wallet-tab-${tab}`}
+              className="mt-1.5"
+            >
+              {panelBody}
+            </div>
+          </section>
+
+          <div className="flex min-w-0 flex-col gap-4">
+            {/* Totals: hidden on a balance error, skeleton while loading. */}
+            {!props.isSummaryError && (
+              <section aria-label={w.totals} className="rounded-[20px] bg-surface px-6 py-2 max-desk:px-4">
+                {props.isSummaryLoading ? (
+                  <div aria-hidden>
+                    <div className="py-3.5">
+                      <span className="mq-skeleton block h-3 w-1/2 rounded-[5px]" />
+                      <span className="mq-skeleton mt-2.5 block h-6 w-[70%] rounded-[6px]" />
+                    </div>
+                    <div className="py-3.5 shadow-[inset_0_1px_0_var(--mq-tonal-ghost)]">
+                      <span className="mq-skeleton block h-3 w-2/5 rounded-[5px]" />
+                      <span className="mq-skeleton mt-2.5 block h-6 w-3/5 rounded-[6px]" />
+                    </div>
+                  </div>
+                ) : (
+                  <dl className="m-0">
+                    <TotalRow
+                      icon={<TrendUpIcon size={20} />}
+                      tint="bg-money/14 text-money"
+                      label={t.wallet.totalDeposited}
+                      value={`${figure(props.summary?.totalDeposited ?? 0, hidden)} Ks`}
+                      valueClassName="text-money"
+                    />
+                    <TotalRow
+                      icon={<TrendDownIcon size={20} />}
+                      tint="bg-tonal-faint text-fg-body"
+                      label={t.wallet.totalSpent}
+                      value={`${figure(props.summary?.totalSpent ?? 0, hidden)} Ks`}
+                      divider
+                    />
+                  </dl>
+                )}
+              </section>
+            )}
+
+            {(props.isDepositWaysLoading || props.depositWays.length > 0) && (
+              <section aria-labelledby="wallet-ways" className="rounded-[20px] bg-surface px-6 pt-5 pb-3.5 max-desk:px-4">
+                <h2 id="wallet-ways" className="text-[18px] leading-6 font-extrabold text-fg">
+                  {w.waysToDeposit}
+                </h2>
+                <p className="mt-1 mb-2 text-[14px] leading-5 text-fg-faint">{w.waysToDepositBody}</p>
+                {props.isDepositWaysLoading ? (
+                  <div aria-hidden>
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="flex min-h-16 items-center gap-3.5">
+                        <span className="mq-skeleton size-10 rounded-[12px]" />
+                        <span className="flex flex-1 flex-col gap-2">
+                          <span className="mq-skeleton h-3.5 w-2/5 rounded-[5px]" />
+                          <span className="mq-skeleton h-3 w-3/5 rounded-[5px]" />
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <ul className="m-0 list-none p-0">
+                    {props.depositWays.map(({ method, accounts }) => {
+                      const names = [...new Set(accounts.map((a) => a.accountName))];
+                      return (
+                        <li key={method.type} className="[&+&]:shadow-[inset_0_1px_0_var(--mq-tonal-ghost)]">
+                          <button
+                            type="button"
+                            onClick={() => props.onDepositWith(method.type)}
+                            aria-haspopup="dialog"
+                            aria-label={w.depositWith(method.label)}
+                            className="-mx-2.5 flex min-h-16 w-[calc(100%+20px)] items-center gap-3.5 rounded-[12px] p-2.5 text-left text-fg outline-none transition-colors hover:bg-tonal-ghost focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+                          >
+                            <MethodLogo logoUrl={method.logoUrl} label={method.label} isBank={method.isBank} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[15px] leading-[22px] font-bold">{method.label}</span>
+                              <span className="block truncate text-[13px] leading-[18px] text-fg-faint">
+                                {names.length === 1 ? w.toAccount(names[0]) : w.accountsCount(accounts.length)}
+                              </span>
+                            </span>
+                            <ChevronRightIcon size={18} className="shrink-0 text-fg-faint" />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            )}
+
+            {/* Keyed on the lock so a new status starts a fresh lock clock. */}
+            <WithdrawalCodeCard
+              key={props.withdrawalCodeStatus?.lockedUntil ?? "none"}
+              status={props.withdrawalCodeStatus}
             />
-          )}
-        </Panel>
+          </div>
+        </div>
       </div>
 
       <DepositDialog {...props} />
       <WithdrawDialog {...props} />
-    </AccountShell>
+    </>
   );
 }
 
 /* ---------------------------------- bits ---------------------------------- */
 
-function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+/**
+ * The "Withdrawal code" card: set / not set / locked until a time, and a link
+ * to the code section on Settings. The lock uses the same rule as Settings
+ * (lockEndFromIso: capped at 15 minutes, already-past = unlocked) and turns
+ * itself off when the time comes, so an open page never shows a lock that
+ * has ended.
+ */
+function WithdrawalCodeCard({ status }: { status: WithdrawalCodeStatus | undefined }) {
+  const { t, language } = useLanguage();
+  const [lockEnd] = useState(() => (status?.hasCode ? lockEndFromIso(status.lockedUntil, Date.now()) : null));
+  const [lockOver, setLockOver] = useState(false);
+  useEffect(() => {
+    if (lockEnd === null) return;
+    const timer = setTimeout(() => setLockOver(true), Math.max(0, lockEnd - Date.now()));
+    return () => clearTimeout(timer);
+  }, [lockEnd]);
+  const locked = lockEnd !== null && !lockOver;
+
   return (
-    <Surface as="section" radius="2xl" className="p-4 sm:p-6">
-      <div className="px-1 sm:px-1.5">
-        <SectionHeader title={title} action={action} />
+    <section aria-labelledby="wallet-code" className="flex items-start gap-3.5 rounded-[20px] bg-surface p-5 px-6 max-desk:px-4">
+      <span
+        aria-hidden
+        className={cn(
+          "flex size-10 shrink-0 items-center justify-center rounded-full",
+          locked ? "bg-danger/14 text-danger" : "bg-crimson/14 text-link",
+        )}
+      >
+        <ShieldIcon size={20} />
+      </span>
+      <div className="min-w-0">
+        <h2 id="wallet-code" className="text-[16px] leading-[22px] font-extrabold text-fg">
+          {t.withdrawalCode.settingsSection}
+        </h2>
+        <p className={cn("mt-1 text-[14px] leading-5", locked ? "text-danger" : "text-fg-muted")}>
+          {!status
+            ? t.withdrawalCode.settingsDescription
+            : locked && lockEnd !== null
+              ? t.withdrawalCode.statusLocked(formatLockTime(lockEnd, language))
+              : status.hasCode
+                ? t.withdrawalCode.statusSet
+                : t.withdrawalCode.statusNone}
+        </p>
+        <Link
+          href={`/settings#${SETTINGS_SECTION_IDS.code}`}
+          className="mq-link mt-2 inline-block rounded-md text-[14px] leading-5 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+        >
+          {status && !status.hasCode ? t.withdrawalCode.createCode : t.withdrawalCode.changeCode}
+        </Link>
       </div>
-      <div className="mt-3">{children}</div>
-    </Surface>
+    </section>
   );
 }
 
-/**
- * Monochrome by design — these are amount shortcuts, not statuses, so they use
- * the same grey-glass/white-pill idiom as the genre chips rather than a color.
- */
-function QuickAmountChips({ value, onSelect }: { value: string; onSelect: (value: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-1.5 pt-1">
-      {QUICK_AMOUNTS.map((qa) => {
-        const active = Number(value) === qa;
-        return (
-          <button
-            key={qa}
-            type="button"
-            onClick={() => onSelect(qa.toString())}
-            aria-pressed={active}
-            className={chipClass({ tone: "mono", size: "md", selected: active })}
-          >
-            <span className="nums">{formatKyat(qa)}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** One field shape for every money input — a dialog full of inputs should read as one form. */
-const fieldInputClass = "h-11 rounded-xl border-white/10 bg-white/[0.04] px-3.5 dark:bg-white/[0.04]";
-const dialogContentClass =
-  "max-h-[calc(100dvh-2rem)] gap-5 overflow-y-auto rounded-3xl p-5 ring-white/10 sm:max-w-md sm:p-6";
-const dialogFooterClass = "mx-0 mb-0 border-t-0 bg-transparent p-0 pt-1";
-
-/** Label + hint stack used by every field in the two money dialogs. */
-function Field({
+/** A hero action tile: 88px, white for Deposit, frosted for the others. */
+function HeroTile({
+  onClick,
+  icon,
   label,
-  htmlFor,
-  hint,
-  error,
-  children,
+  primary = false,
 }: {
+  onClick: () => void;
+  icon: ReactNode;
   label: string;
-  htmlFor?: string;
-  hint?: ReactNode;
-  error?: string | null;
-  children: ReactNode;
+  primary?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-      {hint}
-      {error && <p className="text-sm text-destructive">{error}</p>}
-    </div>
-  );
-}
-
-/* --------------------------------- dialogs -------------------------------- */
-
-function DepositDialog(props: WalletViewProps) {
-  const { t } = useLanguage();
-  return (
-    <Dialog open={props.depositOpen} onOpenChange={props.onDepositOpenChange}>
-      <DialogContent className={dialogContentClass}>
-        <DialogHeader>
-          <Kicker tone="finance">{t.wallet.eyebrow}</Kicker>
-          <DialogTitle className="text-section-title">{t.wallet.depositTitle}</DialogTitle>
-          <DialogDescription>{t.wallet.depositSubtitle}</DialogDescription>
-        </DialogHeader>
-
-        <div className="flex flex-col gap-5">
-          <Field
-            label={t.wallet.amountLabel}
-            htmlFor="amount"
-            hint={
-              props.financeSettings ? (
-                <p className="text-xs text-muted-foreground nums">
-                  {t.wallet.amountRange(
-                    formatKyat(props.financeSettings.minDepositAmount),
-                    formatKyat(props.financeSettings.maxDepositAmount),
-                  )}
-                </p>
-              ) : undefined
-            }
-          >
-            <Input
-              id="amount"
-              type="number"
-              min="1000"
-              step="1000"
-              value={props.amount}
-              onChange={(e) => props.onAmountChange(e.target.value)}
-              className={cn(fieldInputClass, "text-base font-semibold nums")}
-            />
-            <QuickAmountChips value={props.amount} onSelect={props.onAmountChange} />
-          </Field>
-
-          <Field label={t.wallet.paymentMethodLabel}>
-            {props.isAccountsLoading ? (
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-[86px] rounded-2xl" />
-                ))}
-              </div>
-            ) : props.methodTypes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t.wallet.noPaymentMethods}</p>
-            ) : (
-              <MethodTileGrid methods={props.methodTypes} selected={props.effectiveType} onSelect={props.onSelectType} />
-            )}
-          </Field>
-
-          {props.accountsForType.length > 0 && (
-            <Field label={t.wallet.chooseAccountLabel}>
-              <div className="flex flex-col gap-2">
-                {props.accountsForType.map((account) => (
-                  <AccountOption
-                    key={account.id}
-                    account={account}
-                    selected={props.selectedAccount?.id === account.id}
-                    copied={props.copiedAccountId === account.id}
-                    onSelect={() => props.onSelectAccount(account.id)}
-                    onCopy={() => props.onCopyAccountNumber(account.id, account.accountNumber)}
-                  />
-                ))}
-              </div>
-            </Field>
-          )}
-
-          <Field
-            label={t.wallet.referenceLabel}
-            htmlFor="reference"
-            hint={<p className="text-xs text-muted-foreground">{t.wallet.referenceHint}</p>}
-            error={props.referenceError}
-          >
-            <Input
-              id="reference"
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="000123"
-              value={props.reference}
-              onChange={(e) => props.onReferenceChange(e.target.value)}
-              className={cn(fieldInputClass, "tracking-[0.3em] nums")}
-            />
-          </Field>
-        </div>
-
-        <DialogFooter className={dialogFooterClass}>
-          <Button
-            variant="ghost"
-            className="h-11 rounded-full px-5"
-            onClick={props.onCloseDeposit}
-            disabled={props.isDepositing}
-          >
-            {t.common.cancel}
-          </Button>
-          <Button
-            className="h-11 rounded-full px-5"
-            onClick={props.onSubmitDeposit}
-            disabled={props.isDepositing || Number(props.amount) <= 0 || !props.selectedAccount}
-          >
-            {props.isDepositing && <Loader2 className="size-4 animate-spin" />}
-            {t.wallet.submitDeposit(formatKyat(Number(props.amount) || 0))}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/**
- * One of the platform's own accounts to transfer to. The whole tile is the
- * selection target; the copy button inside it stops propagation so copying a
- * number never doubles as choosing that account by accident.
- */
-function AccountOption({
-  account,
-  selected,
-  copied,
-  onSelect,
-  onCopy,
-}: {
-  account: PaymentAccount;
-  selected: boolean;
-  copied: boolean;
-  onSelect: () => void;
-  onCopy: () => void;
-}) {
-  const { t } = useLanguage();
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      aria-pressed={selected}
+    <button
+      type="button"
+      onClick={onClick}
+      aria-haspopup="dialog"
       className={cn(
-        "flex cursor-pointer flex-col gap-1.5 rounded-2xl p-3.5 text-left text-sm ring-1 ring-inset transition-[background-color,box-shadow] duration-200 ease-out outline-none",
-        "focus-visible:ring-2 focus-visible:ring-ring",
-        selected
-          ? "bg-primary/12 ring-primary/60"
-          : "bg-white/[0.04] ring-white/10 hover:bg-white/8 hover:ring-white/20",
+        "mq-press flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-[12px] p-2.5 text-center outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link",
+        primary ? "bg-play text-ink" : "on-art text-fg hover:bg-tonal-hover",
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate font-medium">{account.accountName}</span>
-        {selected && (
-          <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Check className="size-3" />
-          </span>
-        )}
-      </div>
-      <div className="flex items-center justify-between gap-2 text-muted-foreground">
-        <span>{t.wallet.accountNumberLabel}</span>
-        <span className="flex items-center gap-1.5">
-          <span className="font-medium text-foreground nums">{account.accountNumber}</span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCopy();
-            }}
-            aria-label={copied ? t.wallet.copied : t.wallet.copyNumber}
-            className="rounded-lg p-1.5 text-muted-foreground transition-colors outline-none hover:bg-white/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
-          </button>
-        </span>
-      </div>
-      {account.bankName && (
-        <div className="flex items-center justify-between gap-2 text-muted-foreground">
-          <span>{t.wallet.bankNameLabel}</span>
-          <span className="min-w-0 truncate font-medium text-foreground">{account.bankName}</span>
-        </div>
-      )}
-      {account.note && <p className="text-xs text-muted-foreground">{account.note}</p>}
-    </div>
+      {icon}
+      <span className="text-[15px] leading-5 font-extrabold">{label}</span>
+    </button>
   );
 }
 
-function WithdrawDialog(props: WalletViewProps) {
-  const { t } = useLanguage();
+function TotalRow({
+  icon,
+  tint,
+  label,
+  value,
+  valueClassName,
+  divider = false,
+}: {
+  icon: ReactNode;
+  tint: string;
+  label: string;
+  value: string;
+  valueClassName?: string;
+  divider?: boolean;
+}) {
   return (
-    <Dialog open={props.withdrawOpen} onOpenChange={props.onWithdrawOpenChange}>
-      <DialogContent className={dialogContentClass}>
-        <DialogHeader>
-          <Kicker tone="warning">{t.wallet.eyebrow}</Kicker>
-          <DialogTitle className="text-section-title">{t.wallet.withdrawTitle}</DialogTitle>
-          <DialogDescription>{t.wallet.withdrawSubtitle}</DialogDescription>
-        </DialogHeader>
-
-        <div className="flex flex-col gap-5">
-          <Field
-            label={t.wallet.amountLabel}
-            htmlFor="withdraw-amount"
-            hint={
-              <>
-                <p className="text-xs text-muted-foreground nums">
-                  {t.wallet.availableBalance(formatKyat(props.availableBalance))}
-                </p>
-                {props.financeSettings && (
-                  <p className="text-xs text-muted-foreground nums">
-                    {t.wallet.amountRangeWithdraw(
-                      formatKyat(props.financeSettings.minWithdrawalAmount),
-                      formatKyat(props.financeSettings.maxWithdrawalAmount),
-                    )}
-                  </p>
-                )}
-              </>
-            }
-          >
-            <Input
-              id="withdraw-amount"
-              type="number"
-              min="1000"
-              step="1000"
-              value={props.withdrawAmount}
-              onChange={(e) => props.onWithdrawAmountChange(e.target.value)}
-              className={cn(fieldInputClass, "text-base font-semibold nums")}
-            />
-            <QuickAmountChips value={props.withdrawAmount} onSelect={props.onWithdrawAmountChange} />
-          </Field>
-
-          <Field label={t.wallet.accountTypeLabel}>
-            <MethodTileGrid
-              methods={(props.paymentAccountTypes ?? []).map((x) => ({
-                type: x.value,
-                label: x.label,
-                logoUrl: x.logoUrl,
-              }))}
-              selected={props.withdrawAccountType}
-              onSelect={props.onSelectWithdrawType}
-            />
-          </Field>
-
-          {props.withdrawRequiresBankName && (
-            <Field label={t.wallet.bankNameLabel} htmlFor="withdraw-bank-name">
-              <Input
-                id="withdraw-bank-name"
-                type="text"
-                placeholder={t.wallet.bankNamePlaceholder}
-                value={props.withdrawBankName}
-                onChange={(e) => props.onWithdrawBankNameChange(e.target.value)}
-                className={fieldInputClass}
-              />
-            </Field>
-          )}
-
-          <Field label={t.wallet.accountNameLabel} htmlFor="withdraw-account-name">
-            <Input
-              id="withdraw-account-name"
-              type="text"
-              placeholder={t.wallet.accountNamePlaceholder}
-              value={props.withdrawAccountName}
-              onChange={(e) => props.onWithdrawAccountNameChange(e.target.value)}
-              className={fieldInputClass}
-            />
-          </Field>
-
-          <Field label={t.wallet.accountNumberLabel} htmlFor="withdraw-account-number">
-            <Input
-              id="withdraw-account-number"
-              type="text"
-              placeholder={t.wallet.accountNumberPlaceholder}
-              value={props.withdrawAccountNumber}
-              onChange={(e) => props.onWithdrawAccountNumberChange(e.target.value)}
-              className={cn(fieldInputClass, "nums")}
-            />
-          </Field>
-
-          <Surface tone="subtle" className="flex items-start gap-2.5 p-3.5 text-sm nums">
-            <ArrowUpFromLine className="mt-0.5 size-4 shrink-0 text-warning" />
-            <span>{t.wallet.withdrawSummary(formatKyat(props.withdrawAmountNumber))}</span>
-          </Surface>
-          {props.withdrawError && <p className="text-sm text-destructive">{props.withdrawError}</p>}
-        </div>
-
-        <DialogFooter className={dialogFooterClass}>
-          <Button
-            variant="ghost"
-            className="h-11 rounded-full px-5"
-            onClick={props.onCloseWithdraw}
-            disabled={props.isWithdrawing}
-          >
-            {t.common.cancel}
-          </Button>
-          <Button
-            className="h-11 rounded-full px-5"
-            onClick={props.onSubmitWithdraw}
-            disabled={
-              props.isWithdrawing ||
-              props.withdrawAmountNumber <= 0 ||
-              !props.withdrawAccountType ||
-              !props.withdrawAccountName.trim() ||
-              !props.withdrawAccountNumber.trim() ||
-              (props.withdrawRequiresBankName && !props.withdrawBankName.trim())
-            }
-          >
-            {props.isWithdrawing && <Loader2 className="size-4 animate-spin" />}
-            {t.wallet.submitWithdraw}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <div
+      className={cn(
+        "flex items-center gap-3.5 py-3.5",
+        divider && "shadow-[inset_0_1px_0_var(--mq-tonal-ghost)]",
+      )}
+    >
+      <span aria-hidden className={cn("flex size-10 shrink-0 items-center justify-center rounded-[12px]", tint)}>
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <dt className="text-[13px] leading-[18px] text-fg-faint">{label}</dt>
+        <dd className={cn("m-0 mt-0.5 text-[22px] leading-7 font-extrabold text-fg nums", valueClassName)}>{value}</dd>
+      </div>
+    </div>
   );
 }

@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
  * The catalog moved to /media (with /media/movies, /media/books and
  * /media/music under it). Old /movies links — including the ?tab= deep links
  * the previous browse surface wrote — land on the equivalent new address.
+ * Series go to the Series hub with `?tab=series`, the spelling the Media
+ * chip strip and the catalogue use.
  */
 export default async function MoviesRedirectPage({
   searchParams,
@@ -18,7 +20,7 @@ export default async function MoviesRedirectPage({
   if (tab === "music") redirect("/media/music");
 
   const target = new URLSearchParams();
-  if (tab === "series") target.set("type", "series");
+  if (tab === "series") target.set("tab", "series");
   if (q) target.set("q", q);
   const qs = target.toString();
   redirect(qs ? `/media/movies?${qs}` : "/media/movies");

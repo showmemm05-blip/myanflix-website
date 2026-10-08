@@ -90,23 +90,31 @@ export const paymentService = {
 
   /**
    * Submits a withdrawal request — this only creates a PENDING record; the
-   * balance is never touched until an admin approves it (see the wallet
-   * page's realtime handling for the approval/rejection update).
+   * amount is set aside from the balance at once and returned if an admin
+   * rejects it (see the wallet page's realtime handling for the update).
+   *
+   * Every withdrawal carries the account's 6-digit withdrawal code; the
+   * server checks it after the amount and balance checks and before any
+   * money moves. A missing/wrong/locked code comes back as an ApiError with
+   * a WITHDRAWAL_CODE_* `code` (see lib/withdrawal-code.ts).
    */
-  requestWithdrawal(
-    amount: number,
-    accountType: string,
-    accountName: string,
-    accountNumber: string,
+  requestWithdrawal(input: {
+    amount: number;
+    accountType: string;
+    accountName: string;
+    accountNumber: string;
     /** Only sent for bank-transfer account types; omitted entirely otherwise. */
-    bankName?: string,
-  ): Promise<Withdrawal> {
+    bankName?: string;
+    withdrawalCode: string;
+  }): Promise<Withdrawal> {
+    const { amount, accountType, accountName, accountNumber, bankName, withdrawalCode } = input;
     return apiClient.post<Withdrawal>("/withdrawals", {
       amount,
       accountType,
       accountName,
       accountNumber,
       ...(bankName ? { bankName } : {}),
+      withdrawalCode,
     });
   },
 

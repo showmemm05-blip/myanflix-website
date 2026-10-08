@@ -1,26 +1,24 @@
 import * as React from "react";
 
-import { hasMyanmar } from "@/components/books/reader-settings";
 import { cn } from "@/lib/utils";
 
 /**
- * The eyebrow label — the signature editorial device of Aurora Theater. It sits
- * above hero titles and section titles and tells you what *kind* of thing you
- * are looking at before the title tells you which one.
- *
- * `tone` tints it when the section carries a semantic role (finance, premium…);
- * the default muted grey is right for almost everything.
+ * The overline (12/16 · 800 · 0.12em · uppercase · faint). Latin only gets
+ * the tracking: Burmese is never letter-spaced (the :lang(my) rule in
+ * globals.css, plus the check below for a Burmese string on an English page).
  */
 const TONE: Record<string, string> = {
-  muted: "text-muted-foreground",
-  primary: "text-primary",
-  premium: "text-premium",
-  finance: "text-finance",
+  muted: "text-fg-faint",
+  primary: "text-link",
+  premium: "text-gold",
+  finance: "text-money",
   info: "text-info",
-  success: "text-success",
-  warning: "text-warning",
-  destructive: "text-destructive",
+  success: "text-money",
+  warning: "text-pending",
+  destructive: "text-danger",
 };
+
+const MYANMAR = /[က-႟ꧠ-꧿ꩠ-ꩿ]/;
 
 export function Kicker({
   tone = "muted",
@@ -33,13 +31,7 @@ export function Kicker({
     <p
       data-slot="kicker"
       className={cn("text-kicker", TONE[tone], className)}
-      // Tracking pulls a Burmese syllable's stacked marks apart — the same
-      // rule the step labels and filter headings already follow.
-      style={
-        typeof children === "string" && hasMyanmar(children)
-          ? { ...style, letterSpacing: 0 }
-          : style
-      }
+      style={typeof children === "string" && MYANMAR.test(children) ? { ...style, letterSpacing: 0 } : style}
       {...props}
     >
       {children}

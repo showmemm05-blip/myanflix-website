@@ -1,210 +1,191 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { Bell, Bookmark, Clapperboard, Home, LogIn, Menu, Search } from "lucide-react";
 
-import { Brand } from "@/components/shared/Brand";
 import { Footer } from "@/components/footer/Footer";
-import { MobileMenu } from "@/components/navbar/MobileMenu";
-import { AccountMenu } from "@/components/navbar/AccountMenu";
-import { PeakUsersPill, PeakUsersTile } from "@/components/navbar/PeakUsersTile";
-import { SideRail } from "@/components/system/SideRail";
-import { TabBar, type TabBarItem } from "@/components/system/TabBar";
-import { TopBar } from "@/components/system/TopBar";
-import type { NavDestination } from "@/components/system/nav";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAuth } from "@/lib/context/auth-context";
-import { useLanguage } from "@/lib/context/language-context";
-import { notificationService } from "@/services/api/notificationService";
+import { Dock } from "@/components/layout/Dock";
+import { MediaChipStrip } from "@/components/layout/MediaChipStrip";
+import { AuthTopBarHeader, TopBarHeader } from "@/components/layout/TopBar";
+import { ShellProvider, useShellState } from "@/components/layout/shell-context";
+import { isAuthRoute, isImmersiveRoute, isMediaHubRoute } from "@/components/system/nav";
+import { useSection } from "@/lib/i18n/sections/define";
+import { shellText } from "@/lib/i18n/sections/shell";
+import { cn } from "@/lib/utils";
+
+// The shared feedback dialog is closed until "Help & feedback" is pressed, so
+// its code is fetched on first open instead of with every page.
+const FeedbackDialog = dynamic(
+  () => import("@/components/dialogs/FeedbackDialog").then((mod) => mod.FeedbackDialog),
+  { ssr: false },
+);
 
 /**
- * THE APP SHELL of Aurora Theater.
+ * THE MARQUEE APP SHELL (SHELL.md, DesignSystem "Top bar" / "Phone width").
  *
- * Desktop (lg+): a persistent 72px icon rail on the left carries navigation
- * and the account menu, and the content column gets a slim context bar — so
- * the top of the screen belongs to artwork, not to a menu.
- * Mobile: a safe-area-aware bottom tab bar carries the four destinations a
- * thumb wants, a compact top bar carries brand + peak viewers + notifications,
- * and the "More" sheet carries everything else.
+ * - A sticky 72px top bar (60px on phones): wordmark, Home · Media · Wallet ·
+ *   Profile with the crimson active pill, search, the notifications bell,
+ *   the green balance pill and the avatar menu — or a white "Sign in" when
+ *   signed out. Transparent over a page's hero (pages say so with
+ *   useTopBarOverHero / <HeroShell>), frosted glass from 150→250px of
+ *   scroll; pages without a hero get glass from the start.
+ * - The Media chip strip under the bar on every /media page.
+ * - Under 720px the floating dock replaces the nav, and content keeps 104px
+ *   clear at the bottom.
+ * - The quiet footer on long pages; one shared feedback dialog.
+ * - Sign-in pages get the minimal bar (logo + language); the player gets no
+ *   chrome at all (full screen).
+ * - A skip link to the main content.
  *
- * Nothing that existed before became unreachable: watchlist, wallet,
- * transactions, notifications, watch history, profile, settings, the language
- * switcher and sign-out all live in the rail's account menu on desktop and in
- * the overflow sheet on mobile; the footer still links browse/account/support.
+ * It sets `--shell-bar-h` (bar + chip strip height) so heroes can pull up
+ * under the bar (`under-bar`) and sub-bars can stick under it
+ * (`sticky-under-bar`).
  */
 export function AppShell({
   children,
   showFooter = true,
 }: {
   children: React.ReactNode;
+  /** false hides the footer (pages where nothing should sit below the content). */
   showFooter?: boolean;
 }) {
   const pathname = usePathname();
-  const { user } = useAuth();
-  const { t } = useLanguage();
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // Mounted from the first open on (so it can animate closed).
+  const [feedbackMounted, setFeedbackMounted] = useState(false);
+  const openFeedback = useCallback(() => {
+    setFeedbackMounted(true);
+    setFeedbackOpen(true);
+  }, []);
 
-  // Same query key and service call the old navbar used — the notification
-  // badge keeps reading exactly the same cache entry.
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ["notifications", "unread-count"],
-    queryFn: () => notificationService.getUnreadCount(),
-    enabled: Boolean(user),
-  });
-
-  // Watchlist only exists for signed-in users, so it only appears for them.
-  // Wallet moved off the chrome entirely — it lives in the account menu and
-  // the More sheet.
-  const railItems: NavDestination[] = [
-    { key: "home", href: "/", label: t.nav.home, icon: Home },
-    { key: "media", href: "/media", label: t.nav.media, icon: Clapperboard },
-    { key: "search", href: "/search", label: t.nav.search, icon: Search },
-    ...(user
-      ? [{ key: "watchlist", href: "/watchlist", label: t.nav.watchlist, icon: Bookmark }]
-      : []),
-  ];
-
-  const tabItems: TabBarItem[] = [
-    { key: "home", href: "/", label: t.nav.home, icon: Home },
-    { key: "media", href: "/media", label: t.nav.media, icon: Clapperboard },
-    { key: "search", href: "/search", label: t.nav.search, icon: Search },
-    user
-      ? { key: "watchlist", href: "/watchlist", label: t.nav.watchlist, icon: Bookmark }
-      : { key: "signin", href: "/login", label: t.nav.signIn, icon: LogIn },
-    { key: "more", label: t.nav.more, icon: Menu, onClick: () => setMoreOpen(true) },
-  ];
-
-  const notificationsButton = user ? (
-    <Button
-      variant="ghost"
-      size="icon-lg"
-      className="relative size-10 rounded-full"
-      render={<Link href="/notifications" />}
-      nativeButton={false}
-      aria-label={t.nav.notifications}
-    >
-      <Bell className="size-5" />
-      {unreadCount > 0 && (
-        <span className="absolute top-1.5 right-1.5 flex size-2 rounded-full bg-primary ring-2 ring-background" />
-      )}
-    </Button>
-  ) : null;
+  const immersive = isImmersiveRoute(pathname);
+  const auth = isAuthRoute(pathname);
 
   return (
-    <div className="min-h-screen">
-      <SideRail
-        brand={<Brand href="/" wordmarkClassName="sr-only" />}
-        items={railItems}
-        footer={
-          user ? (
-            <>
-              {/* Site-wide social proof: the rail is the one element on every
-                  desktop page, so the peak-viewers figure rides here. */}
-              <PeakUsersTile />
-              {notificationsButton}
-              <AccountMenu side="right" align="end" />
-            </>
-          ) : (
-            <>
-              <PeakUsersTile />
-              <Tooltip>
-                <TooltipTrigger
-                render={
-                  <Link
-                    href="/login"
-                    aria-label={t.nav.signIn}
-                    className="flex size-11 items-center justify-center rounded-2xl bg-primary/15 text-primary transition-colors duration-200 ease-out outline-none hover:bg-primary/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                  />
-                }
-              >
-                <LogIn className="size-5" />
-              </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={10}>
-                  {t.nav.signIn}
-                </TooltipContent>
-              </Tooltip>
-            </>
-          )
-        }
-      />
-
-      <div className="flex min-h-screen flex-col pb-tabbar lg:pl-[72px] lg:pb-0">
-        {/* Mobile-only: from lg up the rail carries the brand, navigation,
-            notifications, the account menu and the balance, which would leave
-            this bar an empty 56px band above every page. */}
-        <TopBar
-          className="lg:hidden"
-          left={
-            <div className="shrink-0 lg:hidden">
-              <Brand wordmarkClassName="hidden sm:inline" />
-            </div>
-          }
-          title={pageTitle(pathname, t)}
-          actions={
-            user ? (
-              <>
-                {/* Phones have no rail, so the rail's peak tile becomes a
-                    compact pill here. */}
-                <PeakUsersPill />
-                {/* Notifications and the account menu live on the rail from lg
-                    up — repeating them here would give the same destination two
-                    buttons on one screen. */}
-                <span className="lg:hidden">{notificationsButton}</span>
-                <span className="lg:hidden">
-                  <AccountMenu side="bottom" align="end" />
-                </span>
-              </>
-            ) : (
-              <>
-                <PeakUsersPill />
-                <Button
-                  className="h-9 rounded-full px-4"
-                  render={<Link href="/login" />}
-                  nativeButton={false}
-                >
-                  {t.nav.signIn}
-                </Button>
-              </>
-            )
-          }
-        />
-
-        <main className="flex-1">{children}</main>
-
-        {showFooter && <Footer />}
-      </div>
-
-      <TabBar items={tabItems} />
-
-      <MobileMenu open={moreOpen} onOpenChange={setMoreOpen} />
-    </div>
+    <ShellProvider onOpenFeedback={openFeedback}>
+      {immersive ? (
+        // The player is full screen: no bar, no dock, no footer.
+        <main id="main-content" tabIndex={-1} className="outline-none">
+          {children}
+        </main>
+      ) : (
+        <ShellFrame variant={auth ? "auth" : "default"} showFooter={showFooter && !auth}>
+          {children}
+        </ShellFrame>
+      )}
+      {feedbackMounted && <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />}
+    </ShellProvider>
   );
 }
 
-/**
- * The context bar's answer to "where am I?". Only the destinations that read
- * as their own place get a title — detail pages carry their own hero title,
- * and repeating it in the bar would be noise.
- */
-function pageTitle(pathname: string, t: ReturnType<typeof useLanguage>["t"]): string | undefined {
-  const titles: Record<string, string> = {
-    "/": t.nav.home,
-    "/media": t.nav.media,
-    "/media/movies": t.search.movies,
-    "/media/books": t.search.books,
-    "/media/music": t.search.music,
-    "/search": t.nav.search,
-    "/watchlist": t.watchlist.title,
-    "/watch-history": t.watchHistory.title,
-    "/wallet": t.wallet.title,
-    "/transactions": t.transactions.title,
-    "/notifications": t.notifications.title,
-    "/profile": t.profile.title,
-    "/settings": t.settings.title,
-  };
-  return titles[pathname];
+function ShellFrame({
+  children,
+  variant,
+  showFooter,
+}: {
+  children: React.ReactNode;
+  variant: "default" | "auth";
+  showFooter: boolean;
+}) {
+  const pathname = usePathname();
+  const s = useSection(shellText);
+  const shell = useShellState();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const withStrip = variant === "default" && isMediaHubRoute(pathname);
+  const overHero = variant === "default" && Boolean(shell?.overHero);
+  const setSlot = shell?.setSlot;
+
+  // Glass: transparent over a hero at the top, fading to frosted glass
+  // between 150px and 250px of scroll. Written straight to the element's
+  // style on animation frames, so scrolling never re-renders React. A layout
+  // effect, so a hero page never paints one frame of glass first after the
+  // code starts; before that, the `[data-shell-root]:has(.under-bar)` rule
+  // in globals.css keeps the server-rendered bar clear over a hero.
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    let frame = 0;
+    const paint = () => {
+      frame = 0;
+      const amount = overHero ? Math.min(1, Math.max(0, (window.scrollY - 150) / 100)) : 1;
+      bar.style.setProperty("--glass-a", amount.toFixed(3));
+      bar.dataset.glass = amount > 0 ? "on" : "off";
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(paint);
+    };
+    paint();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [overHero]);
+
+  // Keep --shell-bar-h equal to the real sticky wrapper (bar + strip + any
+  // page sub-bar), so `under-bar` heroes and `sticky-under-bar` toolbars line
+  // up exactly. The CSS classes below give the right value before hydration.
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    const root = rootRef.current;
+    if (!bar || !root || typeof ResizeObserver === "undefined") return;
+    const sync = () => root.style.setProperty("--shell-bar-h", `${Math.round(bar.getBoundingClientRect().height)}px`);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(bar);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--shell-bar-h");
+    };
+  }, []);
+
+  return (
+    <div
+      ref={rootRef}
+      data-shell-root=""
+      className={cn(
+        "relative flex min-h-screen flex-col bg-ground text-fg [overflow-x:clip]",
+        withStrip
+          ? "[--shell-bar-h:124px] max-desk:[--shell-bar-h:112px]"
+          : "[--shell-bar-h:72px] max-desk:[--shell-bar-h:60px]",
+        variant === "default" && "pb-dock",
+      )}
+    >
+      <a
+        href="#main-content"
+        className="sr-only z-[100] rounded-[12px] bg-play px-4 py-3 text-[15px] font-extrabold text-ink focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:outline-2 focus:outline-offset-2 focus:outline-link"
+      >
+        {s.skipToContent}
+      </a>
+
+      <div
+        ref={barRef}
+        // Server HTML: glass, unless the page opens with an `under-bar` hero
+        // (globals.css clears the bar for that case before any code runs).
+        // From then on the layout effect above drives --glass-a/data-glass.
+        data-shell-bar=""
+        className="sticky top-0 z-50 transition-[background-color] duration-[250ms] [--glass-a:1]"
+        style={{
+          backgroundColor: "rgba(8, 8, 11, calc(0.4 * var(--glass-a)))",
+          WebkitBackdropFilter: "blur(calc(24px * var(--glass-a))) saturate(calc(1 + 0.4 * var(--glass-a)))",
+          backdropFilter: "blur(calc(24px * var(--glass-a))) saturate(calc(1 + 0.4 * var(--glass-a)))",
+        }}
+      >
+        {variant === "auth" ? <AuthTopBarHeader /> : <TopBarHeader />}
+        {withStrip && <MediaChipStrip />}
+        {/* Pages can portal a sub-bar in here with <TopBarSlot>. */}
+        <div ref={setSlot} />
+      </div>
+
+      <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
+        {children}
+      </main>
+
+      {showFooter && <Footer />}
+
+      {variant === "default" && <Dock />}
+    </div>
+  );
 }

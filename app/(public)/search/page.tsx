@@ -3,19 +3,21 @@ import { Suspense } from "react";
 import { BrowseSurface, BrowseSurfaceSkeleton } from "@/components/browse/BrowseSurface";
 
 /**
- * SEARCH — a real destination, not a redirect.
+ * SEARCH — a real destination, not a redirect (Search + SearchResults boards).
  *
- * The nav promotes Search to a primary item, so it has to be somewhere the user
- * can actually BE: a route that redirects to /movies can never light its own
- * nav entry, and the back button lands on a page that immediately bounces
- * again. This renders the very same browse surface (same components, same
- * query hooks, same filters — no separate search stack) with the field open and
- * the editorial hero out of the way.
+ * Before a search runs it is the Search page: the big field, the scope tabs
+ * (Movies · Series · Books · Music SOON), recent and trending searches,
+ * genre chips and a few rows. Once a term settles or a filter is on, the
+ * same surface turns into the results view: compact field with Back,
+ * counted tabs, sort, grid density, Sort & filter, pills and an endless grid.
+ * It is the very same browse surface /media/movies uses (same components,
+ * same query hooks, same filters — no separate search stack). The top bar is
+ * glass from the start: there is no artwork hero here.
  */
 export default function SearchPage() {
   return (
     <Suspense fallback={<BrowseSurfaceSkeleton />}>
-      <BrowseSurface mode="search" />
+      <BrowseSurface />
     </Suspense>
   );
 }

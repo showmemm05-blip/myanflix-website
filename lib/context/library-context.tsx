@@ -1,34 +1,44 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { loginHref } from "@/lib/auth/return-to";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
+import { pickSection } from "@/lib/i18n/sections/define";
+import { libraryText } from "@/lib/i18n/sections/library";
 import { watchlistService } from "@/services/api/watchlistService";
 
 interface LibraryContextValue {
   isInWatchlist: (movieId: string) => boolean;
   toggleWatchlist: (movieId: string) => void;
   watchlistCount: number;
+  /** The saved movie ids in the order they were saved (empty for a guest). */
+  watchlistIds: readonly string[];
 }
 
 const LibraryContext = createContext<LibraryContextValue | null>(null);
+const EMPTY_IDS: readonly string[] = [];
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
-  const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set());
+  // The saved ids live in this browser's storage. useSyncExternalStore reads
+  // them with an empty server snapshot, so the server HTML and the hydrating
+  // client agree (no mismatch), and then switches to the stored list — with
+  // no extra mount effect and no second render of the whole tree.
+  const savedIds = useSyncExternalStore(
+    watchlistService.subscribe,
+    watchlistService.getIdsSnapshot,
+    watchlistService.getServerIdsSnapshot,
+  );
+  const watchlistIds = useMemo(() => new Set(savedIds), [savedIds]);
   // The watchlist is a member feature: a visitor can't open /watchlist, so
   // saving would only ever fill a list they can never see. Every save button
   // in the app goes through here, so the one guest check lives here too.
   const { isAuthenticated } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
-
-  useEffect(() => {
-    setWatchlistIds(new Set(watchlistService.getWatchlistIds()));
-  }, []);
 
   const isInWatchlist = useCallback(
     (movieId: string) => isAuthenticated && watchlistIds.has(movieId),
@@ -45,29 +55,31 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       });
       return;
     }
-    setWatchlistIds((prev) => {
-      const wasIn = prev.has(movieId);
-      if (wasIn) {
-        watchlistService.removeFromWatchlist(movieId);
-        toast("Removed from watchlist");
-      } else {
-        watchlistService.addToWatchlist(movieId);
-        toast.success("Added to watchlist");
-      }
-      const next = new Set(prev);
-      if (wasIn) next.delete(movieId);
-      else next.add(movieId);
-      return next;
-    });
-  }, [isAuthenticated, pathname, router, t]);
+    // The saved list lives in this browser's storage, so it is the truth for
+    // "was it saved?". Side effects (storage write, toast) stay out of the
+    // state updater, which React may run twice.
+    // Each write notifies the store above, which re-renders the readers.
+    const add = (id: string) => watchlistService.addToWatchlist(id);
+    const remove = (id: string) => watchlistService.removeFromWatchlist(id);
+    const l = pickSection(libraryText, language);
+    if (watchlistService.getWatchlistIds().includes(movieId)) {
+      remove(movieId);
+      // Undo puts the title straight back (the Library board's toast).
+      toast(l.removedFromList, { action: { label: l.undo, onClick: () => add(movieId) } });
+    } else {
+      add(movieId);
+      toast.success(l.addedToList);
+    }
+  }, [isAuthenticated, language, pathname, router, t]);
 
   const value = useMemo(
     () => ({
       isInWatchlist,
       toggleWatchlist,
       watchlistCount: isAuthenticated ? watchlistIds.size : 0,
+      watchlistIds: isAuthenticated ? savedIds : EMPTY_IDS,
     }),
-    [isAuthenticated, isInWatchlist, toggleWatchlist, watchlistIds.size],
+    [isAuthenticated, isInWatchlist, toggleWatchlist, watchlistIds.size, savedIds],
   );
 
   return <LibraryContext.Provider value={value}>{children}</LibraryContext.Provider>;

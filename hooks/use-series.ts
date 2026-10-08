@@ -10,8 +10,12 @@ export const seriesInfiniteKey = (query: SeriesQuery) => ["series", "infinite", 
  * old client-side title filtering over one big page is gone). Same contract
  * as `useMoviesInfinite`: `pages[0].total` is the honest match count.
  */
-export function useSeriesInfinite(query: SeriesQuery = {}) {
+export function useSeriesInfinite(
+  query: SeriesQuery = {},
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useInfiniteQuery({
+    enabled,
     queryKey: seriesInfiniteKey(query),
     queryFn: ({ pageParam, signal }) =>
       seriesService.getSeries({ ...query, page: pageParam }, { signal }),
@@ -26,10 +30,11 @@ export function useSeriesInfinite(query: SeriesQuery = {}) {
 }
 
 /** Series filter options (genres/languages/years) — the series tab's counterpart of useMovieFacets. */
-export function useSeriesFacets() {
+export function useSeriesFacets({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ["series", "facets"],
     queryFn: ({ signal }) => seriesService.getSeriesFacets({ signal }),
     staleTime: 5 * 60_000,
+    enabled,
   });
 }

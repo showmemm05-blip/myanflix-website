@@ -1,128 +1,131 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { Play, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Surface } from "@/components/system/Surface";
+import { Artwork } from "@/components/system/Artwork";
+import { CheckIcon, PlayIcon } from "@/components/system/icons";
+import { buttonVariants } from "@/components/ui/button";
 import { useLanguage } from "@/lib/context/language-context";
-import { formatRelativeDate } from "@/lib/format";
-import { FALLBACK_POSTER_URL } from "@/lib/placeholder";
+import { formatDuration } from "@/lib/format";
+import { useSection } from "@/lib/i18n/sections/define";
+import { clockTime, libraryText } from "@/lib/i18n/sections/library";
 import { RESUME_COMPLETE_PERCENT, resumeHref } from "@/lib/player/resume";
 import { cn } from "@/lib/utils";
 import type { WatchHistoryEntry } from "@/types/movie";
 
 /**
- * A row of history: artwork, what it is, how far in you got, and the one action
- * that matters — resume, or watch again once it's finished. The progress bar is
- * the loudest thing in the row on purpose; it is the reason this list exists.
+ * A row of watch history (WatchHistory board): the poster, the title link,
+ * "2h 4m · Last watched 9:40 PM", a 4px progress bar (crimson while in
+ * progress, grey once finished) and the one action that matters — Resume at
+ * the saved second, or Watch again from the start. Flat #121217 row, radius
+ * 16, raised on hover. No poster → the fallback scene.
  */
 export function WatchHistoryCard({ entry }: { entry: WatchHistoryEntry }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const lib = useSection(libraryText);
+  const percent = Math.min(100, Math.max(0, Math.round(entry.progressPercent)));
   const isComplete = entry.progressPercent >= RESUME_COMPLETE_PERCENT;
-  const barWidth = Math.min(100, Math.max(0, entry.progressPercent));
+  const length = formatDuration(entry.durationMinutes);
+  const left =
+    entry.durationMinutes && !isComplete ? formatDuration((entry.durationMinutes * (100 - percent)) / 100) : null;
+  const lastWatched = t.watchHistory.lastWatched(clockTime(entry.lastWatchedAt, language));
 
   return (
-    <Surface interactive className="flex gap-3.5 p-3">
+    <article className="flex gap-4 rounded-[16px] bg-surface p-3 transition-colors duration-150 hover:bg-raised">
+      {/* The poster repeats the title link for the pointer; keyboard and
+          screen readers get the one named link next to it. */}
       <Link
         href={`/movie/${entry.movieId}`}
-        className="focus-ring relative aspect-2/3 w-20 shrink-0 overflow-hidden rounded-xl bg-secondary/60 ring-1 ring-white/10 ring-inset"
+        tabIndex={-1}
+        aria-hidden
+        className="group/card relative aspect-2/3 w-20 shrink-0 overflow-hidden rounded-[10px] bg-raised"
       >
-        <Image
-          src={entry.posterUrl ?? FALLBACK_POSTER_URL}
-          alt={entry.movieTitle}
-          fill
-          sizes="80px"
-          className="object-cover"
-        />
+        <Artwork src={entry.posterUrl} seed={entry.movieTitle} variant="poster" sizes="80px" />
       </Link>
 
       <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
         <div className="min-w-0">
           <Link
             href={`/movie/${entry.movieId}`}
-            className="focus-ring block truncate rounded font-heading text-sm font-semibold transition-colors duration-150 ease-out hover:text-primary"
+            className="block truncate rounded-[6px] text-base leading-[22px] font-extrabold text-fg outline-none transition-colors duration-150 hover:text-link focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
           >
             {entry.movieTitle}
           </Link>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            {t.watchHistory.lastWatched(formatRelativeDate(entry.lastWatchedAt))}
+          <p className="mt-0.5 truncate text-[13px] leading-[18px] text-fg-faint tabular-nums">
+            {length ? `${length} · ${lastWatched}` : lastWatched}
           </p>
         </div>
 
         <div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-            {/* Finished titles read emerald (done), in-progress violet (your action). */}
+          <div
+            role="progressbar"
+            aria-label={isComplete ? lib.completedLabel(entry.movieTitle) : lib.progressLabel(entry.movieTitle, percent)}
+            aria-valuenow={percent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            className="h-1 w-full overflow-hidden rounded-[2px] bg-hairline-strong"
+          >
             <div
-              className={cn(
-                "h-full rounded-full transition-[width] duration-300 ease-out",
-                isComplete ? "bg-success" : "bg-primary",
-              )}
-              style={{ width: `${barWidth}%` }}
+              className={cn("h-full rounded-[2px]", isComplete ? "bg-fg-faint" : "bg-crimson")}
+              style={{ width: `${percent}%` }}
             />
           </div>
-          <div className="mt-2.5 flex items-center justify-between gap-2">
-            <span className="truncate text-xs text-muted-foreground nums">
-              {isComplete ? t.watchHistory.completed : t.watchHistory.percentWatched(entry.progressPercent)}
+          <div className="mt-2.5 flex items-center justify-between gap-3">
+            <span className="flex min-w-0 items-center gap-1.5 truncate text-[13px] leading-[18px] text-fg-muted tabular-nums">
+              {isComplete && <CheckIcon size={16} className="shrink-0 text-money" />}
+              <span className="truncate">
+                {isComplete
+                  ? t.watchHistory.completed
+                  : left
+                    ? lib.statusLeft(percent, left)
+                    : t.watchHistory.percentWatched(percent)}
+              </span>
             </span>
             {isComplete ? (
-              <Button
-                size="pill-sm"
-                variant="ghost"
-                className="shrink-0 bg-white/8 font-semibold ring-1 ring-white/15 ring-inset hover:bg-white/15 active:scale-[0.98]"
-                render={<Link href={`/player/${entry.movieId}`} />}
-                nativeButton={false}
+              <Link
+                href={`/player/${entry.movieId}`}
+                aria-label={lib.watchAgainTitle(entry.movieTitle)}
+                className={cn(buttonVariants({ variant: "tonal" }), "h-9 shrink-0 gap-1.5 pr-3.5 pl-3 font-extrabold")}
               >
-                <RotateCcw className="size-3.5" />
+                <RotateCcw className="size-4" strokeWidth={1.75} />
                 {t.watchHistory.watchAgain}
-              </Button>
+              </Link>
             ) : (
-              <Button
-                variant="onArt"
-                size="pill-sm"
-                className="shrink-0"
+              <Link
                 // H-27: resume at the saved second, not 0:00.
-                render={
-                  <Link
-                    href={resumeHref(
-                      entry.movieId,
-                      entry.progressPercent,
-                      entry.lastPositionSeconds,
-                    )}
-                  />
-                }
-                nativeButton={false}
+                href={resumeHref(entry.movieId, entry.progressPercent, entry.lastPositionSeconds)}
+                aria-label={lib.resumeFrom(entry.movieTitle, percent)}
+                className={cn(buttonVariants({ variant: "tonal" }), "h-9 shrink-0 gap-1.5 pr-3.5 pl-3 font-extrabold")}
               >
-                <Play className="size-3.5 fill-current" />
+                <PlayIcon size={16} />
                 {t.watchHistory.resume}
-              </Button>
+              </Link>
             )}
           </div>
         </div>
       </div>
-    </Surface>
+    </article>
   );
 }
 
 export function WatchHistoryCardSkeleton() {
   return (
-    <Surface className="flex gap-3.5 p-3">
-      <Skeleton className="aspect-2/3 w-20 shrink-0 rounded-xl" />
-      <div className="flex min-w-0 flex-1 flex-col justify-between py-1">
-        <div>
-          <Skeleton className="h-4 w-3/5" />
-          <Skeleton className="mt-2 h-3 w-2/5" />
-        </div>
-        <div>
-          <Skeleton className="h-1.5 w-full rounded-full" />
-          <div className="mt-2.5 flex items-center justify-between gap-2">
-            <Skeleton className="h-3 w-16" />
-            <Skeleton className="h-10 w-24 rounded-full" />
-          </div>
-        </div>
-      </div>
-    </Surface>
+    <div aria-hidden className="flex gap-4 rounded-[16px] bg-surface p-3">
+      <span className="mq-skeleton block aspect-2/3 w-20 shrink-0 rounded-[10px]" />
+      <span className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
+        <span>
+          <span className="mq-skeleton block h-4 w-3/5 rounded-[5px]" />
+          <span className="mq-skeleton mt-2 block h-3 w-2/5 rounded-[5px]" />
+        </span>
+        <span>
+          <span className="mq-skeleton block h-1 rounded-[2px]" />
+          <span className="mt-2.5 flex justify-between">
+            <span className="mq-skeleton block h-3 w-20 rounded-[5px]" />
+            <span className="mq-skeleton block h-9 w-24 rounded-[12px]" />
+          </span>
+        </span>
+      </span>
+    </div>
   );
 }

@@ -5,7 +5,9 @@
  *
  * Every endpoint responds with `{ success: true, data }` on success or
  * `{ success: false, message }` on failure — this client unwraps that
- * envelope so callers just get `data` back (or a thrown ApiError).
+ * envelope so callers just get `data` back (or a thrown ApiError). A few
+ * refusals also carry a stable `code` (plus e.g. `triesLeft`/`lockedUntil`);
+ * the ApiError keeps those too.
  */
 import axios, {
   type AxiosError,
@@ -34,14 +36,50 @@ export const API_ORIGIN = new URL(API_BASE_URL).origin;
 export const CLIENT_PLATFORM = "WEB";
 export const CLIENT_PLATFORM_HEADER = "X-Client-Platform";
 
+/**
+ * What a coded backend refusal carries next to `message` (CodedHttpException:
+ * `{ success: false, message, code, ...extra }`). Most errors have none of
+ * these — only the ones whose callers must branch on the reason (today: the
+ * withdrawal code) do.
+ */
+export interface ApiErrorDetails {
+  /** Stable reason, e.g. "WITHDRAWAL_CODE_WRONG". Branch on this, never on `message`. */
+  code?: string;
+  /** Wrong withdrawal-code tries left before the lock (0 while locked). */
+  triesLeft?: number;
+  maxTries?: number;
+  /** ISO time a locked withdrawal code opens again. */
+  lockedUntil?: string;
+}
+
 export class ApiError extends Error {
   status: number;
+  code?: string;
+  triesLeft?: number;
+  maxTries?: number;
+  lockedUntil?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, details: ApiErrorDetails = {}) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = details.code;
+    this.triesLeft = details.triesLeft;
+    this.maxTries = details.maxTries;
+    this.lockedUntil = details.lockedUntil;
   }
+}
+
+/** The coded fields of an error body, each kept only when it has the expected type. */
+function errorDetails(body: unknown): ApiErrorDetails {
+  if (!body || typeof body !== "object") return {};
+  const b = body as Record<string, unknown>;
+  return {
+    code: typeof b.code === "string" ? b.code : undefined,
+    triesLeft: typeof b.triesLeft === "number" ? b.triesLeft : undefined,
+    maxTries: typeof b.maxTries === "number" ? b.maxTries : undefined,
+    lockedUntil: typeof b.lockedUntil === "string" ? b.lockedUntil : undefined,
+  };
 }
 
 interface RequestOptions extends Omit<AxiosRequestConfig, "params"> {
@@ -90,6 +128,23 @@ export function toCsvParams(
   return params;
 }
 
+/**
+ * How long a READ (GET) may wait for an answer before it fails. Without one,
+ * a stalled connection (weak signal, a server mid-restart) left spinners up
+ * forever: React Query only retries after a failure, and none ever came. A
+ * timeout fails as status 0 ("no answer"), which isTransientStatus treats as
+ * "server unreachable" — the session is kept, and the query simply retries.
+ *
+ * Writes (POST/PUT/PATCH/DELETE) deliberately get NO default timeout, as
+ * before: a deposit, withdrawal, purchase or subscription that the server
+ * finishes after the client gave up would show "Couldn't reach MyanFlix" for
+ * an action that went through — and invite a second, duplicate attempt.
+ * The token refresh and file uploads set their own timeouts below.
+ */
+export const REQUEST_TIMEOUT_MS = 20_000;
+/** File uploads (the profile photo) get longer: a slow phone link needs it. */
+export const UPLOAD_TIMEOUT_MS = 120_000;
+
 const axiosClient = axios.create({ baseURL: API_BASE_URL });
 
 axiosClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
@@ -108,6 +163,11 @@ axiosClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 let refreshPromise: Promise<string | null> | null = null;
 
+/** axios reports a timeout as ECONNABORTED (or ETIMEDOUT with clarifyTimeoutError). */
+function isTimeout(err: AxiosError): boolean {
+  return err.code === "ECONNABORTED" || err.code === "ETIMEDOUT";
+}
+
 /** What a caller sees when the refresh could not reach a verdict (H-20). */
 const SERVER_UNREACHABLE_MESSAGE =
   "Couldn't reach MyanFlix. Check your connection and try again.";
@@ -115,10 +175,15 @@ const SERVER_UNREACHABLE_MESSAGE =
 /** Any thrown value as the ApiError every caller of this client expects. */
 function toApiError(err: unknown): ApiError {
   if (err instanceof ApiError) return err;
+  if (axios.isAxiosError(err) && !err.response && isTimeout(err)) {
+    // No answer in time: status 0, like any other "never reached the server".
+    return new ApiError(SERVER_UNREACHABLE_MESSAGE, 0);
+  }
   if (axios.isAxiosError(err)) {
     return new ApiError(
       err.response?.data?.message ?? err.message,
       err.response?.status ?? 0,
+      errorDetails(err.response?.data),
     );
   }
   return new ApiError("Request failed", 0);
@@ -167,7 +232,13 @@ async function performRefresh(): Promise<string | null> {
     const response = await axios.post(
       `${API_BASE_URL}/auth/refresh`,
       { refreshToken },
-      { headers: { [CLIENT_PLATFORM_HEADER]: CLIENT_PLATFORM } },
+      {
+        headers: { [CLIENT_PLATFORM_HEADER]: CLIENT_PLATFORM },
+        // A stalled refresh would hold every waiting request with it. A
+        // timeout has no response, so it is not a refusal: the tokens are
+        // kept and a status-0 error goes back (see the catch below).
+        timeout: REQUEST_TIMEOUT_MS,
+      },
     );
     const nextAccessToken: string | undefined =
       response.data?.data?.accessToken;
@@ -217,6 +288,7 @@ async function request<T>(
       throw new ApiError(
         response.data.message ?? "Request failed",
         response.status,
+        errorDetails(response.data),
       );
     }
     return (response.data?.data ?? response.data) as T;
@@ -275,6 +347,7 @@ async function request<T>(
       throw new ApiError(
         retryResponse.data.message ?? "Request failed",
         retryResponse.status,
+        errorDetails(retryResponse.data),
       );
     }
     return (retryResponse.data?.data ?? retryResponse.data) as T;
@@ -283,7 +356,7 @@ async function request<T>(
 
 export const apiClient = {
   get: <T>(path: string, options?: RequestOptions) =>
-    request<T>(path, { ...options, method: "GET" }),
+    request<T>(path, { timeout: REQUEST_TIMEOUT_MS, ...options, method: "GET" }),
   post: <T>(path: string, data?: unknown, options?: RequestOptions) =>
     request<T>(path, { ...options, method: "POST", data }),
   /**
@@ -293,7 +366,7 @@ export const apiClient = {
    * header, envelope unwrap, and refresh-on-401 behavior as every other method.
    */
   postMultipart: <T>(path: string, formData: FormData, options?: RequestOptions) =>
-    request<T>(path, { ...options, method: "POST", data: formData }),
+    request<T>(path, { timeout: UPLOAD_TIMEOUT_MS, ...options, method: "POST", data: formData }),
   put: <T>(path: string, data?: unknown, options?: RequestOptions) =>
     request<T>(path, { ...options, method: "PUT", data }),
   patch: <T>(path: string, data?: unknown, options?: RequestOptions) =>

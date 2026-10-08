@@ -18,6 +18,13 @@ export default function TransactionsPage() {
     queryFn: () => paymentService.getTransactions({ page, limit: PAGE_SIZE }),
   });
 
+  // The header's balance — the same ["wallet-summary"] query the top bar's
+  // pill and /wallet read, so it stays live with the realtime listener.
+  const { data: summary, isLoading: isSummaryLoading } = useQuery({
+    queryKey: ["wallet-summary"],
+    queryFn: () => paymentService.getWalletSummary(),
+  });
+
   const filtered = (data?.items ?? []).filter((t) => {
     const matchesSearch = (t.movieTitle ?? "").toLowerCase().includes(search.toLowerCase());
     const matchesType =
@@ -42,13 +49,21 @@ export default function TransactionsPage() {
         setTypeFilter(type);
         setPage(1);
       }}
+      onClearFilters={() => {
+        setSearch("");
+        setTypeFilter("all");
+        setPage(1);
+      }}
       transactions={filtered}
+      totalCount={data?.total ?? 0}
       isLoading={isLoading}
       isError={isError}
       onRetry={() => refetch()}
       page={page}
       totalPages={totalPages}
       onPageChange={setPage}
+      balance={summary?.balance}
+      isBalanceLoading={isSummaryLoading}
     />
   );
 }

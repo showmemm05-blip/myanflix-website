@@ -1,11 +1,10 @@
 "use client";
 
-import { hasMyanmar } from "@/components/books/reader-settings";
-import { X } from "lucide-react";
-
-import { chipClass } from "@/components/system/Chip";
-import { Kicker } from "@/components/system/Kicker";
+import { RemovableChip } from "@/components/system/Chip";
 import { useLanguage } from "@/lib/context/language-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import { searchText } from "@/lib/i18n/sections/search";
+import { cn } from "@/lib/utils";
 
 export interface ActivePill {
   key: string;
@@ -14,51 +13,38 @@ export interface ActivePill {
 }
 
 /**
- * What's currently narrowing the results, each removable in one click. Without
- * this, a filter set inside the sheet and then forgotten looks like "the
- * catalog is missing things".
- *
- * These are the one place on a browse page where a chip is deliberately violet:
- * they represent an ACTION the user took, and the eye should find them before
- * it starts blaming the catalog.
+ * What's currently narrowing the results, each removable in one click
+ * (SearchResults board): a faint "FILTERS" overline (desktop), one
+ * crimson-soft pill per value ("Remove filter: Burmese" to a screen reader),
+ * and a crimson "Clear all". Without this, a filter set in the drawer and then
+ * forgotten looks like "the catalogue is missing things".
  */
-export function ActiveFilterPills({ pills, onClearAll }: { pills: ActivePill[]; onClearAll: () => void }) {
+export function ActiveFilterPills({
+  pills,
+  onClearAll,
+  className,
+}: {
+  pills: ActivePill[];
+  onClearAll: () => void;
+  className?: string;
+}) {
   const { t } = useLanguage();
+  const sx = useSection(searchText);
   if (pills.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Kicker
-        className="mr-0.5 hidden sm:block"
-        // Kicker tracks 0.18em; Burmese must not be letter-spaced (mm is the
-        // default locale, where this label reads "စစ်ထုတ်မှုများ").
-        style={{ letterSpacing: hasMyanmar(t.filters.title) ? 0 : undefined }}
-      >
-        {t.filters.title}
-      </Kicker>
+    <div role="group" aria-label={sx.activeFilters} className={cn("flex flex-wrap items-center gap-x-2.5 gap-y-2", className)}>
+      <span className="mr-0.5 text-kicker max-desk:hidden">{t.filters.title}</span>
       {pills.map((pill) => (
-        <button
-          key={pill.key}
-          type="button"
-          onClick={pill.onRemove}
-          // The visible label is just the filter's value ("Action"), which
-          // announces as a pill that does nothing. Say what pressing it does.
-          aria-label={`${t.watchlist.remove}: ${pill.label}`}
-          className={chipClass({ tone: "primary", variant: "outline", size: "md" })}
-        >
-          {pill.label}
-          <X className="opacity-70" />
-        </button>
+        <RemovableChip key={pill.key} label={pill.label} onRemove={pill.onRemove} className="nums" />
       ))}
-      {pills.length >= 1 && (
-        <button
-          type="button"
-          onClick={onClearAll}
-          className="focus-ring rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground underline-offset-4 transition-colors duration-150 ease-out hover:text-foreground hover:underline"
-        >
-          {t.browse.clearAll}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onClearAll}
+        className="mq-link h-9 cursor-pointer rounded-[6px] border-0 bg-transparent px-1.5 text-sm font-extrabold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+      >
+        {t.browse.clearAll}
+      </button>
     </div>
   );
 }

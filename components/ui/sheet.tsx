@@ -5,7 +5,8 @@ import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { XIcon } from "lucide-react"
+import { CloseIcon } from "@/components/system/icons"
+import { useLanguage } from "@/lib/context/language-context"
 
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
@@ -28,7 +29,7 @@ function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
     <SheetPrimitive.Backdrop
       data-slot="sheet-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/55 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-sm",
+        "fixed inset-0 z-[80] bg-black/60 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0",
         className
       )}
       {...props}
@@ -44,12 +45,12 @@ function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
  * lose to the primitive's `data-[side=right]:sm:max-w-sm`.
  */
 const SHEET_SIDES = {
-  top: "inset-x-0 top-0 h-auto border-b data-ending-style:-translate-y-10 data-starting-style:-translate-y-10",
+  top: "inset-x-0 top-0 h-auto rounded-b-[20px] data-ending-style:-translate-y-10 data-starting-style:-translate-y-10",
   bottom:
-    "inset-x-0 bottom-0 h-auto border-t data-ending-style:translate-y-10 data-starting-style:translate-y-10",
-  left: "inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm data-ending-style:-translate-x-10 data-starting-style:-translate-x-10",
+    "inset-x-0 bottom-0 h-auto max-h-[90dvh] rounded-t-[20px] pb-[env(safe-area-inset-bottom)] data-ending-style:translate-y-10 data-starting-style:translate-y-10",
+  left: "inset-y-0 left-0 h-full w-3/4 sm:max-w-sm data-ending-style:-translate-x-10 data-starting-style:-translate-x-10",
   right:
-    "inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm data-ending-style:translate-x-10 data-starting-style:translate-x-10",
+    "inset-y-0 right-0 h-full w-3/4 sm:max-w-sm data-ending-style:translate-x-10 data-starting-style:translate-x-10",
 } as const
 
 function SheetContent({
@@ -62,6 +63,7 @@ function SheetContent({
   side?: keyof typeof SHEET_SIDES
   showCloseButton?: boolean
 }) {
+  const { t } = useLanguage()
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -69,7 +71,7 @@ function SheetContent({
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-popover/95 bg-clip-padding text-sm text-popover-foreground shadow-e3 backdrop-blur-xl transition duration-200 ease-out data-ending-style:opacity-0 data-starting-style:opacity-0",
+          "fixed z-[80] flex flex-col gap-4 bg-popover text-[15px] text-fg shadow-e3 transition duration-200 ease-out outline-none data-ending-style:opacity-0 data-starting-style:opacity-0",
           SHEET_SIDES[side],
           className
         )}
@@ -84,14 +86,13 @@ function SheetContent({
                 variant="ghost"
                 // 40px of hit area for a control that is often the only way
                 // back out of a full-height sheet on a phone.
-                className="absolute top-2 right-2 size-10 rounded-full"
-                size="icon-lg"
+                className="absolute top-4 right-4 bg-tonal-faint hover:bg-tonal-soft"
+                size="icon-bar"
               />
             }
           >
-            <XIcon
-            />
-            <span className="sr-only">Close</span>
+            <CloseIcon size={20} />
+            <span className="sr-only">{t.common.close}</span>
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Popup>
@@ -103,7 +104,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-header"
-      className={cn("flex flex-col gap-0.5 p-4", className)}
+      className={cn("flex flex-col gap-1 p-6 pr-16", className)}
       {...props}
     />
   )
@@ -113,7 +114,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-footer"
-      className={cn("mt-auto flex flex-col gap-2 p-4", className)}
+      className={cn("mt-auto flex flex-col gap-3 p-6 pt-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]", className)}
       {...props}
     />
   )
@@ -124,7 +125,7 @@ function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
     <SheetPrimitive.Title
       data-slot="sheet-title"
       className={cn(
-        "font-heading text-base font-medium text-foreground",
+        "text-section-title text-fg",
         className
       )}
       {...props}
@@ -139,7 +140,7 @@ function SheetDescription({
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"
-      className={cn("text-sm text-muted-foreground", className)}
+      className={cn("text-[15px] leading-[23px] text-fg-muted", className)}
       {...props}
     />
   )

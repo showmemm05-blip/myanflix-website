@@ -1,19 +1,19 @@
 import { Suspense } from "react";
 
-import { MediaPageTransition } from "@/components/media/MediaPageTransition";
-import { BrowseSurface, CatalogSkeleton } from "@/components/browse/BrowseSurface";
+import { CatalogHubRoute } from "@/components/media/CatalogHub";
+import { HubSkeleton } from "@/components/media/CatalogParts";
 
 /**
- * /media/movies — the dense poster catalog (Movies|Series tabs, grid-first).
- * It renders THE browse surface in media mode rather than a catalog of its
- * own: one filter system, one query path, shared with /search.
+ * /media/movies — the catalogue address every older link uses
+ * (`?tab=movies|series`, `?type=series`, `?q=`, and the shared filter
+ * parameters). It renders the same hubs as /media: `?tab=series` (or the old
+ * `?type=series`) is the Series hub (MediaSeries.dc.html), anything else the
+ * Movies hub, with the link's filters applied to its "All" grid.
  */
 export default function MediaMoviesPage() {
   return (
-    <MediaPageTransition>
-      <Suspense fallback={<CatalogSkeleton />}>
-        <BrowseSurface mode="media" />
-      </Suspense>
-    </MediaPageTransition>
+    <Suspense fallback={<HubSkeleton rows={["poster", "poster"]} />}>
+      <CatalogHubRoute />
+    </Suspense>
   );
 }

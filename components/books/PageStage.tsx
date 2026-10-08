@@ -11,6 +11,7 @@ import Image from "next/image";
 import { useLanguage } from "@/lib/context/language-context";
 import type { BookPage } from "@/types/book";
 import type { FitId, PageDirectionId, RotationId } from "./reader-settings";
+import { BackIcon, ForwardChevronIcon } from "./reader-icons";
 
 // ── Zoom contract ──────────────────────────────────────────────────────────
 // One clamp shared by the buttons, the keys and the wheel, so no path can
@@ -26,11 +27,11 @@ export function clampZoom(value: number): number {
 
 /**
  * The stage's fit budget: the bars float over the stage, so a fitted sheet
- * leaves them room — 8rem vertical, the same allowance the scroll mode's
- * fit-screen calc (100dvh - 8rem) has always documented, plus a little
- * horizontal breathing space.
+ * leaves them room — 10rem vertical (the 64px top and bottom bars plus 16px
+ * of air at each), the same allowance the scroll mode's fit-screen calc
+ * (100dvh - 10rem) uses, plus a little horizontal breathing space.
  */
-const STAGE_ALLOWANCE_Y = 128;
+const STAGE_ALLOWANCE_Y = 160;
 const STAGE_ALLOWANCE_X = 32;
 
 /** Width/height of a page AS DISPLAYED — 90°/270° swap the axes. */
@@ -332,15 +333,29 @@ export function PageStage({
             tabIndex={-1}
             aria-label={leftIsNext ? r.nextPage : r.previousPage}
             onClick={leftIsNext ? onNext : onPrev}
-            className="absolute inset-y-0 left-0 z-10 w-[30%]"
-          />
+            className="group/turn absolute inset-y-0 left-0 z-10 w-[30%] cursor-pointer border-0 bg-transparent"
+          >
+            <span
+              aria-hidden
+              className="absolute top-1/2 -mt-7 hidden size-14 items-center justify-center rounded-full bg-[color-mix(in_oklab,var(--ink)_8%,transparent)] text-[var(--ink)] transition-colors group-hover/turn:bg-[color-mix(in_oklab,var(--ink)_16%,transparent)] desk:flex left-[clamp(12px,2.5vw,32px)]"
+            >
+              <BackIcon size={24} />
+            </span>
+          </button>
           <button
             type="button"
             tabIndex={-1}
             aria-label={leftIsNext ? r.previousPage : r.nextPage}
             onClick={leftIsNext ? onPrev : onNext}
-            className="absolute inset-y-0 right-0 z-10 w-[30%]"
-          />
+            className="group/turn absolute inset-y-0 right-0 z-10 w-[30%] cursor-pointer border-0 bg-transparent"
+          >
+            <span
+              aria-hidden
+              className="absolute top-1/2 -mt-7 hidden size-14 items-center justify-center rounded-full bg-[color-mix(in_oklab,var(--ink)_8%,transparent)] text-[var(--ink)] transition-colors group-hover/turn:bg-[color-mix(in_oklab,var(--ink)_16%,transparent)] desk:flex right-[clamp(12px,2.5vw,32px)]"
+            >
+              <ForwardChevronIcon size={24} />
+            </span>
+          </button>
         </>
       )}
     </div>

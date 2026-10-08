@@ -1,0 +1,47 @@
+/* The withdrawal-code boxes' two motions (Withdraw.dc.html): a short shake
+   when the server refuses the code, and the blinking caret in the box being
+   typed into. The site-wide reduced-motion guard in globals.css stops both. */
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+.shake {
+  animation: shake 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.caret {
+  animation: blink 1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shake,
+  .caret {
+    animation: none;
+  }
+}

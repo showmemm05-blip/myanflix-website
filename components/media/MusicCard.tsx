@@ -1,117 +1,92 @@
 "use client";
 
-import Image from "next/image";
-import { Play } from "lucide-react";
 import { toast } from "sonner";
 
+import { FallbackArt, PlayIcon } from "@/components/system";
 import { useLanguage } from "@/lib/context/language-context";
 import { formatTimecode } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { useSection } from "@/lib/i18n/sections/define";
+import { mediaText } from "@/lib/i18n/sections/media";
 import type { MusicAlbum, MusicTrack } from "@/types/music";
 
 /**
- * THE MUSIC CARD — square artwork, a play button that arrives on approach.
+ * MUSIC PREVIEW CARDS (MediaMusic.dc.html).
  *
- * The third distinct object in the media system: where MovieCard is a tall
- * poster and BookCard is a hardcover on a shelf, this is a record sleeve —
- * square art edge to edge, and a filled play disc that slides up from the
- * corner on hover the way every music platform has taught a hand to expect.
- * Title and artist sit under the sleeve as two quiet lines.
- *
- * Playback doesn't exist yet (the music backend is a labeled preview), so the
- * play button answers honestly with the "coming soon" toast instead of dying
- * silently or pretending to be a link.
+ * The square album sleeve and the numbered track row. Music is still a
+ * labelled preview, so the sleeve art is drawn on the page (never a remote
+ * placeholder) and every Play answers with the same honest "isn't available
+ * yet" toast instead of dying silently or pretending to be a link.
  */
-export function MusicCard({ album, className }: { album: MusicAlbum; className?: string }) {
+function useNotPlayable() {
   const { t } = useLanguage();
+  return () => toast(t.search.musicComingSoon);
+}
+
+export function AlbumCard({ album }: { album: MusicAlbum }) {
+  const m = useSection(mediaText);
+  const notPlayable = useNotPlayable();
 
   return (
-    <article className={cn("group/music flex min-w-0 flex-col", className)}>
-      {/* ─ The sleeve ─ */}
-      <div className="relative aspect-square overflow-hidden rounded-xl bg-secondary/60 shadow-e1 ring-1 ring-white/8 transition-[box-shadow] duration-200 ease-out ring-inset group-hover/music:shadow-e2 group-hover/music:ring-white/16">
-        <Image
-          src={album.artworkUrl}
-          alt=""
-          fill
-          sizes="(max-width: 640px) 46vw, (max-width: 1024px) 23vw, 220px"
-          className="object-cover transition-transform duration-500 ease-out group-hover/music:scale-[1.04]"
+    <article className="group/card relative min-w-0">
+      <span className="relative block aspect-square overflow-hidden rounded-[10px] bg-raised">
+        <FallbackArt
+          seed={album.title}
+          variant="poster"
+          className="transition-transform duration-500 ease-[cubic-bezier(.2,.8,.2,1)] group-hover/card:scale-[1.04]"
         />
-        {/* Footlight for the play disc — only when it's on stage. */}
-        <div
+        <span
           aria-hidden
-          className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent opacity-0 transition-opacity duration-200 ease-out group-hover/music:opacity-100 group-focus-within/music:opacity-100"
-        />
+          className="absolute right-2.5 bottom-2.5 left-2.5 line-clamp-2 text-[13px] leading-[14px] font-black tracking-[-0.01em] text-white uppercase"
+        >
+          {album.title}
+        </span>
+      </span>
+      <span className="mt-2.5 block truncate text-[15px] leading-5 font-bold text-fg transition-colors duration-150 group-hover/card:text-link">
+        {album.title}
+      </span>
+      <span className="block truncate text-[13px] leading-[18px] text-fg-faint tabular-nums">
+        {m.albumMeta(album.artist, album.releaseYear)}
+      </span>
+      {/* Visible on hover / keyboard focus with a pointer; always reachable on touch. */}
+      <span className="pointer-events-none absolute inset-x-0 top-0 z-[2] flex aspect-square items-center justify-center">
         <button
           type="button"
-          aria-label={t.browse.play}
-          onClick={() => toast(t.media.comingSoon)}
-          className={cn(
-            "absolute right-2.5 bottom-2.5 flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_20px_rgba(0,0,0,0.45)]",
-            "translate-y-2 opacity-0 transition-[opacity,transform] duration-200 ease-out",
-            "group-hover/music:translate-y-0 group-hover/music:opacity-100",
-            "focus-visible:translate-y-0 focus-visible:opacity-100",
-            "hover:scale-105 active:scale-95",
-          )}
+          aria-label={m.playAlbum(album.title)}
+          onClick={notPlayable}
+          className="pointer-events-auto flex size-12 cursor-pointer items-center justify-center rounded-full border-0 bg-play text-ink transition-opacity duration-200 outline-none group-focus-within/card:opacity-100 group-hover/card:opacity-100 hover-device:opacity-0 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link active:scale-[0.97]"
         >
-          <Play className="size-4 translate-x-px fill-current" />
+          <PlayIcon size={20} />
         </button>
-      </div>
-
-      {/* ─ Two lines: what it is, who made it ─ */}
-      <div className="min-w-0 px-0.5 pt-2.5">
-        <h3 className="truncate text-sm leading-tight font-medium text-foreground transition-colors duration-150 ease-out group-hover/music:text-primary">
-          {album.title}
-        </h3>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          {album.artist}
-          <span className="text-muted-foreground/40"> · </span>
-          <span className="nums">{album.releaseYear}</span>
-        </p>
-      </div>
+      </span>
     </article>
   );
 }
 
-/**
- * One row of the popular-tracks list — the pattern square cards can't cover:
- * an index that becomes a play button on hover, a thumbnail of the sleeve,
- * title/artist, the album (desktop only) and a tabular duration.
- */
 export function TrackRow({ track, index }: { track: MusicTrack; index: number }) {
-  const { t } = useLanguage();
+  const m = useSection(mediaText);
+  const notPlayable = useNotPlayable();
 
   return (
-    <li className="group/track flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors duration-150 ease-out hover:bg-white/6 sm:px-3">
-      <span className="relative flex size-7 shrink-0 items-center justify-center">
-        <span className="text-xs text-muted-foreground transition-opacity duration-150 nums group-hover/track:opacity-0 group-focus-within/track:opacity-0">
-          {index + 1}
-        </span>
-        <button
-          type="button"
-          aria-label={t.browse.play}
-          onClick={() => toast(t.media.comingSoon)}
-          className="focus-ring absolute inset-0 flex items-center justify-center rounded-full text-foreground opacity-0 transition-opacity duration-150 group-hover/track:opacity-100 focus-visible:opacity-100"
-        >
-          <Play className="size-3.5 fill-current" />
-        </button>
+    <li className="flex min-h-16 items-center gap-3.5 rounded-[10px] px-2.5 py-2 transition-colors duration-150 hover:bg-raised">
+      <span aria-hidden className="w-6 shrink-0 text-right text-sm font-bold text-fg-faint tabular-nums">
+        {index + 1}
       </span>
-
-      <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-secondary/60 ring-1 ring-white/8 ring-inset">
-        <Image src={track.artworkUrl} alt="" fill sizes="40px" className="object-cover" />
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">{track.title}</p>
-        <p className="truncate text-xs text-muted-foreground">{track.artist}</p>
-      </div>
-
-      <span className="hidden w-44 shrink-0 truncate text-xs text-muted-foreground md:block">
-        {track.album}
+      <span aria-hidden className="relative size-11 shrink-0 overflow-hidden rounded-[6px]">
+        <FallbackArt seed={track.album} variant="poster" />
       </span>
-
-      <span className="shrink-0 pl-2 text-xs text-muted-foreground nums">
-        {formatTimecode(track.durationSeconds)}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] leading-5 font-bold text-fg">{track.title}</span>
+        <span className="block truncate text-[13px] leading-[18px] text-fg-faint">{m.trackSub(track.artist, track.album)}</span>
       </span>
+      <span className="shrink-0 text-[13px] text-fg-faint tabular-nums">{formatTimecode(track.durationSeconds)}</span>
+      <button
+        type="button"
+        aria-label={m.playTrack(track.title, track.artist)}
+        onClick={notPlayable}
+        className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-fg transition-colors duration-150 outline-none hover:bg-tonal-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+      >
+        <PlayIcon size={18} />
+      </button>
     </li>
   );
 }

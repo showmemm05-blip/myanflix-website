@@ -70,63 +70,185 @@ const FILTER_PARAM_KEYS = [
   "access",
 ] as const;
 
-function parseCsv(value: string | null): string[] {
-  if (!value) return [];
-  return value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+// ── Input limits ───────────────────────────────────────────────────────
+// These mirror what the API's query DTOs accept (backend movie-query.dto.ts /
+// series-query.dto.ts). Filters arrive from two places we do not control — a
+// shared link and this browser's saved preferences — and anything the server
+// would answer 400 to must be dropped HERE, or the grid sits on "couldn't
+// load" with a Retry that can never succeed (and the saved copy brings the
+// same bad value back on the next visit). Everything the UI itself can pick is
+// well inside these limits, so a real user never hits them.
+/** @ArrayMaxSize(20) on every facet list. */
+const MAX_LIST_ENTRIES = 20;
+/** @MaxLength(64, { each: true }) on genres / languages / countries / ageRatings. */
+const MAX_FACET_LENGTH = 64;
+/** @MaxLength(120, { each: true }) on directors. */
+const MAX_DIRECTOR_LENGTH = 120;
+/** @MaxLength(200) on `search`. */
+const MAX_SEARCH_LENGTH = 200;
+/** Resolved one request each on a deep link — kept to the historic cap. */
+const MAX_ACTORS = 10;
+/** actorIds are @IsUUID('4') server-side; anything else is a guaranteed 400. */
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseNum(value: string | null, lo: number, hi: number): number | undefined {
-  if (!value) return undefined;
+/**
+ * A facet list from anywhere: trimmed strings only, over-long entries dropped
+ * (they can't match a real facet value anyway), de-duplicated, capped at the
+ * API's list size. Non-list input (a tampered prefs blob) is simply empty.
+ */
+function cleanList(value: unknown, maxLength = MAX_FACET_LENGTH): string[] {
+  if (!Array.isArray(value)) return [];
+  const out = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry !== "string") continue;
+    const s = entry.trim();
+    if (s.length === 0 || s.length > maxLength) continue;
+    out.add(s);
+    if (out.size >= MAX_LIST_ENTRIES) break;
+  }
+  return [...out];
+}
+
+function parseCsv(value: string | null, maxLength = MAX_FACET_LENGTH): string[] {
+  if (!value) return [];
+  return cleanList(value.split(","), maxLength);
+}
+
+/**
+ * A numeric bound from a URL string or a stored value. `integer` mirrors the
+ * API's @IsInt (years, minutes): `2000.5` is out, not rounded, so the link
+ * and the saved copy stay honest about what was asked for.
+ */
+function parseNum(value: unknown, lo: number, hi: number, integer: boolean): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (typeof value !== "string" && typeof value !== "number") return undefined;
   const n = Number(value);
   if (!Number.isFinite(n) || n < lo || n > hi) return undefined;
+  if (integer && !Number.isInteger(n)) return undefined;
   return n;
 }
 
-function parseAccess(value: string | null): AccessType | undefined {
+function parseAccess(value: unknown): AccessType | undefined {
   return value === "FREE" || value === "SUBSCRIPTION" ? value : undefined;
 }
 
-function parseMovieFilters(params: URLSearchParams): FilterState {
-  const sortParam = params.get("sort") as MovieSortOption | null;
+function parseSort<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return typeof value === "string" && (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : fallback;
+}
+
+function parseAgeRatings(value: unknown): AgeRating[] {
+  return cleanList(value).filter((v): v is AgeRating => AGE_RATINGS.includes(v as AgeRating));
+}
+
+/** {id, name} pairs: only well-formed v4 ids survive (the API rejects any other), at most MAX_ACTORS. */
+function cleanActors(value: unknown): ActorSelection[] {
+  if (!Array.isArray(value)) return [];
+  const out: ActorSelection[] = [];
+  const seen = new Set<string>();
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    const { id, name } = entry;
+    if (typeof id !== "string" || !UUID_V4.test(id) || typeof name !== "string") continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, name: name.slice(0, MAX_DIRECTOR_LENGTH) });
+    if (out.length >= MAX_ACTORS) break;
+  }
+  return out;
+}
+
+/**
+ * THE one place an untrusted movie-filter shape becomes a valid FilterState.
+ * Both the URL parser and the localStorage restore feed through here, so the
+ * API limits above are enforced identically whichever way a value arrived.
+ */
+function sanitizeMovieFilters(raw: unknown): FilterState {
+  const f = isRecord(raw) ? raw : {};
   return {
-    sort: sortParam && MOVIE_SORTS.includes(sortParam) ? sortParam : DEFAULT_MOVIE_SORT,
-    // ?genre= is the legacy single-genre deep link — read forever, folded in.
-    genres: [...new Set([...parseCsv(params.get("genres")), ...parseCsv(params.get("genre"))])],
-    languages: parseCsv(params.get("languages")),
-    // A URL-only link carries ids alone; the id doubles as a provisional name
-    // until resolveActorNames swaps the real one in.
-    actors: parseCsv(params.get("actorIds"))
-      .slice(0, 10)
-      .map((id): ActorSelection => ({ id, name: id })),
-    directors: parseCsv(params.get("directors")),
-    countries: parseCsv(params.get("countries")),
-    ageRatings: parseCsv(params.get("ageRatings")).filter((v): v is AgeRating =>
-      AGE_RATINGS.includes(v as AgeRating),
-    ),
-    yearFrom: parseNum(params.get("yearFrom"), 1888, 2100),
-    yearTo: parseNum(params.get("yearTo"), 1888, 2100),
-    ratingMin: parseNum(params.get("ratingMin"), 0, 10),
-    ratingMax: parseNum(params.get("ratingMax"), 0, 10),
-    durationMin: parseNum(params.get("durationMin"), 0, 6000),
-    durationMax: parseNum(params.get("durationMax"), 0, 6000),
-    accessType: parseAccess(params.get("access")),
+    sort: parseSort(f.sort, MOVIE_SORTS, DEFAULT_MOVIE_SORT),
+    genres: cleanList(f.genres),
+    languages: cleanList(f.languages),
+    actors: cleanActors(f.actors),
+    directors: cleanList(f.directors, MAX_DIRECTOR_LENGTH),
+    countries: cleanList(f.countries),
+    ageRatings: parseAgeRatings(f.ageRatings),
+    yearFrom: parseNum(f.yearFrom, 1888, 2100, true),
+    yearTo: parseNum(f.yearTo, 1888, 2100, true),
+    ratingMin: parseNum(f.ratingMin, 0, 10, false),
+    ratingMax: parseNum(f.ratingMax, 0, 10, false),
+    durationMin: parseNum(f.durationMin, 0, 6000, true),
+    durationMax: parseNum(f.durationMax, 0, 6000, true),
+    accessType: parseAccess(f.accessType),
   };
 }
 
-function parseSeriesFilters(params: URLSearchParams): SeriesFilterState {
-  const sortParam = params.get("sort") as SeriesSortOption | null;
+function sanitizeSeriesFilters(raw: unknown): SeriesFilterState {
+  const f = isRecord(raw) ? raw : {};
   return {
-    sort: sortParam && SERIES_SORTS.includes(sortParam) ? sortParam : DEFAULT_SERIES_SORT,
-    genres: [...new Set([...parseCsv(params.get("genres")), ...parseCsv(params.get("genre"))])],
-    languages: parseCsv(params.get("languages")),
-    yearFrom: parseNum(params.get("yearFrom"), 1888, 2100),
-    yearTo: parseNum(params.get("yearTo"), 1888, 2100),
-    accessType: parseAccess(params.get("access")),
+    sort: parseSort(f.sort, SERIES_SORTS, DEFAULT_SERIES_SORT),
+    genres: cleanList(f.genres),
+    languages: cleanList(f.languages),
+    yearFrom: parseNum(f.yearFrom, 1888, 2100, true),
+    yearTo: parseNum(f.yearTo, 1888, 2100, true),
+    accessType: parseAccess(f.accessType),
   };
 }
+
+/** The search term as the API's @MaxLength(200) allows it; anything else is not a string. */
+function sanitizeSearch(value: unknown): string {
+  return typeof value === "string" ? value.slice(0, MAX_SEARCH_LENGTH) : "";
+}
+
+function parseMovieFilters(params: URLSearchParams): FilterState {
+  return sanitizeMovieFilters({
+    sort: params.get("sort"),
+    // ?genre= is the legacy single-genre deep link — read forever, folded in.
+    genres: [...parseCsv(params.get("genres")), ...parseCsv(params.get("genre"))],
+    languages: parseCsv(params.get("languages")),
+    // A URL-only link carries ids alone; the id doubles as a provisional name
+    // until resolveActorNames swaps the real one in.
+    actors: parseCsv(params.get("actorIds")).map((id): ActorSelection => ({ id, name: id })),
+    directors: parseCsv(params.get("directors"), MAX_DIRECTOR_LENGTH),
+    countries: parseCsv(params.get("countries")),
+    ageRatings: parseCsv(params.get("ageRatings")),
+    yearFrom: params.get("yearFrom"),
+    yearTo: params.get("yearTo"),
+    ratingMin: params.get("ratingMin"),
+    ratingMax: params.get("ratingMax"),
+    durationMin: params.get("durationMin"),
+    durationMax: params.get("durationMax"),
+    accessType: params.get("access"),
+  });
+}
+
+function parseSeriesFilters(params: URLSearchParams): SeriesFilterState {
+  return sanitizeSeriesFilters({
+    sort: params.get("sort"),
+    genres: [...parseCsv(params.get("genres")), ...parseCsv(params.get("genre"))],
+    languages: parseCsv(params.get("languages")),
+    yearFrom: params.get("yearFrom"),
+    yearTo: params.get("yearTo"),
+    accessType: params.get("access"),
+  });
+}
+
+/**
+ * Test seam (no React needed): the pure parsers, under one name so the hook's
+ * public surface stays the hook. Not for use by components.
+ */
+export const catalogFilterParsers = {
+  parseMovieFilters,
+  parseSeriesFilters,
+  sanitizeMovieFilters,
+  sanitizeSeriesFilters,
+  sanitizeSearch,
+};
 
 interface StoredPrefs {
   filters?: Partial<FilterState>;
@@ -184,12 +306,17 @@ export function useCatalogFilters(mode: "media" | "search") {
    */
   const {
     term: search,
-    setTerm: setSearch,
+    setTerm,
     effectiveTerm,
     isDebouncing,
     isTooShort,
     clear: clearSearch,
-  } = useSearchTerm(searchParams.get("q") ?? "");
+  } = useSearchTerm(sanitizeSearch(searchParams.get("q")));
+  // The field is held to the API's limit the same way a link or a saved term
+  // is: a term typed or pasted past 200 characters would otherwise go out as
+  // typed and come back as a 400. The input is controlled by `search`, so
+  // this behaves like a maxLength on the box.
+  const setSearch = useCallback((value: string) => setTerm(sanitizeSearch(value)), [setTerm]);
 
   const [density, setDensity] = useState<GridDensity>("comfortable");
   const [hydrated, setHydrated] = useState(false);
@@ -205,17 +332,20 @@ export function useCatalogFilters(mode: "media" | "search") {
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as StoredPrefs;
+        // Storage is this browser's own, but it is still untrusted input: a
+        // crafted link once saved here would otherwise come back on every
+        // visit — so the restore runs the same sanitiser as the URL.
         if (!urlHasFilters) {
           if (parsed.filters) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
-            setFilters({ ...DEFAULT_FILTERS, ...parsed.filters });
+            setFilters(sanitizeMovieFilters(parsed.filters));
           }
           if (parsed.seriesFilters) {
-            setSeriesFilters({ ...DEFAULT_SERIES_FILTERS, ...parsed.seriesFilters });
+            setSeriesFilters(sanitizeSeriesFilters(parsed.seriesFilters));
           }
         }
         if (typeof parsed.search === "string" && !searchParams.get("q")) {
-          setSearch(parsed.search);
+          setSearch(parsed.search); // setSearch applies the 200-char limit
         }
         if (parsed.density === "compact" || parsed.density === "comfortable") {
           setDensity(parsed.density);
@@ -320,6 +450,15 @@ export function useCatalogFilters(mode: "media" | "search") {
       setNum("yearTo", seriesFilters.yearTo);
       if (seriesFilters.accessType) params.set("access", seriesFilters.accessType);
     }
+
+    // Parameters this hook does not own (e.g. `categories`, which opens the
+    // Categories overlay and selects the Categories chip) are carried over
+    // untouched, so this rewrite never drops another feature's state. `type`
+    // is the legacy spelling of `tab` and is owned (replaced by `tab`).
+    const owned = new Set<string>(["tab", "q", "type", ...FILTER_PARAM_KEYS]);
+    new URLSearchParams(window.location.search).forEach((value, key) => {
+      if (!owned.has(key) && !params.has(key)) params.append(key, value);
+    });
 
     // Idempotent on purpose. A mount that restores saved preferences changes
     // filters, series filters and the term in quick succession, and each one

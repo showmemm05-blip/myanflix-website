@@ -1,12 +1,11 @@
 "use client";
 
-import { hasMyanmar } from "./reader-settings";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
 import { useLanguage } from "@/lib/context/language-context";
 import type { TranslationShape } from "@/lib/i18n/translations";
-import { ReaderButton } from "./ReaderChrome";
+import { MARQUEE_PANEL_VARS, PanelOverline } from "./ReaderChrome";
+import { CloseBookIcon } from "./reader-icons";
 
 type ReaderStrings = TranslationShape["book"]["reader"];
 /** Only the plain-string reader keys — the fn-style ones can't label a row. */
@@ -70,14 +69,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd
-      className="inline-flex min-w-6 items-center justify-center rounded-md px-1.5 py-0.5 font-mono text-[11px]"
-      style={{
-        background: "color-mix(in oklab, var(--ink) 8%, transparent)",
-        border: "1px solid var(--rule)",
-        color: "var(--ink-soft)",
-      }}
-    >
+    <kbd className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-badge bg-raised px-[7px] font-sans text-[12px] leading-[22px] font-bold text-fg-body">
       {children}
     </kbd>
   );
@@ -122,50 +114,46 @@ export function ShortcutsHelp({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[90] flex items-center justify-center p-4 ${themeClass ?? ""}`}
+      className={`fixed inset-0 z-[90] flex items-center justify-center p-4 max-desk:items-end max-desk:p-0 ${themeClass ?? ""}`}
       role="dialog"
       aria-modal="true"
-      aria-label={r.shortcuts}
+      aria-labelledby="reader-shortcuts-title"
     >
       <button
         type="button"
         aria-label={t.common.close}
         onClick={onClose}
-        className="absolute inset-0 cursor-default bg-black/45"
+        className="absolute inset-0 cursor-default border-0 bg-overlay"
       />
       <div
-        className="relative max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-2xl p-5 shadow-e3"
-        style={{
-          background: "var(--paper-raised)",
-          border: "1px solid var(--rule)",
-          color: "var(--ink)",
-        }}
+        className="relative max-h-[85dvh] w-full max-w-[560px] overflow-y-auto rounded-dialog bg-popover p-6 text-fg shadow-e3 max-desk:max-w-none max-desk:rounded-b-none max-desk:pb-[calc(24px+env(safe-area-inset-bottom,0px))]"
+        style={MARQUEE_PANEL_VARS}
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-base font-semibold">{r.shortcuts}</h2>
-          <ReaderButton label={t.common.close} onClick={onClose}>
-            <X className="size-4" />
-          </ReaderButton>
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <h2 id="reader-shortcuts-title" className="m-0 text-section-title text-fg">
+            {r.shortcuts}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t.common.close}
+            className="focus-ring flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-tonal-faint text-fg transition-colors hover:bg-tonal-soft"
+          >
+            <CloseBookIcon size={20} />
+          </button>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-6 desk:grid-cols-2">
           {SHORTCUT_GROUPS.map((group) => (
-            <section key={group.id} className={group.id === "nav" ? "sm:col-span-2" : ""}>
-              <h3
-                className="mb-2 text-xs font-medium uppercase"
-                style={{
-                  color: "var(--ink-faint)",
-                  letterSpacing: hasMyanmar(r[group.label]) ? 0 : "0.025em",
-                }}
-              >
+            <section key={group.id} className={group.id === "nav" ? "desk:col-span-2" : ""}>
+              <PanelOverline as="h3" className="mb-2.5">
                 {r[group.label]}
-              </h3>
-              <ul className="space-y-1.5">
+              </PanelOverline>
+              <ul className="m-0 list-none space-y-2 p-0">
                 {group.items.map((item) => (
                   <li
                     key={item.label + item.keys.join()}
-                    className="flex items-center justify-between gap-3 text-sm"
-                    style={{ color: "var(--ink-soft)" }}
+                    className="flex items-center justify-between gap-3 text-sm leading-5 text-fg-body"
                   >
                     <span className="min-w-0 truncate">{r[item.label]}</span>
                     <span className="flex shrink-0 items-center gap-1">

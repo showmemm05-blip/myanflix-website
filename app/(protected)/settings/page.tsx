@@ -2,12 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SettingsView, SettingsViewSkeleton } from "@/components/views/SettingsView";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { ApiError } from "@/services/api/apiClient";
 import { ACCOUNT_DELETE_REFUSALS, profileService } from "@/services/api/profileService";
+import {
+  WITHDRAWAL_CODE_STATUS_KEY,
+  withdrawalCodeService,
+  type WithdrawalCodeStatus,
+} from "@/services/api/withdrawalCodeService";
+import { authErrorMessage } from "@/lib/auth/auth-errors";
 import type { NotificationPreferences } from "@/types/user";
 import { toast } from "sonner";
 
@@ -18,6 +24,13 @@ export default function SettingsPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [codeDialog, setCodeDialog] = useState<{
+    open: boolean;
+    status: WithdrawalCodeStatus | null;
+    key: number;
+  }>({ open: false, status: null, key: 0 });
+  const [isOpeningCode, setIsOpeningCode] = useState(false);
 
   const {
     data: prefs,
@@ -31,6 +44,16 @@ export default function SettingsPage() {
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const activePrefs = preferences ?? prefs;
 
+  const {
+    data: codeStatus,
+    isError: isCodeError,
+    refetch: refetchCode,
+  } = useQuery({
+    queryKey: WITHDRAWAL_CODE_STATUS_KEY,
+    queryFn: () => withdrawalCodeService.getStatus(),
+    enabled: Boolean(user),
+  });
+
   if (!user) return <SettingsViewSkeleton />;
 
   const updatePref = async (key: keyof NotificationPreferences, value: boolean) => {
@@ -39,6 +62,24 @@ export default function SettingsPage() {
       setPreferences(updated);
     } catch {
       toast.error(t.common.somethingWentWrong);
+    }
+  };
+
+  // "Create code" / "Change code": the status is read again first, so the
+  // dialog never starts from a stale "no code" or a lock that has ended.
+  const openWithdrawalCode = async () => {
+    setIsOpeningCode(true);
+    try {
+      const status = await queryClient.fetchQuery({
+        queryKey: WITHDRAWAL_CODE_STATUS_KEY,
+        queryFn: () => withdrawalCodeService.getStatus(),
+        staleTime: 0,
+      });
+      setCodeDialog((prev) => ({ open: true, status, key: prev.key + 1 }));
+    } catch (err) {
+      toast.error(authErrorMessage(err, t));
+    } finally {
+      setIsOpeningCode(false);
     }
   };
 
@@ -87,6 +128,14 @@ export default function SettingsPage() {
       isDeleting={isDeleting}
       deleteError={deleteError}
       onConfirmDelete={handleDeleteAccount}
+      withdrawalCodeStatus={codeStatus}
+      withdrawalCodeError={isCodeError}
+      onRetryWithdrawalCode={() => refetchCode()}
+      onOpenWithdrawalCode={() => void openWithdrawalCode()}
+      isOpeningWithdrawalCode={isOpeningCode}
+      withdrawalCodeDialog={codeDialog}
+      // The status stays while the dialog animates closed.
+      onWithdrawalCodeDialogOpenChange={(open) => setCodeDialog((prev) => ({ ...prev, open }))}
     />
   );
 }

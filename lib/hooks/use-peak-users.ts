@@ -25,11 +25,3 @@ export function usePeakUsers(): number | null {
   if (typeof peak !== "number" || !Number.isFinite(peak) || peak <= 0) return null;
   return peak;
 }
-
-/** 1,234 -> "1.2K" — for the 56px rail column where a full figure cannot fit. */
-export function compactCount(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(value);
-}

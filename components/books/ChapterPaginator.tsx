@@ -254,9 +254,10 @@ export const ChapterPaginator = forwardRef<
       <div
         ref={viewportRef}
         className="overflow-hidden"
-        // The 8rem is the bar allowance both readers share: top bar + folio
-        // bar + breathing room (the PageReader fit math documents the same).
-        style={{ height: "calc(100dvh - 8rem)" }}
+        // The bar allowance: ChapterReader pads 80px on top (64px bar + 16px
+        // air) and this leaves 84px below (60px folio bar + 24px air), so
+        // no page of text sits under either bar while they show.
+        style={{ height: "calc(100dvh - 164px)" }}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
       >

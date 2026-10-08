@@ -43,23 +43,24 @@ export function PageThumbnails({
   }, [open, currentPage]);
 
   return (
-    <div
+    <nav
       // inert, not just opacity-0: a hidden strip must not leave hundreds of
       // page buttons in the tab order (the ContentsDrawer precedent).
       inert={!open}
+      aria-label={t.book.reader.thumbnails}
       className={cn(
-        "reader-thumb-strip fixed inset-x-0 z-40",
+        "reader-thumb-strip fixed inset-x-0 z-40 backdrop-blur-[20px]",
         open ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0",
       )}
       style={{
-        // Sits on the bottom bar's shoulder: the bar is h-11 (2.75rem) plus
-        // the home-indicator inset it absorbs.
-        bottom: "calc(2.75rem + env(safe-area-inset-bottom, 0px))",
-        background: "var(--paper)",
-        borderTop: "1px solid var(--rule)",
+        // Sits on the page bar's shoulder: the bar is 64px plus the
+        // home-indicator inset it absorbs.
+        bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
+        background: "color-mix(in oklab, var(--paper) 94%, transparent)",
+        boxShadow: "inset 0 1px 0 var(--rule)",
       }}
     >
-      <div className="flex h-24 snap-x items-center gap-2 overflow-x-auto px-3 py-2">
+      <div className="scrollbar-none flex h-28 snap-x items-center gap-2.5 overflow-x-auto px-gutter py-3">
         {openedOnce &&
           pages.map((page) => {
             const current = page.pageNumber === currentPage;
@@ -74,14 +75,17 @@ export function PageThumbnails({
                   pages.length,
                 )}
                 aria-current={current ? "true" : undefined}
-                className="focus-ring relative h-full shrink-0 snap-center overflow-hidden rounded-sm"
+                className={cn(
+                  "focus-ring relative h-[82px] shrink-0 cursor-pointer snap-center overflow-hidden rounded-[3px] border-0 p-0 transition-transform duration-150 hover:-translate-y-0.5",
+                  !current && "opacity-[0.82]",
+                )}
                 style={{
                   aspectRatio: `${page.width} / ${page.height}`,
+                  // A scanned sheet is white stock whatever the theme.
                   background: "#ffffff",
-                  outline: current
-                    ? "2px solid var(--accent)"
-                    : "1px solid var(--rule)",
-                  outlineOffset: "-2px",
+                  boxShadow: current
+                    ? "0 0 0 2px var(--paper), 0 0 0 4px var(--mq-crimson)"
+                    : "0 2px 6px rgba(0,0,0,0.35)",
                 }}
               >
                 <Image
@@ -93,13 +97,13 @@ export function PageThumbnails({
                   className="object-contain"
                   unoptimized
                 />
-                <span className="pointer-events-none absolute inset-x-0 bottom-0.5 text-center text-[10px] text-black/50 nums">
+                <span className="pointer-events-none absolute inset-x-0 bottom-[3px] text-center text-[10px] leading-3 font-bold text-black/55 tabular-nums">
                   {page.pageNumber}
                 </span>
               </button>
             );
           })}
       </div>
-    </div>
+    </nav>
   );
 }

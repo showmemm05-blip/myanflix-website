@@ -38,6 +38,16 @@ export type OtpVerifyProof = { stepToken?: string; password?: string };
 export const STEP_TOKEN_REFUSED_MESSAGE = "Please enter your password again.";
 
 /**
+ * The 503 POST /auth/otp/request answers when the code cannot be handed to
+ * the SMS gateway phone right now: the phone has not checked in lately, or
+ * the day's SMS cap is used up. No code was kept, so the resend wait and the
+ * hourly limit are not spent — asking again a little later is the cure.
+ * Word for word the backend's text (sms.service.ts); it is the lookup key.
+ */
+export const SMS_UNAVAILABLE_MESSAGE =
+  "SMS service is temporarily unavailable. Please try again shortly.";
+
+/**
  * What a requested code is for. A sign-in code never resets a password and a
  * reset code never signs in — the server checks each code against the
  * purpose it was requested with.
@@ -67,8 +77,10 @@ export const authService = {
    * "No account was found for this phone number."), and one whose account is
    * suspended, banned or closed too (401 "This account is no longer active"),
    * both before any code exists. The 60 s wait (409 "Please wait before
-   * requesting another code") is counted per purpose. skipAuth keeps the 401
-   * away from the session-refresh path, so it reaches the form as is.
+   * requesting another code") is counted per purpose. A 503
+   * SMS_UNAVAILABLE_MESSAGE means the SMS gateway could not take the code;
+   * nothing was kept, so the user may simply ask again shortly. skipAuth keeps
+   * the 401 away from the session-refresh path, so it reaches the form as is.
    */
   requestOtp(phone: string, purpose?: OtpPurpose) {
     return apiClient.post<{ sent: boolean }>(

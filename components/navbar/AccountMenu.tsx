@@ -1,169 +1,175 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import {
-  Crown,
-  History,
-  LogOut,
-  MessageSquarePlus,
-  Receipt,
-  Settings,
-  User,
-  Wallet,
-} from "lucide-react";
+import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { FeedbackDialog } from "@/components/dialogs/FeedbackDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { initialsOf } from "@/components/cards/PersonDisc";
+import { useShellFeedback } from "@/components/layout/shell-context";
+import {
+  CrownIcon,
+  FeedbackIcon,
+  GlobeIcon,
+  ProfileIcon,
+  ReceiptIcon,
+  SettingsIcon,
+  SignOutIcon,
+} from "@/components/system/icons";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { useSubscription } from "@/lib/context/subscription-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import { shellText } from "@/lib/i18n/sections/shell";
 import { cn } from "@/lib/utils";
 
 /**
- * The account menu that sits at the bottom of the desktop rail (and in the top
- * bar on tablets). It carries every account destination plus the language
- * switcher and sign-out, so the desktop layout reaches exactly what the mobile
- * overflow sheet reaches.
+ * THE ACCOUNT MENU (SHELL.md §5) — the avatar disc at the right of the top
+ * bar opens it.
+ *
+ * Header: avatar, name, plan badge (gold "Premium until 7 Nov" or a quiet
+ * "Not subscribed"). Then Profile, Settings, Transactions, Send feedback
+ * (opens the shared dialog), the English | မြန်မာ switch and Sign out.
+ * Wallet left the menu because it is a top-bar tab now; Watch history left
+ * it on 2026-10-07 because the Profile page now shows it in its "Your
+ * library" group. This menu is the way to Profile: the nav has no Profile
+ * tab (owner, 2026-10-07 — the avatar already stands for it).
+ *
+ * A real base-ui menu: arrow keys move, Esc closes and focus returns to the
+ * avatar. The language switch is a radio group inside the menu, so it is
+ * reachable with the same arrow keys.
  */
-export function AccountMenu({
-  side = "right",
-  align = "end",
-  className,
-}: {
-  side?: "top" | "right" | "bottom" | "left";
-  align?: "start" | "center" | "end";
-  className?: string;
-}) {
+export function AccountMenu({ className }: { className?: string }) {
   const { user, logout } = useAuth();
-  const { t, language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const { isSubscribed, expiresAt } = useSubscription();
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const openFeedback = useShellFeedback();
+  const s = useSection(shellText);
 
   if (!user) return null;
 
+  const initials = initialsOf(user.name);
+  const until =
+    isSubscribed && expiresAt
+      ? new Date(expiresAt).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+        })
+      : null;
+
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <button
-              aria-label={t.nav.profile}
-              className={cn(
-                "rounded-full outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                className,
-              )}
-            />
-          }
-        >
-          <Avatar className="size-9 ring-1 ring-white/12 ring-inset">
-            <AvatarImage src={user.avatarUrl ?? undefined} alt={user.name} />
-            <AvatarFallback>{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <button
+            type="button"
+            aria-label={s.accountMenu}
+            className={cn(
+              "flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-avatar p-0 text-sm font-extrabold text-avatar-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)] outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link data-popup-open:shadow-[inset_0_0_0_2px_var(--mq-link)] max-desk:size-8 max-desk:text-xs",
+              className,
+            )}
+          />
+        }
+      >
+        <Avatar className="size-full after:hidden">
+          {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
+          <AvatarFallback className="bg-transparent text-inherit">{initials}</AvatarFallback>
+        </Avatar>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent align="end" sideOffset={8} className="w-[296px] max-w-[calc(100vw-32px)] mq-rise">
+        <div className="flex items-center gap-3 px-2.5 pt-2.5 pb-3.5">
+          <Avatar size="lg" className="size-11 after:hidden">
+            {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
+            <AvatarFallback className="text-base">{initials}</AvatarFallback>
           </Avatar>
-        </DropdownMenuTrigger>
-
-        <DropdownMenuContent side={side} align={align} sideOffset={10} className="w-60">
-          <DropdownMenuGroup>
-            {/* Identity, then plan: the subscription badge used to sit on the
-                content bar all day for something checked about once a month.
-                Here it is one click away, next to the person it belongs to. */}
-            <DropdownMenuLabel className="truncate">{user.name}</DropdownMenuLabel>
-            <div className="px-2 pb-1.5">
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset",
-                  isSubscribed
-                    ? "bg-premium/15 text-premium ring-premium/25"
-                    : "bg-white/6 text-muted-foreground ring-white/12",
-                )}
-              >
-                <Crown className="size-3" />
-                {isSubscribed && expiresAt
-                  ? t.badges.premiumUntil(
-                      new Date(expiresAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      }),
-                    )
-                  : t.badges.notSubscribed}
+          <div className="min-w-0">
+            <div className="truncate text-[15px] leading-5 font-extrabold text-fg">{user.name}</div>
+            {until ? (
+              <span className="mt-1 inline-flex h-[22px] items-center gap-[5px] rounded-full bg-gold/16 px-2 text-xs font-bold text-gold">
+                <CrownIcon size={11} />
+                {s.premiumUntil(until)}
               </span>
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem render={<Link href="/profile" />}>
-              <User className="size-4" />
-              {t.nav.profile}
-            </DropdownMenuItem>
-            <DropdownMenuItem render={<Link href="/wallet" />}>
-              <Wallet className="size-4" />
-              {t.nav.wallet}
-            </DropdownMenuItem>
-            <DropdownMenuItem render={<Link href="/transactions" />}>
-              <Receipt className="size-4" />
-              {t.transactions.title}
-            </DropdownMenuItem>
-            <DropdownMenuItem render={<Link href="/watch-history" />}>
-              <History className="size-4" />
-              {t.watchHistory.title}
-            </DropdownMenuItem>
-            <DropdownMenuItem render={<Link href="/settings" />}>
-              <Settings className="size-4" />
-              {t.nav.settings}
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+            ) : (
+              <span className="mt-1 inline-flex h-[22px] items-center rounded-full bg-tonal-faint px-2 text-xs font-bold text-fg-muted">
+                {t.badges.notSubscribed}
+              </span>
+            )}
+          </div>
+        </div>
 
-          <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="mx-1 mt-0 mb-1.5" />
 
-          {/* Its own group, below the destinations: everything above navigates
-              somewhere, this one opens a dialog, and grouping it with the
-              pages would make it read as a settings screen that doesn't exist. */}
-          <DropdownMenuGroup>
-            <DropdownMenuItem onClick={() => setFeedbackOpen(true)}>
-              <MessageSquarePlus className="size-4" />
-              {t.feedback.trigger}
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+        <DropdownMenuGroup>
+          <DropdownMenuItem render={<Link href="/profile" />}>
+            <ProfileIcon />
+            {t.profile.title}
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/settings" />}>
+            <SettingsIcon />
+            {t.nav.settings}
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/transactions" />}>
+            <ReceiptIcon />
+            {t.transactions.title}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={openFeedback}>
+            <FeedbackIcon />
+            {t.feedback.trigger}
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
 
-          <DropdownMenuSeparator />
+        <DropdownMenuSeparator />
 
-          {/* Option labels stay in their own script on purpose — a language
-              switcher is found by recognition, not by translation. */}
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>{t.language.switcherLabel}</DropdownMenuLabel>
-            <DropdownMenuRadioGroup
-              value={language}
-              onValueChange={(value) => value && setLanguage(value as "en" | "mm")}
-            >
-              <DropdownMenuRadioItem value="mm">မြန်မာ</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="en">English</DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </DropdownMenuGroup>
+        {/* Language: label on the left, the two-option switch on the right. The
+            options stay in their own script on purpose. */}
+        <MenuPrimitive.Group className="flex items-center justify-between gap-3 py-1.5 pr-1 pl-3">
+          <MenuPrimitive.GroupLabel className="flex items-center gap-3 text-[15px] font-semibold text-fg-body">
+            <GlobeIcon className="text-fg-muted" />
+            {s.language}
+          </MenuPrimitive.GroupLabel>
+          <MenuPrimitive.RadioGroup
+            value={language}
+            onValueChange={(value) => {
+              if (value === "en" || value === "mm") setLanguage(value);
+            }}
+            className="flex gap-0.5 rounded-full bg-raised p-[3px]"
+          >
+            {(
+              [
+                ["en", "English", "en"],
+                ["mm", "မြန်မာ", "my"],
+              ] as const
+            ).map(([value, label, lang]) => (
+              <MenuPrimitive.RadioItem
+                key={value}
+                value={value}
+                lang={lang}
+                closeOnClick={false}
+                className="flex h-[30px] cursor-pointer items-center rounded-full px-3 text-[13px] font-bold whitespace-nowrap text-fg-muted outline-none select-none data-checked:bg-play data-checked:font-extrabold data-checked:text-ink data-highlighted:outline-2 data-highlighted:outline-offset-1 data-highlighted:outline-link data-checked:data-highlighted:text-ink"
+              >
+                {label}
+              </MenuPrimitive.RadioItem>
+            ))}
+          </MenuPrimitive.RadioGroup>
+        </MenuPrimitive.Group>
 
-          <DropdownMenuSeparator />
+        <DropdownMenuSeparator />
 
-          <DropdownMenuGroup>
-            <DropdownMenuItem variant="destructive" onClick={logout}>
-              <LogOut className="size-4" />
-              {t.nav.logOut}
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {/* Sibling of the menu, not a child: the menu unmounts its popup when an
-          item is clicked, which would take a dialog rendered inside it along
-          for the ride. */}
-      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
-    </>
+        <DropdownMenuGroup>
+          <DropdownMenuItem variant="destructive" onClick={logout}>
+            <SignOutIcon />
+            {s.signOut}
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

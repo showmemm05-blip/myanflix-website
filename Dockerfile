@@ -21,6 +21,16 @@ ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
+# Security headers (next.config.ts headers()) are also fixed at build time.
+# CSP_ENFORCE=1 makes the Content-Security-Policy blocking instead of
+# Report-Only; CSP_EXTRA_ORIGINS lists extra allowed origins (space
+# separated) when posters/video are served from somewhere other than the
+# API host on :8080. Both default to empty.
+ARG CSP_ENFORCE
+ENV CSP_ENFORCE=$CSP_ENFORCE
+ARG CSP_EXTRA_ORIGINS
+ENV CSP_EXTRA_ORIGINS=$CSP_EXTRA_ORIGINS
+
 RUN npm run build
 
 # ---- runner stage -----------------------------------------------------------

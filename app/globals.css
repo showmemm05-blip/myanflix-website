@@ -4,18 +4,147 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Reveal-on-hover chrome (MediaCard info shelf, card affordances) is only a
-   good idea where a real pointer can hover. On touch there is no hover state
-   to enter, so anything hidden behind one is simply unreachable — this variant
-   lets a component say "hide me only on hover-capable devices". */
+/* Reveal-on-hover chrome is only a good idea where a real pointer can hover.
+   On touch there is no hover state to enter, so anything hidden behind one
+   would be unreachable — this variant lets a component say "hide me only on
+   hover-capable devices". */
 @custom-variant hover-device (@media (hover: hover) and (pointer: fine));
 
+/* ══════════════════════════════════════════════════════════════════════════
+   MARQUEE — the phone app's design system, on the web.
+   Source of truth: docs/website-marquee-redesign-2026-10-07/design/
+   DesignSystem.dc.html and SHELL.md. Near-black ground, crimson for
+   everything active, white for Play, gold for Premium, green for money.
+   Flat: no card borders, no card shadows, no gradients except scrims over
+   artwork. The ONE layout breakpoint is 720px (`desk:` = 720 and up,
+   `max-desk:` = phone).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root,
+.dark {
+  /* ── Marquee palette (raw) ─────────────────────────────────────────── */
+  --mq-ground: #08080b;
+  --mq-surface: #121217;
+  --mq-raised: #1c1c23;
+  --mq-raised-hover: #26262f;
+  --mq-popover: #16161c;
+  --mq-hairline: rgba(255, 255, 255, 0.08);
+  --mq-hairline-strong: rgba(255, 255, 255, 0.14);
+  --mq-overlay: rgba(0, 0, 0, 0.6);
+  --mq-art-badge: rgba(8, 8, 11, 0.72);
+  --mq-glass: rgba(8, 8, 11, 0.4);
+  --mq-dock: rgba(22, 22, 28, 0.92);
+
+  --mq-crimson: #e0181f;
+  --mq-link: #ff4d55;
+  --mq-link-hover: #ff7a80;
+  --mq-crimson-soft: rgba(224, 24, 31, 0.16);
+  --mq-play: #ffffff;
+  --mq-ink: #08080b;
+  --mq-tonal: rgba(255, 255, 255, 0.16);
+  --mq-tonal-hover: rgba(255, 255, 255, 0.24);
+  --mq-tonal-soft: rgba(255, 255, 255, 0.12);
+  --mq-tonal-faint: rgba(255, 255, 255, 0.08);
+  --mq-tonal-ghost: rgba(255, 255, 255, 0.06);
+  --mq-gold: #f5c451;
+  --mq-gold-ink: #1f1600;
+  --mq-money: #2fd07e;
+  --mq-pending: #f5a524;
+  --mq-danger: #ff5a5f;
+  --mq-danger-fill: #b3262c;
+  --mq-info: #4db3ff;
+
+  --mq-fg: #ffffff;
+  --mq-fg-body: #d9d9e0;
+  --mq-fg-muted: #b3b3bd;
+  --mq-fg-faint: #8c8c99;
+  --mq-fg-decor: #5e5e6a;
+  --mq-avatar: #2b1a1e;
+  --mq-avatar-ink: #ff8a8f;
+
+  /* Scrims — the only gradients in the system. */
+  --mq-scrim-left: linear-gradient(90deg, rgba(8, 8, 11, 0.88) 0%, rgba(8, 8, 11, 0.55) 34%, rgba(8, 8, 11, 0) 64%);
+  --mq-scrim-top: linear-gradient(180deg, rgba(8, 8, 11, 0.75) 0%, rgba(8, 8, 11, 0) 100%);
+  --mq-scrim-bottom: linear-gradient(180deg, rgba(8, 8, 11, 0) 0%, rgba(8, 8, 11, 0.8) 60%, #08080b 100%);
+  --mq-scrim-card: linear-gradient(180deg, rgba(8, 8, 11, 0) 0%, rgba(8, 8, 11, 0.7) 100%);
+
+  /* Layout. --shell-bar-h is rewritten by the AppShell (it measures the
+     sticky bar, chip strip included); the fallback is the desktop bar. */
+  --mq-gutter: clamp(16px, 4vw, 56px);
+  --shell-bar-h: 72px;
+  --shell-dock-clear: 0px;
+
+  /* ── shadcn / base-ui semantic names, mapped onto Marquee ────────────
+     Everything not rebuilt yet reads these, so it already looks right. */
+  --background: var(--mq-ground);
+  --foreground: var(--mq-fg);
+  --card: var(--mq-surface);
+  --card-foreground: var(--mq-fg);
+  --popover: var(--mq-popover);
+  --popover-foreground: var(--mq-fg);
+  --primary: var(--mq-crimson);
+  --primary-foreground: var(--mq-fg);
+  --secondary: var(--mq-raised);
+  --secondary-foreground: var(--mq-fg);
+  --muted: var(--mq-raised);
+  --muted-foreground: var(--mq-fg-muted);
+  --accent: var(--mq-tonal-ghost);
+  --accent-foreground: var(--mq-fg);
+  --destructive: var(--mq-danger);
+  --border: var(--mq-hairline);
+  --input: var(--mq-tonal-soft);
+  --ring: var(--mq-link);
+  --chart-1: var(--mq-crimson);
+  --chart-2: var(--mq-money);
+  --chart-3: var(--mq-gold);
+  --chart-4: var(--mq-info);
+  --chart-5: var(--mq-pending);
+  --radius: 12px;
+  --success: var(--mq-money);
+  --warning: var(--mq-pending);
+  --brand: var(--mq-crimson);
+  --brand-foreground: var(--mq-fg);
+  --premium: var(--mq-gold);
+  --premium-foreground: var(--mq-gold-ink);
+  --finance: var(--mq-money);
+  --finance-foreground: var(--mq-ink);
+  --info: var(--mq-info);
+  --info-foreground: var(--mq-ink);
+
+  /* Retired Aurora tokens: kept so old class names resolve, but flat. */
+  --aurora-violet: transparent;
+  --aurora-sky: transparent;
+  --aurora-ember: transparent;
+  --hairline: var(--mq-hairline);
+  --hairline-strong: var(--mq-hairline-strong);
+  /* Cards have no shadow. Menus and dialogs are the only lifted surfaces. */
+  --elevation-1: 0 0 #0000;
+  --elevation-2: 0 24px 64px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --elevation-3: 0 32px 80px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
+
+@media (max-width: 719px) {
+  :root {
+    --shell-bar-h: 60px;
+    /* The floating dock: 64 tall + 20 off the bottom + 20 of air. */
+    --shell-dock-clear: calc(104px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 @theme inline {
+  /* One breakpoint for layout: 720px. `desk:` = 720 and up; `max-desk:` = phone. */
+  --breakpoint-desk: 45rem;
+
+  /* Fonts — Noto Sans Myanmar is the single UI face, for English and Burmese. */
+  --font-sans: var(--font-ui), "Noto Sans Myanmar", "Noto Sans", system-ui, sans-serif;
+  --font-heading: var(--font-ui), "Noto Sans Myanmar", "Noto Sans", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* shadcn semantic colours */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter), var(--font-noto-myanmar);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-plus-jakarta-sans), var(--font-noto-myanmar);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -37,111 +166,6 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-:root {
-  --background: oklch(0.15 0.015 265);
-  --foreground: oklch(0.97 0 0);
-  --card: oklch(0.195 0.017 265);
-  --card-foreground: oklch(0.97 0 0);
-  --popover: oklch(0.185 0.017 265);
-  --popover-foreground: oklch(0.97 0 0);
-  --primary: oklch(0.66 0.19 292);
-  --primary-foreground: oklch(0.14 0.03 292);
-  --secondary: oklch(0.24 0.018 265);
-  --secondary-foreground: oklch(0.97 0 0);
-  --muted: oklch(0.22 0.018 265);
-  --muted-foreground: oklch(0.66 0.012 265);
-  --accent: oklch(0.28 0.03 290);
-  --accent-foreground: oklch(0.97 0 0);
-  --destructive: oklch(0.68 0.19 25);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.66 0.19 292 / 60%);
-  --chart-1: oklch(0.66 0.19 292);
-  --chart-2: oklch(0.72 0.16 162);
-  --chart-3: oklch(0.82 0.15 88);
-  --chart-4: oklch(0.72 0.13 235);
-  --chart-5: oklch(0.68 0.16 35);
-  --radius: 0.75rem;
-  --success: oklch(0.72 0.16 162);
-  --warning: oklch(0.79 0.15 70);
-  --brand: oklch(0.6 0.22 25);
-  --brand-foreground: oklch(0.99 0 0);
-  --premium: oklch(0.82 0.15 88);
-  --premium-foreground: oklch(0.28 0.06 80);
-  --finance: oklch(0.72 0.16 162);
-  --finance-foreground: oklch(0.2 0.04 162);
-  --info: oklch(0.72 0.13 235);
-  --info-foreground: oklch(0.2 0.04 235);
-
-  /* ── Aurora Theater additions ──────────────────────────────────────────
-     Ambient wash stops (violet → sky, with a faint warm ember) and the
-     elevation ramp used by Surface. These ADD to the semantic system above;
-     no existing role meaning changes. */
-  --aurora-violet: oklch(0.66 0.19 292 / 30%);
-  --aurora-sky: oklch(0.72 0.13 235 / 22%);
-  --aurora-ember: oklch(0.68 0.16 35 / 12%);
-  --hairline: oklch(1 0 0 / 8%);
-  --hairline-strong: oklch(1 0 0 / 14%);
-  --elevation-1: 0 1px 0 0 oklch(1 0 0 / 4%) inset, 0 2px 8px -2px oklch(0 0 0 / 40%);
-  --elevation-2: 0 1px 0 0 oklch(1 0 0 / 5%) inset, 0 10px 30px -12px oklch(0 0 0 / 55%);
-  --elevation-3: 0 1px 0 0 oklch(1 0 0 / 6%) inset, 0 24px 60px -20px oklch(0 0 0 / 65%);
-}
-
-.dark {
-  --background: oklch(0.15 0.015 265);
-  --foreground: oklch(0.97 0 0);
-  --card: oklch(0.195 0.017 265);
-  --card-foreground: oklch(0.97 0 0);
-  --popover: oklch(0.185 0.017 265);
-  --popover-foreground: oklch(0.97 0 0);
-  --primary: oklch(0.66 0.19 292);
-  --primary-foreground: oklch(0.14 0.03 292);
-  --secondary: oklch(0.24 0.018 265);
-  --secondary-foreground: oklch(0.97 0 0);
-  --muted: oklch(0.22 0.018 265);
-  --muted-foreground: oklch(0.66 0.012 265);
-  --accent: oklch(0.28 0.03 290);
-  --accent-foreground: oklch(0.97 0 0);
-  --destructive: oklch(0.68 0.19 25);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.66 0.19 292 / 60%);
-  --chart-1: oklch(0.66 0.19 292);
-  --chart-2: oklch(0.72 0.16 162);
-  --chart-3: oklch(0.82 0.15 88);
-  --chart-4: oklch(0.72 0.13 235);
-  --chart-5: oklch(0.68 0.16 35);
-  --success: oklch(0.72 0.16 162);
-  --warning: oklch(0.79 0.15 70);
-  --brand: oklch(0.6 0.22 25);
-  --brand-foreground: oklch(0.99 0 0);
-  --premium: oklch(0.82 0.15 88);
-  --premium-foreground: oklch(0.28 0.06 80);
-  --finance: oklch(0.72 0.16 162);
-  --finance-foreground: oklch(0.2 0.04 162);
-  --info: oklch(0.72 0.13 235);
-  --info-foreground: oklch(0.2 0.04 235);
-
-  --aurora-violet: oklch(0.66 0.19 292 / 30%);
-  --aurora-sky: oklch(0.72 0.13 235 / 22%);
-  --aurora-ember: oklch(0.68 0.16 35 / 12%);
-  --hairline: oklch(1 0 0 / 8%);
-  --hairline-strong: oklch(1 0 0 / 14%);
-  --elevation-1: 0 1px 0 0 oklch(1 0 0 / 4%) inset, 0 2px 8px -2px oklch(0 0 0 / 40%);
-  --elevation-2: 0 1px 0 0 oklch(1 0 0 / 5%) inset, 0 10px 30px -12px oklch(0 0 0 / 55%);
-  --elevation-3: 0 1px 0 0 oklch(1 0 0 / 6%) inset, 0 24px 60px -20px oklch(0 0 0 / 65%);
-}
-
-@theme inline {
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-brand: var(--brand);
@@ -153,229 +177,484 @@
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
 
-  /* Elevation ramp — `shadow-e1`…`shadow-e3`. */
+  /* Marquee colours — bg-ground, bg-raised, text-link, text-fg-muted… */
+  --color-ground: var(--mq-ground);
+  --color-surface: var(--mq-surface);
+  --color-raised: var(--mq-raised);
+  --color-raised-hover: var(--mq-raised-hover);
+  --color-hairline: var(--mq-hairline);
+  --color-hairline-strong: var(--mq-hairline-strong);
+  --color-overlay: var(--mq-overlay);
+  --color-art-badge: var(--mq-art-badge);
+  --color-glass: var(--mq-glass);
+  --color-crimson: var(--mq-crimson);
+  --color-link: var(--mq-link);
+  --color-link-hover: var(--mq-link-hover);
+  --color-crimson-soft: var(--mq-crimson-soft);
+  --color-play: var(--mq-play);
+  --color-ink: var(--mq-ink);
+  --color-tonal: var(--mq-tonal);
+  --color-tonal-hover: var(--mq-tonal-hover);
+  --color-tonal-soft: var(--mq-tonal-soft);
+  --color-tonal-faint: var(--mq-tonal-faint);
+  --color-tonal-ghost: var(--mq-tonal-ghost);
+  --color-gold: var(--mq-gold);
+  --color-gold-ink: var(--mq-gold-ink);
+  --color-money: var(--mq-money);
+  --color-pending: var(--mq-pending);
+  --color-danger: var(--mq-danger);
+  --color-danger-fill: var(--mq-danger-fill);
+  --color-fg: var(--mq-fg);
+  --color-fg-body: var(--mq-fg-body);
+  --color-fg-muted: var(--mq-fg-muted);
+  --color-fg-faint: var(--mq-fg-faint);
+  --color-fg-decor: var(--mq-fg-decor);
+  --color-avatar: var(--mq-avatar);
+  --color-avatar-ink: var(--mq-avatar-ink);
+
+  /* Spacing: `px-gutter`, `-mx-gutter`, `top-bar`, `pb-dock`… */
+  --spacing-gutter: var(--mq-gutter);
+  --spacing-bar: var(--shell-bar-h);
+  --spacing-dock: var(--shell-dock-clear);
+
+  /* Radii (DesignSystem: 4 tags · 6 art badge · 10 poster · 12 button/field/
+     landscape · 16 panel/menu · 20 dialog · 32 dock · 999 chip). */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+  --radius-4xl: 32px;
+  --radius-tag: 4px;
+  --radius-badge: 6px;
+  --radius-card: 10px;
+  --radius-landscape: 12px;
+  --radius-button: 12px;
+  --radius-field: 12px;
+  --radius-panel: 16px;
+  --radius-menu: 16px;
+  --radius-dialog: 20px;
+  --radius-dock: 32px;
+
+  /* Web type scale (DesignSystem "Type scale (web)"). Each class sets size,
+     line height, weight and tracking in one go: `text-display`, `text-title`… */
+  --text-display: clamp(40px, 4.4vw, 64px);
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.035em;
+  --text-display--font-weight: 900;
+  --text-title: clamp(28px, 2.8vw, 40px);
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.03em;
+  --text-title--font-weight: 900;
+  --text-section-title: 22px;
+  --text-section-title--line-height: 28px;
+  --text-section-title--letter-spacing: -0.01em;
+  --text-section-title--font-weight: 800;
+  --text-card-title: 15px;
+  --text-card-title--line-height: 20px;
+  --text-card-title--font-weight: 700;
+  --text-body: 16px;
+  --text-body--line-height: 26px;
+  --text-meta: 14px;
+  --text-meta--line-height: 20px;
+  --text-meta--font-weight: 500;
+  --text-caption: 13px;
+  --text-caption--line-height: 18px;
+  --text-caption--font-weight: 500;
+  --text-label: 13px;
+  --text-label--line-height: 18px;
+  --text-label--font-weight: 700;
+  --text-overline: 12px;
+  --text-overline--line-height: 16px;
+  --text-overline--letter-spacing: 0.12em;
+  --text-overline--font-weight: 800;
+  --text-button: 16px;
+  --text-button--line-height: 22px;
+  --text-button--font-weight: 800;
+
+  /* Shadows: e1 is none (cards are flat), e2 = menus, e3 = dialogs. */
   --shadow-e1: var(--elevation-1);
   --shadow-e2: var(--elevation-2);
   --shadow-e3: var(--elevation-3);
+  --shadow-dock: 0 12px 32px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-toast: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 
-  /* One easing for the whole system: everything decelerates the same way. */
-  --ease-aurora: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Motion: one decelerating curve (press, hover, rise). */
+  --ease-aurora: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-marquee: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --animate-mq-pulse: mq-pulse 1.4s ease-in-out infinite;
+  --animate-mq-rise: mq-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-mq-settle: mq-settle 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes mq-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes mq-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mq-settle {
+  from {
+    opacity: 0.35;
+    transform: scale(1.06);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mq-fill {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+    background: var(--mq-ground);
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+  ::selection {
+    background: rgba(224, 24, 31, 0.45);
+    color: #ffffff;
+  }
+  /* The one focus ring: 2px crimson-text, 2px off the element. Components
+     that draw their own ring (ring-*) still win, being utilities. */
+  :where(a, button, select, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--mq-link);
+    outline-offset: 2px;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--mq-fg-faint);
   }
 }
 
-@layer components {
-  /* ── THE SLATE: MyanFlix's toast ──────────────────────────────────────
-     A broadcast lower-third rather than a corner rectangle. Every state is
-     one variable apart — `--toast-accent` — set from the `data-type` Sonner
-     writes, so success/error/warning/info share one silhouette and differ
-     only in colour, icon and glow.
+/* ── Marquee utilities (variant-aware) ──────────────────────────────────── */
 
-     Kept in CSS rather than a wall of Tailwind classes because most of it is
-     pseudo-elements (the spine, the drain) and keyframes, which a className
-     string can express only awkwardly. */
-  .mf-toast[data-sonner-toast] {
-    --toast-accent: var(--primary);
-    /* Must equal the Toaster's `duration` prop, or the drain lies. */
-    --mf-toast-duration: 4500ms;
+/* Pull a full-bleed hero up under the sticky top bar (+ chip strip). */
+@utility under-bar {
+  margin-top: calc(-1 * var(--shell-bar-h));
+}
+/* Stick right under the shell's top bar. */
+@utility sticky-under-bar {
+  position: sticky;
+  top: var(--shell-bar-h);
+}
+/* The eyebrow: overline, uppercase, faint. Burmese is never tracked. */
+@utility text-kicker {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mq-fg-faint);
+}
+@utility text-body-muted {
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--mq-fg-muted);
+}
+/* Money, counts, durations — digits must not dance as values update. */
+@utility nums {
+  font-variant-numeric: tabular-nums;
+}
+/* Frosted glass (the top bar's material). */
+@utility glass {
+  background: var(--mq-glass);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: blur(24px) saturate(1.4);
+}
+/* Translucent chip over artwork. */
+@utility on-art {
+  background: rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+/* Rails: snap, hidden scrollbar, start on the gutter. */
+@utility mq-rail {
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+  scroll-padding-left: var(--mq-gutter);
+  overscroll-behavior-x: contain;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+@utility mq-snap {
+  scroll-snap-align: start;
+}
+/* Press: scale .97 in 120ms; hover: opacity .88. */
+@utility mq-press {
+  transition:
+    opacity 0.15s ease,
+    transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1),
+    background-color 0.15s ease;
+  &:hover:not(:disabled) {
+    opacity: 0.88;
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+}
+/* Crimson text link: See all, Clear, Retry-as-link. */
+@utility mq-link {
+  color: var(--mq-link);
+  font-weight: 700;
+  &:hover {
+    color: var(--mq-link-hover);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+/* Skeleton block: raised fill, pulse 1.4s. Never a spinner for rows. */
+@utility mq-skeleton {
+  background: var(--mq-raised);
+  animation: mq-pulse 1.4s ease-in-out infinite;
+}
+@utility mq-rise {
+  animation: mq-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@utility mq-settle {
+  animation: mq-settle 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+/* Poster grid: comfortable 168px min (7 columns at 1440); 3 columns on phones. */
+@utility mq-grid-posters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 28px 16px;
+  @media (max-width: 719px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px 10px;
+  }
+}
+@utility mq-grid-posters-compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 28px 16px;
+  @media (max-width: 719px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px 10px;
+  }
+}
+/* Landscape cards / panels: 300px min; 2 columns on phones. */
+@utility mq-grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px 16px;
+  @media (max-width: 719px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* Any multi-column grid becomes one column on phones. */
+@utility mq-stack {
+  @media (max-width: 719px) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
 
-    position: relative;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    width: 100%;
-    padding: 0.875rem 1rem 0.875rem 1.125rem;
-    overflow: hidden;
-    /* Square where the spine lands, rounded away from it: the asymmetry is
-       the shape's signature. */
-    border: 0;
-    border-radius: 6px 16px 16px 6px;
-    background: color-mix(in oklab, var(--popover) 92%, transparent);
-    backdrop-filter: blur(20px);
-    box-shadow:
-      var(--elevation-3),
-      /* The accent bleeds a little light into the page — the only glow, and
-         it is what makes an error feel urgent without turning red. */
-      0 0 0 1px color-mix(in oklab, var(--toast-accent) 22%, transparent),
-      0 10px 40px -16px color-mix(in oklab, var(--toast-accent) 45%, transparent);
+/* ── Legacy utility names, restated in Marquee ───────────────────────────
+   The two still in use. (The other old-design utilities were removed on
+   2026-10-07 once nothing referenced them.) */
+@utility surface {
+  border-radius: 16px;
+  background: var(--mq-surface);
+}
+@utility focus-ring {
+  outline: none;
+  &:focus-visible {
+    outline: 2px solid var(--mq-link);
+    outline-offset: 2px;
   }
+}
 
-  /* The spine. */
-  .mf-toast[data-sonner-toast]::before {
-    content: "";
-    position: absolute;
-    inset-block: 0;
-    left: 0;
-    width: 4px;
-    background: var(--toast-accent);
-  }
+/* Burmese is never letter-spaced and needs more leading for stacked marks. */
+:root:lang(my) .text-kicker,
+:root:lang(my) .text-overline,
+[lang="my"] .text-kicker,
+[lang="my"] .text-overline,
+.text-kicker:lang(my),
+.text-overline:lang(my) {
+  letter-spacing: 0;
+}
+:root:lang(my) .text-body {
+  line-height: 30px;
+}
+:root:lang(my) .text-meta {
+  line-height: 24px;
+}
+:root:lang(my) .text-caption,
+:root:lang(my) .text-label {
+  line-height: 22px;
+}
 
-  /* The drain: a playhead running out along the bottom edge. It pauses with
-     the timer the instant the stack is pointed at. */
-  .mf-toast[data-sonner-toast]::after {
-    content: "";
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    height: 2px;
-    width: 100%;
-    transform-origin: left center;
-    background: color-mix(in oklab, var(--toast-accent) 55%, transparent);
-    animation: mf-toast-drain var(--mf-toast-duration) linear forwards;
+/* ── Toast (sonner): bottom centre, popover slab, coloured icon ─────────
+   Unlayered with a long selector on purpose: sonner injects its own
+   unlayered stylesheet at runtime, and layered rules would lose to it. */
+[data-sonner-toaster] .mf-toast[data-sonner-toast][data-styled="true"] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 8px 10px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--mq-popover);
+  color: var(--mq-fg);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  font-family: inherit;
+}
+[data-sonner-toaster] .mf-toast[data-sonner-toast] [data-icon] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  color: var(--mq-fg-muted);
+}
+[data-sonner-toaster] .mf-toast[data-sonner-toast][data-type="success"] [data-icon] {
+  color: var(--mq-money);
+}
+[data-sonner-toaster] .mf-toast[data-sonner-toast][data-type="error"] [data-icon] {
+  color: var(--mq-danger);
+}
+[data-sonner-toaster] .mf-toast[data-sonner-toast][data-type="warning"] [data-icon] {
+  color: var(--mq-pending);
+}
+[data-sonner-toaster] .mf-toast[data-sonner-toast][data-type="info"] [data-icon] {
+  color: var(--mq-info);
+}
+[data-sonner-toaster] .mf-toast[data-sonner-toast] [data-content] {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+[data-sonner-toaster] .mf-toast[data-sonner-toast] [data-title] {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--mq-fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+[data-sonner-toaster] .mf-toast[data-sonner-toast] [data-description] {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--mq-fg-faint);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Action = crimson text button ("Undo"). */
+[data-sonner-toaster] .mf-toast[data-sonner-toast] [data-button] {
+  height: 40px;
+  margin: 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--mq-link);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-sonner-toaster] .mf-toast[data-sonner-toast] [data-button]:hover {
+  color: var(--mq-link-hover);
+  text-decoration: underline;
+}
+[data-sonner-toaster] .mf-toast[data-sonner-toast] [data-cancel] {
+  height: 40px;
+  margin: 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--mq-fg-muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-sonner-toaster] .mf-toast[data-sonner-toast] [data-close-button] {
+  position: static;
+  order: 10;
+  transform: none;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--mq-fg-faint);
+}
+[data-sonner-toaster] .mf-toast[data-sonner-toast] [data-close-button]:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--mq-fg);
+}
+/* The toast lifts above the floating dock on phones — only on pages that
+   show the dock (the Toaster adds .mf-toaster-dock there; sign-in pages and
+   the player don't get it). */
+@media (max-width: 719px) {
+  [data-sonner-toaster].mf-toaster-dock[data-y-position="bottom"] {
+    bottom: var(--shell-dock-clear) !important;
   }
-  [data-sonner-toaster]:hover .mf-toast[data-sonner-toast]::after,
-  .mf-toast[data-sonner-toast]:focus-within::after {
-    animation-play-state: paused;
-  }
-  /* A toast with an action or an explicit dismiss is not on a clock. */
-  .mf-toast[data-sonner-toast][data-type="loading"]::after {
-    animation: none;
-    width: 0;
-  }
+}
 
-  @keyframes mf-toast-drain {
-    from {
-      transform: scaleX(1);
-    }
-    to {
-      transform: scaleX(0);
-    }
-  }
-
-  /* ── States ─────────────────────────────────────────────────────────── */
-  .mf-toast[data-sonner-toast][data-type="success"] {
-    --toast-accent: var(--success);
-  }
-  .mf-toast[data-sonner-toast][data-type="error"] {
-    --toast-accent: var(--destructive);
-  }
-  .mf-toast[data-sonner-toast][data-type="warning"] {
-    --toast-accent: var(--warning);
-  }
-  .mf-toast[data-sonner-toast][data-type="info"] {
-    --toast-accent: var(--info);
-  }
-
-  /* ── Icon: a tinted slate, not a circle ─────────────────────────────── */
-  .mf-toast[data-sonner-toast] [data-icon] {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 1.75rem;
-    height: 1.75rem;
-    margin: 0;
-    border-radius: 9px;
-    color: var(--toast-accent);
-    background: color-mix(in oklab, var(--toast-accent) 16%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--toast-accent) 28%, transparent);
-  }
-
-  /* ── Type ───────────────────────────────────────────────────────────── */
-  .mf-toast[data-sonner-toast] [data-content] {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-    flex: 1;
-  }
-  .mf-toast[data-sonner-toast] [data-title] {
-    font-family: var(--font-heading), var(--font-sans);
-    font-size: 0.875rem;
-    font-weight: 600;
-    line-height: 1.3;
-    color: var(--foreground);
-    /* Long messages wrap to two lines, then stop — a toast is a headline,
-       not a paragraph. */
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .mf-toast[data-sonner-toast] [data-description] {
-    font-size: 0.8125rem;
-    line-height: 1.45;
-    color: var(--muted-foreground);
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  /* ── Dismiss: revealed on approach, never shouting ──────────────────── */
-  .mf-toast[data-sonner-toast] [data-close-button] {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    left: auto;
-    transform: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.5rem;
-    height: 1.5rem;
-    border: 0;
-    border-radius: 999px;
-    background: color-mix(in oklab, var(--foreground) 8%, transparent);
-    color: var(--muted-foreground);
-    opacity: 0;
-    transition:
-      opacity 150ms ease-out,
-      color 150ms ease-out,
-      background-color 150ms ease-out;
-  }
-  .mf-toast[data-sonner-toast]:hover [data-close-button],
-  .mf-toast[data-sonner-toast] [data-close-button]:focus-visible {
-    opacity: 1;
-  }
-  .mf-toast[data-sonner-toast] [data-close-button]:hover {
-    background: color-mix(in oklab, var(--foreground) 14%, transparent);
-    color: var(--foreground);
-  }
-  /* Touch has no hover to reveal it, so it simply stays. */
-  @media (hover: none) {
-    .mf-toast[data-sonner-toast] [data-close-button] {
-      opacity: 1;
-    }
-  }
-  .mf-toast[data-sonner-toast]:has([data-close-button]) [data-content] {
-    padding-right: 1.25rem;
-  }
-
-  /* Sonner drives entrance, exit, stacking and swipe with transforms of its
-     own; layering a transform of ours on top would fight it. The extra
-     flourish is therefore blur and light only. */
-  .mf-toast[data-sonner-toast][data-mounted="true"] {
-    animation: mf-toast-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  @keyframes mf-toast-in {
-    from {
-      filter: blur(6px);
-    }
-    to {
-      filter: blur(0);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .mf-toast[data-sonner-toast][data-mounted="true"] {
-      animation: none;
-    }
-    .mf-toast[data-sonner-toast]::after {
-      animation-duration: var(--mf-toast-duration);
-      animation-timing-function: step-end;
-    }
-  }
+/* The top bar before the page's code runs: a page that opens with a
+   full-bleed hero (`under-bar`) starts with a clear bar, so the server HTML
+   never flashes one frame of frosted glass over the picture. Once the shell
+   is running it writes --glass-a inline (scroll-driven), which wins. */
+[data-shell-root]:has(.under-bar) > [data-shell-bar] {
+  --glass-a: 0;
 }
 
 @layer utilities {
@@ -465,17 +744,18 @@
       var(--font-literata), var(--font-noto-serif-myanmar), Georgia,
       "Times New Roman", serif;
   }
-  /* The sans reading face — the UI's Inter, with the Myanmar sans behind it. */
+  /* The sans reading face — the UI's own face (Noto Sans Myanmar carries
+     Latin as well as Burmese, so one family sets both). */
   .font-reading-sans {
     font-family:
-      var(--font-inter), var(--font-noto-myanmar), system-ui, sans-serif;
+      var(--font-ui), "Noto Sans Myanmar", system-ui, sans-serif;
   }
   /* "Easy read" — Atkinson Hyperlegible (loaded in app/layout.tsx). There is
      no dyslexia-specific Myanmar face anywhere, so Burmese under this
-     setting intentionally falls back to Noto Sans Myanmar, same as sans. */
+     setting intentionally falls back to Noto Sans Myanmar (the UI face). */
   .font-reading-dyslexic {
     font-family:
-      var(--font-atkinson), var(--font-noto-myanmar), system-ui, sans-serif;
+      var(--font-atkinson), var(--font-ui), system-ui, sans-serif;
   }
 
   /* ── The reading surface ─────────────────────────────────────────────────
@@ -793,9 +1073,6 @@
   .reader-stage-sheet {
     transition: opacity 0.15s ease;
   }
-  .reader-zoomable {
-    transition: width 0.16s ease, height 0.16s ease;
-  }
 
   /* The thumbnail strip slides up over the bottom bar. */
   .reader-thumb-strip {
@@ -851,117 +1128,6 @@
 }
 
 @layer utilities {
-  /* ── Typography scale ────────────────────────────────────────────────────
-     The Aurora Theater type system, codified once so every page speaks with
-     the same voice instead of re-deriving sizes per component. */
-
-  /* Hero/display titles. */
-  .text-display {
-    @apply font-heading text-3xl leading-[1.02] font-bold tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl;
-  }
-  /* A step down from display — page titles that still need weight. */
-  .text-title {
-    @apply font-heading text-2xl leading-[1.08] font-bold tracking-tight sm:text-3xl;
-  }
-  /* The heading above every rail/grid/panel. */
-  .text-section-title {
-    @apply font-heading text-lg font-semibold tracking-tight sm:text-xl;
-  }
-  /* The signature editorial eyebrow. */
-  .text-kicker {
-    @apply text-[11px] font-semibold tracking-[0.18em] text-muted-foreground uppercase;
-  }
-  /* Secondary body copy. */
-  .text-body-muted {
-    @apply text-sm text-muted-foreground sm:text-[15px];
-  }
-  /* Money, counts, durations — digits must not dance as values update. */
-  .nums {
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* ── Surfaces & motion ───────────────────────────────────────────────── */
-
-  /* The standard quiet-glass panel. Components use <Surface>; this exists for
-     the odd place that needs the look on an element it already owns. */
-  .surface {
-    @apply rounded-2xl bg-card/60 ring-1 ring-white/8 ring-inset backdrop-blur-xl;
-  }
-  .hover-lift {
-    @apply transition-transform duration-200 ease-out hover:-translate-y-0.5;
-  }
-  .focus-ring {
-    @apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
-  }
-
-  /* The ambient aurora — page tops, hero edges, empty states. Never behind
-     body text: it is always painted on an aria-hidden layer underneath. */
-  .aurora-wash {
-    background-image:
-      radial-gradient(60% 70% at 12% 0%, var(--aurora-violet), transparent 70%),
-      radial-gradient(52% 62% at 88% 4%, var(--aurora-sky), transparent 72%),
-      radial-gradient(44% 52% at 50% 0%, var(--aurora-ember), transparent 76%);
-  }
-  .aurora-wash-soft {
-    background-image:
-      radial-gradient(70% 90% at 50% 0%, var(--aurora-violet), transparent 72%),
-      radial-gradient(60% 80% at 85% 10%, var(--aurora-sky), transparent 74%);
-  }
-
-  /* ── Safe area (bottom tab bar, notched phones) ──────────────────────── */
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  .pt-safe {
-    padding-top: env(safe-area-inset-top, 0px);
-  }
-  .px-safe {
-    padding-left: env(safe-area-inset-left, 0px);
-    padding-right: env(safe-area-inset-right, 0px);
-  }
-  /* Room for the mobile tab bar so nothing hides behind it. */
-  .pb-tabbar {
-    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
-  }
-
-  .glass-card {
-    @apply bg-card/60 backdrop-blur-xl border border-white/[0.08] shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset,0_8px_30px_rgba(0,0,0,0.4)];
-  }
-  .glass-panel {
-    @apply bg-background/70 backdrop-blur-xl border border-white/[0.08];
-  }
-  .text-gradient-primary {
-    background: linear-gradient(135deg, oklch(0.72 0.18 292), oklch(0.55 0.21 292));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-  .glow-primary {
-    box-shadow: 0 0 0 1px oklch(0.66 0.19 292 / 25%), 0 8px 24px -8px oklch(0.66 0.19 292 / 45%);
-  }
-  .scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: oklch(1 0 0 / 15%) transparent;
-  }
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: oklch(1 0 0 / 15%);
-    border-radius: 9999px;
-  }
-  .scrollbar-none {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .scrollbar-none::-webkit-scrollbar {
-    display: none;
-  }
-  .fade-edge-x {
-    mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
-  }
-
   /* ---- Player ---- */
 
   /* The transient centered burst that confirms a keyboard/gesture action —
@@ -986,20 +1152,6 @@
   }
   .animate-hud-pop {
     animation: player-hud-pop 820ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  }
-
-  @keyframes player-rise-in {
-    from {
-      opacity: 0;
-      transform: translateY(12px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  .animate-rise-in {
-    animation: player-rise-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   /* Slow drift keeps the ambient wash feeling alive during a static shot,
@@ -1047,10 +1199,10 @@
 }
 
 /* ── prefers-reduced-motion, once, globally ────────────────────────────────
-   Every hover lift, shelf reveal and overlay fade in the design system is a
-   CSS transition or animation, so one guard covers the whole app instead of
-   each component remembering. Kept outside @layer so the !important wins
-   against utility-declared durations. */
+   Every hover, rise and fade in the system is a CSS transition or
+   animation, so one guard covers the whole app. Outside @layer so the
+   !important wins against utility-declared durations. Everything becomes an
+   instant cross-fade; no pager fill, no pulse, no press scale. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1060,23 +1212,7 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-
-/* ── mf-store: THE ARCADE (homepage storefront) ──────────────────────────
-   Two idle motions, both decorative, both neutralised by the global
-   prefers-reduced-motion guard above. Used ONLY by components/home/Store*. */
-@keyframes mf-store-drift {
-  from { transform: scale(1.08) translate3d(0, 0, 0); }
-  to { transform: scale(1.16) translate3d(-1.2%, -1.2%, 0); }
-}
-.mf-store-drift {
-  animation: mf-store-drift 28s ease-in-out infinite alternate;
-  will-change: transform;
-}
-@keyframes mf-store-float {
-  0%, 100% { transform: translate3d(0, 0, 0); opacity: 0.35; }
-  50% { transform: translate3d(4px, -14px, 0); opacity: 0.8; }
-}
-.mf-store-float {
-  animation: mf-store-float 9s ease-in-out infinite;
+  .mq-press:active {
+    transform: none !important;
+  }
 }

@@ -5,7 +5,7 @@ import { SegmentManager } from "./SegmentManager";
 import { PrefetchManager } from "./PrefetchManager";
 import { PlaybackTracker } from "./PlaybackTracker";
 import { createHlsCacheLoader } from "./HlsCacheLoader";
-import type { CacheEntry, PrefetchWindowConfig } from "./types";
+import type { PrefetchWindowConfig } from "./types";
 
 export interface PrefetchSystemOptions {
   /** Max concurrent segment downloads on a good connection — the ceiling adaptive concurrency scales down from. */
@@ -37,9 +37,6 @@ export interface PrefetchStatus {
 }
 
 export interface PrefetchHandle {
-  setWindow: (window: PrefetchWindowConfig) => void;
-  getWindow: () => PrefetchWindowConfig;
-  getCacheSnapshot: () => CacheEntry[];
   getStatus: () => PrefetchStatus;
   destroy: () => void;
 }
@@ -66,8 +63,6 @@ export function createPrefetchSystem(window: PrefetchWindowConfig, options: Pref
 
   return {
     loaderClass,
-    cache,
-    downloader,
 
     /** Call once the Hls instance is constructed and media is attached to start playback tracking + prefetching. */
     attach(hls: Hls, video: HTMLVideoElement): PrefetchHandle {
@@ -99,9 +94,6 @@ export function createPrefetchSystem(window: PrefetchWindowConfig, options: Pref
       });
 
       return {
-        setWindow: (nextWindow) => prefetchManager.setWindow(nextWindow),
-        getWindow: () => prefetchManager.getWindow(),
-        getCacheSnapshot: () => cache.snapshot(),
         getStatus: () => {
           const snapshot = cache.snapshot();
           const downloaded = snapshot.filter((entry) => entry.status === "downloaded");

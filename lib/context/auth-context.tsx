@@ -15,6 +15,7 @@ import {
   type OtpVerifyProof,
 } from "@/services/api/authService";
 import { profileService } from "@/services/api/profileService";
+import type { WalletSummary } from "@/services/api/paymentService";
 import { ApiError } from "@/services/api/apiClient";
 import { tokenStore, onUnauthorized, onTokensChanged } from "@/lib/auth/token-store";
 import { isTransientStatus } from "@/lib/auth/session-errors";
@@ -80,6 +81,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const profile = await profileService.getProfile();
       setUser(profile);
+      // The balance pill, wallet page and dialogs read ["wallet-summary"],
+      // which is built from this very same GET /users/me
+      // (paymentService.getWalletSummary). Seed it here so they do not ask
+      // for the profile a second time right after it was loaded.
+      queryClient.setQueryData<WalletSummary>(["wallet-summary"], {
+        balance: profile.walletBalance,
+        totalDeposited: profile.totalDeposited,
+        totalSpent: profile.totalSpent,
+      });
       return true;
     } catch (err) {
       if (err instanceof ApiError && isTransientStatus(err.status)) return false;
@@ -136,6 +146,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (retryTimer !== undefined) clearTimeout(retryTimer);
       window.removeEventListener("online", retryNow);
     };
+    // Session restore runs once, on mount. loadProfile only uses values that
+    // never change (the state setters and the app's single QueryClient), so
+    // leaving it out of the list cannot run a stale copy.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Closes the refresh gap: apiClient rotates the access token every ~15

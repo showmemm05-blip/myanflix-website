@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { GoogleOAuthProvider, useGoogleLogin, useGoogleOAuth } from "@react-oauth/google";
-import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GOOGLE_CLIENT_ID, warnGoogleAuthUnconfiguredOnce } from "@/lib/auth/google-client-id";
 import { useLanguage } from "@/lib/context/language-context";
+import { cn } from "@/lib/utils";
 
 /**
  * How long a click may wait for accounts.google.com to load before we give
@@ -127,13 +127,18 @@ function GoogleButton({ disabled, busy, onCode, onError, onPopupChange, classNam
 
   const waiting = busy || pending || popupOpen;
 
+  // Login board: the tonal 52px row with the four-colour G; while Google
+  // is working it shows the three busy dots (the name stays for screen
+  // readers via busyLabel). Dimmed to 40% while the phone check runs.
   return (
     <Button
       type="button"
-      variant="outline"
-      disabled={disabled || waiting}
-      aria-busy={waiting}
-      className={className}
+      variant="tonal"
+      size="block"
+      disabled={disabled}
+      busy={waiting}
+      busyLabel={t.auth.continueWithGoogle}
+      className={cn("mt-6 gap-2.5 font-bold", className)}
       onClick={() => {
         if (scriptLoadedSuccessfully) {
           setPopupOpen(true);
@@ -141,7 +146,7 @@ function GoogleButton({ disabled, busy, onCode, onError, onPopupChange, classNam
         } else setPending(true);
       }}
     >
-      {waiting ? <Loader2 className="size-4 animate-spin" /> : <GoogleMark />}
+      <GoogleMark />
       {t.auth.continueWithGoogle}
     </Button>
   );
@@ -150,7 +155,7 @@ function GoogleButton({ disabled, busy, onCode, onError, onPopupChange, classNam
 /**
  * The "or / Continue with Google" block under the phone step.
  *
- * The button is ours (same pill as the phone submit, Google's "G" in the
+ * The button is ours (the board's tonal 52px row, Google's "G" in the
  * icon slot) and renders on first paint. Clicking it opens Google's popup
  * (auth-code flow); Google hands the page a one-time code which the backend
  * exchanges and verifies server-side — no token ever reaches the browser.
@@ -179,7 +184,7 @@ export function GoogleSignIn({
   onError: () => void;
   /** Google's popup opened / closed — lock the phone form while it is open. */
   onPopupChange?: (open: boolean) => void;
-  /** Extra classes for the button — the phone form passes its submit pill classes so both match. */
+  /** Extra classes for the button. */
   className?: string;
 }) {
   const { t } = useLanguage();
@@ -192,15 +197,15 @@ export function GoogleSignIn({
 
   return (
     <>
-      {/* Same eyebrow treatment as the step labels above the form. */}
+      {/* "—— or ——" between the phone Continue and Google. */}
       <div
         role="separator"
         aria-label={t.auth.or}
-        className="flex items-center gap-3 text-[10px] font-semibold tracking-[0.14em] uppercase text-muted-foreground"
+        className="mt-6 flex items-center gap-3.5 text-[13px] leading-[18px] font-bold text-fg-faint"
       >
-        <span aria-hidden className="h-px flex-1 bg-white/10" />
-        {t.auth.or}
-        <span aria-hidden className="h-px flex-1 bg-white/10" />
+        <span aria-hidden className="h-px flex-1 bg-hairline" />
+        <span aria-hidden>{t.auth.or}</span>
+        <span aria-hidden className="h-px flex-1 bg-hairline" />
       </div>
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
         <GoogleButton

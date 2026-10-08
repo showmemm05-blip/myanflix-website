@@ -4,7 +4,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -14,8 +13,12 @@ import { toast } from "sonner";
 import { subscriptionService } from "@/services/api/subscriptionService";
 import { notificationService } from "@/services/api/notificationService";
 import { useAuth } from "@/lib/context/auth-context";
+import { useLanguage } from "@/lib/context/language-context";
+import { pickSection } from "@/lib/i18n/sections/define";
+import { walletText } from "@/lib/i18n/sections/wallet";
 import { ApiError } from "@/services/api/apiClient";
 import type { SubscriptionPlan, SubscriptionStatus } from "@/types/subscription";
+import type { AppUser } from "@/types/user";
 
 interface SubscriptionContextValue {
   isSubscribed: boolean;
@@ -38,35 +41,54 @@ const EMPTY_STATUS: SubscriptionStatus = {
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated, refreshProfile } = useAuth();
+  const { user, isAuthenticated, refreshProfile } = useAuth();
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<SubscriptionStatus>(EMPTY_STATUS);
+  const { language } = useLanguage();
+  // What GET /subscriptions/me last said, and for which profile it was asked.
+  // Only refresh() fills it; a newer profile (refreshProfile, a new sign-in)
+  // takes over again, because it carries the same live answer.
+  const [fetched, setFetched] = useState<{ forUser: AppUser; status: SubscriptionStatus } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // The status the profile (GET /users/me, already loaded by the auth
+  // context) carries: the backend computes isSubscribed/expiresAt there with
+  // the same rule as /subscriptions/me (an unexpired subscription row), so no
+  // second request is needed on every page load. Signed out = not subscribed.
+  const status: SubscriptionStatus = useMemo(() => {
+    if (!isAuthenticated || !user) return EMPTY_STATUS;
+    if (fetched && fetched.forUser === user) return fetched.status;
+    return {
+      ...EMPTY_STATUS,
+      isActive: user.isSubscribed,
+      expiresAt: user.subscriptionExpiresAt,
+    };
+  }, [isAuthenticated, user, fetched]);
+
+  /** Asks /subscriptions/me again (after a purchase, or when a caller wants it). */
   const loadStatus = useCallback(async () => {
-    if (!isAuthenticated) {
-      setStatus(EMPTY_STATUS);
+    if (!isAuthenticated || !user) {
+      setFetched(null);
       return;
     }
     setIsLoading(true);
     try {
       const result = await subscriptionService.getMyStatus();
-      setStatus(result);
+      setFetched({ forUser: user, status: result });
     } catch {
-      setStatus(EMPTY_STATUS);
+      setFetched({ forUser: user, status: EMPTY_STATUS });
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    loadStatus();
-  }, [loadStatus]);
+  }, [isAuthenticated, user]);
 
   const subscribe = useCallback(
     async (planId: string) => {
       try {
-        const plans = await subscriptionService.getPlans();
+        // The Subscribe dialog has already loaded the plans; read them from
+        // its cache, and only ask the server when they are not there.
+        const plans =
+          queryClient.getQueryData<SubscriptionPlan[]>(["subscription-plans"]) ??
+          (await subscriptionService.getPlans());
         const plan = plans.find((p: SubscriptionPlan) => p.id === planId);
         await subscriptionService.subscribe(planId);
         await loadStatus();
@@ -77,25 +99,22 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         queryClient.invalidateQueries({ queryKey: ["wallet-summary"] });
         // A completed subscription purchase is the one moment the level's
         // qualifying total (lifetime subscription spend) moves — deposits no
-        toast.success("Subscribed", {
-          description: plan
-            ? `You're now subscribed to ${plan.name}. Enjoy all subscription content!`
-            : "Your subscription is now active.",
+        const w = pickSection(walletText, language);
+        toast.success(w.subscribedTitle, {
+          description: plan ? w.subscribedToPlan(plan.name) : w.premiumActive,
         });
         notificationService.push({
           type: "SUBSCRIPTION",
-          title: "Subscription active",
-          message: plan
-            ? `You've subscribed to ${plan.name}. Enjoy all subscription content!`
-            : "Your subscription is now active.",
+          title: w.subscribedTitle,
+          message: plan ? w.subscribedToPlan(plan.name) : w.premiumActive,
         });
         await refreshProfile();
       } catch (err) {
-        toast.error(err instanceof ApiError ? err.message : "Subscription failed");
+        toast.error(err instanceof ApiError ? err.message : pickSection(walletText, language).subscriptionFailed);
         throw err;
       }
     },
-    [loadStatus, refreshProfile, queryClient],
+    [language, loadStatus, refreshProfile, queryClient],
   );
 
   const value = useMemo(

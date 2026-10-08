@@ -1,38 +1,54 @@
-import { WifiHigh, WifiLow, WifiOff, type LucideIcon } from "lucide-react";
-import type { NetworkQuality } from "@/lib/hooks/use-network-quality";
+"use client";
 
-const ICONS: Record<NetworkQuality, LucideIcon> = {
-  good: WifiHigh,
-  slow: WifiLow,
-  offline: WifiOff,
+import type { NetworkQuality } from "@/lib/hooks/use-network-quality";
+import { useSection } from "@/lib/i18n/sections/define";
+import { playText } from "@/lib/i18n/sections/play";
+import { cn } from "@/lib/utils";
+import { WifiIcon, WifiLowIcon, WifiOffIcon, type PlayerIconProps } from "./player-icons";
+
+const ICONS: Record<NetworkQuality, (p: PlayerIconProps) => React.ReactElement> = {
+  good: WifiIcon,
+  slow: WifiLowIcon,
+  offline: WifiOffIcon,
 };
 
 const COLORS: Record<NetworkQuality, string> = {
-  good: "text-success",
-  slow: "text-warning",
-  offline: "text-destructive",
-};
-
-const LABELS: Record<NetworkQuality, string> = {
-  good: "Good connection",
-  slow: "Slow connection",
-  offline: "No internet connection",
+  good: "text-money",
+  slow: "text-pending",
+  offline: "text-danger",
 };
 
 /**
- * Icon-only, top-right of the player — no text/toast/modal per spec. Color
- * and glyph both change with quality so it reads at a glance like Netflix/
- * YouTube's own connection indicators.
+ * Icon-only connection disc (Player.dc.html: 36px, glass, green Wi-Fi) — no
+ * text/toast/modal per spec. Colour and glyph both change with quality so it
+ * reads at a glance. Placed by the player: in the top row while the controls
+ * show, alone at the top right once they fade.
  */
-export function NetworkStatusIcon({ quality }: { quality: NetworkQuality }) {
+export function NetworkStatusIcon({
+  quality,
+  className,
+  silent = false,
+}: {
+  quality: NetworkQuality;
+  className?: string;
+  /** Hide from screen readers (a faded-out copy while another one speaks). */
+  silent?: boolean;
+}) {
+  const p = useSection(playText);
   const Icon = ICONS[quality];
+  const label = quality === "good" ? p.networkGood : quality === "slow" ? p.networkSlow : p.networkOffline;
   return (
-    <div
-      role="img"
-      aria-label={LABELS[quality]}
-      className={`pointer-events-none absolute top-3 right-3 z-10 flex size-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/12 backdrop-blur-xl transition-colors duration-300 ease-out ring-inset ${COLORS[quality]}`}
+    <span
+      role={silent ? undefined : "img"}
+      aria-label={silent ? undefined : label}
+      aria-hidden={silent || undefined}
+      className={cn(
+        "pointer-events-none flex size-9 shrink-0 items-center justify-center rounded-full bg-glass backdrop-blur-[14px] transition-colors duration-300 ease-out",
+        COLORS[quality],
+        className,
+      )}
     >
-      <Icon className="size-4" />
-    </div>
+      <Icon size={18} />
+    </span>
   );
 }

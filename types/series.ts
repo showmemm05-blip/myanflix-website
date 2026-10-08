@@ -17,6 +17,8 @@ export type SeriesSortOption =
 export interface SeriesQuery {
   search?: string;
   genres?: string[];
+  /** Only series in this category (GET /series?categoryId — needs the 2026-10-07 backend). */
+  categoryId?: string;
   languages?: string[];
   yearFrom?: number;
   yearTo?: number;

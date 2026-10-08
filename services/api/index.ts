@@ -12,3 +12,4 @@ export { notificationService } from "./notificationService";
 export { peakUsersService } from "./peakUsersService";
 export { commentService } from "./commentService";
 export { feedbackService } from "./feedbackService";
+export { withdrawalCodeService } from "./withdrawalCodeService";

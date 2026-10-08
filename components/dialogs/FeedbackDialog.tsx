@@ -1,32 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import Link from "next/link";
-import { AlertTriangle, Loader2, MessageSquarePlus, Send } from "lucide-react";
+import { Bug, CreditCard, Ellipsis, Film, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FieldError, Modal } from "@/components/system";
+import { AlertCircleIcon } from "@/components/system/icons";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Surface } from "@/components/system";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import { libraryText } from "@/lib/i18n/sections/library";
+import { cn } from "@/lib/utils";
 import { ApiError } from "@/services/api/apiClient";
 import { feedbackService } from "@/services/api/feedbackService";
 import {
@@ -36,22 +23,27 @@ import {
   type FeedbackCategory,
 } from "@/types/feedback";
 
-// The dialog idioms this app already uses everywhere else.
-const dialogContentClass = "gap-5 rounded-3xl p-5 ring-white/10 sm:max-w-md sm:p-6";
-const dialogFooterClass = "mx-0 mb-0 border-0 bg-transparent p-0 pt-1";
-
-/** How close to the ceiling the draft gets before the count appears. */
-const COUNTER_VISIBLE_FROM = 200;
+const CATEGORY_ICON: Record<FeedbackCategory, ComponentType<{ className?: string; strokeWidth?: number }>> = {
+  BUG: Bug,
+  SUGGESTION: Lightbulb,
+  CONTENT: Film,
+  PAYMENT: CreditCard,
+  OTHER: Ellipsis,
+};
 
 /**
- * ONE feedback dialog for the whole app — the account menu and the footer both
- * open this, so what a user sees is the same wherever they found the way in.
+ * ONE feedback dialog for the whole app — the account menu, the footer and
+ * Settings › Help & privacy all open this (the shell mounts it once), so what
+ * a user sees is the same wherever they found the way in.
  *
- * Validation is mirrored from the backend (a trimmed 5..2000 message and a
- * category from its enum) and shown inline before anything is sent, so the
- * round trip is spent on real submissions. The two failures the server can
- * still return are treated differently on purpose: a 429 is a state the user
- * can wait out and gets said plainly, while anything else is a retry.
+ * Marquee dialog frame (every board's "Send feedback"): the five topics as
+ * big tappable tiles (a real radio group — arrow keys move between them),
+ * the message box with "At least 5 characters…" and a live count, Cancel and
+ * Send. Validation is mirrored from the backend (a trimmed 5..2000 message
+ * and a category from its enum) and shown inline before anything is sent.
+ * The two failures the server can still return are treated differently on
+ * purpose: a 429 is a state the user can wait out and gets said plainly,
+ * while anything else is a retry.
  *
  * Signed-out visitors reach this from the footer, so it opens as a sign-in
  * prompt rather than a composer that would be rejected on submit.
@@ -64,6 +56,7 @@ export function FeedbackDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useLanguage();
+  const lib = useSection(libraryText);
   const { isAuthenticated } = useAuth();
 
   const [category, setCategory] = useState<FeedbackCategory | null>(null);
@@ -73,7 +66,6 @@ export function FeedbackDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const trimmedLength = message.trim().length;
-  const remaining = FEEDBACK_MESSAGE_MAX - message.length;
 
   const reset = () => {
     setCategory(null);
@@ -120,12 +112,7 @@ export function FeedbackDialog({
       // since "Internal server error" tells the reader nothing.
       if (error instanceof ApiError && error.status === 429) {
         setSubmitError(t.feedback.rateLimited);
-      } else if (
-        error instanceof ApiError &&
-        error.status >= 400 &&
-        error.status < 500 &&
-        error.message
-      ) {
+      } else if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.message) {
         setSubmitError(error.message);
       } else {
         setSubmitError(t.feedback.failed);
@@ -135,126 +122,141 @@ export function FeedbackDialog({
     }
   };
 
+  if (!isAuthenticated) {
+    return (
+      <Modal
+        open={open}
+        onOpenChange={handleOpenChange}
+        title={t.feedback.title}
+        subtitle={t.feedback.signedOutBody}
+        size="sm"
+        footer={
+          <>
+            <Button variant="tonal" size="cta" onClick={() => handleOpenChange(false)}>
+              {t.common.close}
+            </Button>
+            <Link
+              href="/login"
+              onClick={() => handleOpenChange(false)}
+              className={buttonVariants({ variant: "commit", size: "cta" })}
+            >
+              {t.comments.signIn}
+            </Link>
+          </>
+        }
+      >
+        <p className="rounded-[12px] bg-raised px-4 py-3.5 text-[15px] leading-[22px] text-fg-body">
+          {t.feedback.signedOutTitle}
+        </p>
+      </Modal>
+    );
+  }
+
+  const count = message.length.toLocaleString("en-US");
+  const max = FEEDBACK_MESSAGE_MAX.toLocaleString("en-US");
+
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className={dialogContentClass}>
-        <DialogHeader>
-          <span className="mb-1 flex size-11 items-center justify-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/25 ring-inset">
-            <MessageSquarePlus className="size-5" />
-          </span>
-          <DialogTitle className="text-section-title">{t.feedback.title}</DialogTitle>
-          <DialogDescription>
-            {isAuthenticated ? t.feedback.description : t.feedback.signedOutBody}
-          </DialogDescription>
-        </DialogHeader>
+    <Modal
+      open={open}
+      onOpenChange={handleOpenChange}
+      title={t.feedback.title}
+      subtitle={t.feedback.description}
+      dismissible={!isSubmitting}
+      footer={
+        <>
+          <Button variant="tonal" size="cta" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>
+            {t.common.cancel}
+          </Button>
+          <Button
+            variant="commit"
+            size="cta"
+            disabled={!category || trimmedLength < FEEDBACK_MESSAGE_MIN}
+            busy={isSubmitting}
+            busyLabel={t.feedback.submitting}
+            onClick={submit}
+          >
+            {t.feedback.submit}
+          </Button>
+        </>
+      }
+    >
+      <fieldset className="m-0 min-w-0 border-0 p-0" disabled={isSubmitting}>
+        <legend className="p-0 text-[13px] leading-[18px] font-bold text-fg-muted">{t.feedback.categoryLabel}</legend>
+        <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+          {FEEDBACK_CATEGORIES.map((value) => {
+            const Icon = CATEGORY_ICON[value];
+            const checked = category === value;
+            return (
+              <label
+                key={value}
+                className={cn(
+                  "flex min-h-14 cursor-pointer items-center gap-2.5 rounded-[12px] px-3.5 py-2.5 transition-colors duration-150",
+                  "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-link",
+                  value === "OTHER" && "col-span-2",
+                  checked
+                    ? "bg-crimson/14 text-fg shadow-[inset_0_0_0_2px_var(--mq-crimson)]"
+                    : "bg-raised text-fg-body hover:bg-raised-hover",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="feedback-category"
+                  value={value}
+                  checked={checked}
+                  onChange={() => setCategory(value)}
+                  className="sr-only"
+                />
+                <Icon className="size-[22px] shrink-0" strokeWidth={1.75} />
+                <span className="min-w-0 text-sm leading-[19px] font-bold">{t.feedback.categories[value]}</span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
 
-        {!isAuthenticated ? (
-          <>
-            <Surface tone="subtle" className="px-4 py-3.5">
-              <p className="text-sm text-muted-foreground">{t.feedback.signedOutTitle}</p>
-            </Surface>
-            <DialogFooter className={dialogFooterClass}>
-              <DialogClose render={<Button variant="ghost" className="h-11 rounded-full px-5" />}>
-                {t.common.close}
-              </DialogClose>
-              <Button
-                className="h-11 rounded-full px-5"
-                render={<Link href="/login" />}
-                nativeButton={false}
-                onClick={() => handleOpenChange(false)}
-              >
-                {t.comments.signIn}
-              </Button>
-            </DialogFooter>
-          </>
-        ) : (
-          <>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="feedback-category">{t.feedback.categoryLabel}</Label>
-              <Select
-                id="feedback-category"
-                items={FEEDBACK_CATEGORIES.map((value) => ({
-                  value,
-                  label: t.feedback.categories[value],
-                }))}
-                value={category}
-                onValueChange={(value) => setCategory((value ?? null) as FeedbackCategory | null)}
-                disabled={isSubmitting}
-              >
-                <SelectTrigger className="h-11 w-full rounded-xl">
-                  <SelectValue placeholder={t.feedback.categoryPlaceholder} />
-                </SelectTrigger>
-                <SelectContent>
-                  {FEEDBACK_CATEGORIES.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {t.feedback.categories[value]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      <div>
+        <label htmlFor="feedback-message" className="block text-[13px] leading-[18px] font-bold text-fg-muted">
+          {t.feedback.messageLabel}
+        </label>
+        <Textarea
+          id="feedback-message"
+          value={message}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            if (fieldError) setFieldError(null);
+          }}
+          onBlur={() => {
+            // Only nags about a message someone has actually started — an
+            // untouched empty box is not yet a mistake.
+            if (message.length > 0) validate();
+          }}
+          placeholder={t.feedback.messagePlaceholder}
+          rows={5}
+          maxLength={FEEDBACK_MESSAGE_MAX}
+          disabled={isSubmitting}
+          aria-invalid={fieldError ? true : undefined}
+          aria-describedby={fieldError ? "feedback-message-error feedback-message-help" : "feedback-message-help"}
+          className="mt-2 min-h-[140px] resize-y"
+        />
+        {fieldError && <FieldError id="feedback-message-error">{fieldError}</FieldError>}
+        <div
+          id="feedback-message-help"
+          className="mt-2 flex justify-between gap-3 text-[13px] leading-[18px] text-fg-faint"
+        >
+          <span>{lib.feedbackHelp(FEEDBACK_MESSAGE_MIN)}</span>
+          <span className="shrink-0 tabular-nums">{lib.charCount(count, max)}</span>
+        </div>
+      </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="feedback-message">{t.feedback.messageLabel}</Label>
-              <Textarea
-                id="feedback-message"
-                value={message}
-                onChange={(e) => {
-                  setMessage(e.target.value);
-                  if (fieldError) setFieldError(null);
-                }}
-                onBlur={() => {
-                  // Only nags about a message someone has actually started —
-                  // an untouched empty box is not yet a mistake.
-                  if (message.length > 0) validate();
-                }}
-                placeholder={t.feedback.messagePlaceholder}
-                rows={5}
-                maxLength={FEEDBACK_MESSAGE_MAX}
-                disabled={isSubmitting}
-                aria-invalid={fieldError ? true : undefined}
-                aria-describedby={fieldError ? "feedback-message-error" : undefined}
-                className="resize-none rounded-2xl border-white/10 bg-white/[0.04] dark:bg-white/[0.04]"
-              />
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p id="feedback-message-error" className="text-xs text-destructive">
-                  {fieldError}
-                </p>
-                <span className="text-[11px] text-muted-foreground nums">
-                  {remaining <= COUNTER_VISIBLE_FROM ? t.feedback.charactersLeft(remaining) : ""}
-                </span>
-              </div>
-            </div>
-
-            {submitError && (
-              <Surface
-                tone="subtle"
-                className="flex items-start gap-2.5 bg-destructive/6 px-4 py-3 ring-destructive/25"
-              >
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
-                <p className="text-xs text-destructive">{submitError}</p>
-              </Surface>
-            )}
-
-            <DialogFooter className={dialogFooterClass}>
-              <DialogClose
-                render={<Button variant="ghost" className="h-11 rounded-full px-5" />}
-                disabled={isSubmitting}
-              >
-                {t.common.cancel}
-              </DialogClose>
-              <Button
-                className="h-11 rounded-full px-5"
-                disabled={!category || trimmedLength < FEEDBACK_MESSAGE_MIN || isSubmitting}
-                onClick={submit}
-              >
-                {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-                {isSubmitting ? t.feedback.submitting : t.feedback.submit}
-              </Button>
-            </DialogFooter>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
+      {submitError && (
+        <p
+          role="alert"
+          className="flex items-start gap-2 rounded-[12px] bg-danger/10 px-3.5 py-3 text-sm leading-[21px] text-danger"
+        >
+          <AlertCircleIcon size={18} className="mt-px shrink-0" />
+          <span>{submitError}</span>
+        </p>
+      )}
+    </Modal>
   );
 }

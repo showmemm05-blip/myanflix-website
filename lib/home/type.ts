@@ -50,14 +50,3 @@ export function headingLeading(language: string, size: "display" | "title" | "de
   if (size === "deck") return { lineHeight: 1.7 };
   return { lineHeight: size === "display" ? 1.32 : 1.4 };
 }
-
-/**
- * `.text-kicker` sets `tracking-[0.18em]`, which is right for a Latin eyebrow
- * and wrong for Myanmar: the script is not letter-spaced, and the extra track
- * both hurts legibility and makes a word ~20% wider than it should be —
- * enough to truncate "ဇာတ်လမ်းတွဲ" out of a tight cell on a phone. Applies to
- * every Burmese-capable kicker and badge label on the storefront.
- */
-export function kickerTracking(language: string) {
-  return language === "mm" ? { letterSpacing: "0.02em" } : undefined;
-}

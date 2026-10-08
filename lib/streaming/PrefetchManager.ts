@@ -30,14 +30,6 @@ export class PrefetchManager {
     this.window = window;
   }
 
-  setWindow(window: PrefetchWindowConfig): void {
-    this.window = window;
-  }
-
-  getWindow(): PrefetchWindowConfig {
-    return this.window;
-  }
-
   /**
    * Turns speculative background prefetch on/off. On a connection too slow to
    * sustain real-time playback, background prefetch only competes with hls.js's
@@ -58,26 +50,35 @@ export class PrefetchManager {
     const segmentsInWindow = this.segmentManager.getSegmentsInRange(windowStart, windowEnd);
     const keepUrls = new Set(segmentsInWindow.map((segment) => segment.url));
 
-    // `keepUrls` is main-timeline only — SegmentManager enumerates the current
-    // video level's fragments and nothing else — so cancelExcept() would abort
-    // any alt-rendition download in flight (a subtitle VTT can never appear in
-    // this set). That is safe precisely because HlsCacheLoader keeps
-    // non-main fragments out of this DownloadManager entirely; if that ever
-    // changes, this line starts killing them on every tick and seek.
+    // `keepUrls` is main-timeline only — SegmentManager enumerates the video
+    // level hls.js is loading and nothing else — so cancelExcept() aborts any
+    // other BACKGROUND download in flight. Downloads hls.js asked for itself
+    // (HlsCacheLoader → requestImmediate) are never cancelled here, even when
+    // they belong to a different quality during a switch, and evictOutside()
+    // never drops a queued/downloading entry, so the piece hls.js is waiting
+    // for always survives. Subtitle VTTs stay out of DownloadManager entirely
+    // (HlsCacheLoader fetches them directly).
     this.cache.evictOutside(keepUrls);
     this.downloader.cancelExcept(keepUrls);
 
     if (!this.prefetchEnabled) return;
 
-    // Segments after the playhead are more urgent (they're what's about to play);
-    // segments behind it exist purely for instant rewind, so they're lower priority
-    // and ordered by closeness to "now".
+    // Only the segment under the playhead and the ones after it are ever
+    // fetched — they're what's about to play. Segments that end before the
+    // playhead stay in `keepUrls` above, so whatever is already cached
+    // survives for an instant rewind (in the quality hls.js is loading — a
+    // rewind is fetched in that quality, so after a switch the old quality's
+    // copies are let go), but nothing behind is downloaded: after
+    // a forward seek that would only fetch video the viewer just skipped past
+    // (hls.js's own backBufferLength already keeps recently played video).
+    // During normal playback those segments were fetched as "ahead" anyway.
+    // While a quality switch is on its way to the screen, hls.js already holds
+    // the stretch up to where it started loading the new quality (in the old
+    // quality) and never asks for it again, so the look-ahead starts there.
+    const aheadFrom = this.segmentManager.lookAheadStart(currentTime);
     const ahead = segmentsInWindow
-      .filter((segment) => segment.startTime >= currentTime)
+      .filter((segment) => segment.endTime > aheadFrom)
       .sort((a, b) => a.startTime - b.startTime);
-    const behind = segmentsInWindow
-      .filter((segment) => segment.startTime < currentTime)
-      .sort((a, b) => b.startTime - a.startTime);
 
     // These are fire-and-forget: PrefetchManager doesn't need the bytes itself,
     // it just wants CacheManager populated (DownloadManager updates that
@@ -90,14 +91,11 @@ export class PrefetchManager {
       if (!this.cache.has(segment.url)) this.downloader.request(segment, priority).catch(() => {});
       priority++;
     }
-    for (const segment of behind) {
-      if (!this.cache.has(segment.url)) this.downloader.request(segment, priority).catch(() => {});
-      priority++;
-    }
   }
 
   /** Semantic alias for the seek case — same reconciliation, called out separately per spec. */
   onSeek(newTime: number): void {
+    this.segmentManager.resetLoadPosition();
     this.update(newTime);
   }
 }

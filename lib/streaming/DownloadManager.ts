@@ -19,12 +19,14 @@ const IMMEDIATE_PRIORITY = -Infinity;
  * fix; only a fresh stream lookup can).
  */
 export class SegmentHttpError extends Error {
-  constructor(
-    readonly status: number,
-    url: string,
-  ) {
+  // A plain field rather than a constructor parameter property, so the unit
+  // tests can load this file under Node's type-stripping (it rejects those).
+  readonly status: number;
+
+  constructor(status: number, url: string) {
     super(`Segment fetch failed: ${status} for ${url}`);
     this.name = "SegmentHttpError";
+    this.status = status;
   }
 }
 
@@ -43,6 +45,13 @@ export class DownloadManager {
   private inFlight = new Map<string, Promise<ArrayBuffer>>();
   private controllers = new Map<string, AbortController>();
   private activePriority = new Map<string, number>();
+  /**
+   * The most urgent priority anyone has asked for, per queued/active URL. A
+   * background prefetch that hls.js then asks for itself (requestImmediate on
+   * the same URL) is deduped onto the existing download, so this is how that
+   * download learns it now belongs to hls.js.
+   */
+  private priorities = new Map<string, number>();
 
   constructor(cache: CacheManager, maxConcurrent = 3) {
     this.cache = cache;
@@ -66,7 +75,10 @@ export class DownloadManager {
     if (cached?.status === "downloaded" && cached.data) return Promise.resolve(cached.data);
 
     const existing = this.inFlight.get(segment.url);
-    if (existing) return existing;
+    if (existing) {
+      this.raisePriority(segment.url, priority);
+      return existing;
+    }
 
     this.cache.ensure(segment);
     this.cache.markQueued(segment.url);
@@ -76,8 +88,31 @@ export class DownloadManager {
       this.queue.sort((a, b) => a.priority - b.priority);
     });
     this.inFlight.set(segment.url, promise);
+    this.priorities.set(segment.url, priority);
     this.pump();
     return promise;
+  }
+
+  /** Moves an already queued/active download up to `priority` if that is more urgent than what it has. */
+  private raisePriority(url: string, priority: number): void {
+    const current = this.priorities.get(url);
+    if (current === undefined || priority >= current) return;
+    this.priorities.set(url, priority);
+    if (this.activePriority.has(url)) {
+      this.activePriority.set(url, priority);
+      return;
+    }
+    const item = this.queue.find((entry) => entry.segment.url === url);
+    if (item) {
+      item.priority = priority;
+      this.queue.sort((a, b) => a.priority - b.priority);
+      this.pump();
+    }
+  }
+
+  /** True while hls.js itself is waiting on this URL (queued or downloading). */
+  private isImmediate(url: string): boolean {
+    return this.priorities.get(url) === IMMEDIATE_PRIORITY;
   }
 
   /** Used by the Hls fragment loader — same dedupe/cache-first behavior, just always highest priority. */
@@ -97,14 +132,22 @@ export class DownloadManager {
       const [item] = this.queue.splice(index, 1);
       item.reject(new Error("cancelled"));
       this.inFlight.delete(url);
+      this.priorities.delete(url);
       this.cache.markCancelled(url);
     }
   }
 
-  /** Cancels every queued/active download whose URL isn't in `keepUrls` — called on seek to drop now-irrelevant work. */
+  /**
+   * Cancels every background download whose URL isn't in `keepUrls` — called
+   * on every tick and seek to drop now-irrelevant prefetch work. Never touches
+   * a download hls.js asked for itself: during an Auto quality step up, hls.js
+   * fetches the higher quality's piece before the prefetch window has moved to
+   * that quality, and killing it here made every step up fail. hls.js cancels
+   * its own loads through `cancel()` (HlsCacheLoader.abort).
+   */
   cancelExcept(keepUrls: Set<string>): void {
     for (const url of [...this.inFlight.keys()]) {
-      if (!keepUrls.has(url)) this.cancel(url);
+      if (!keepUrls.has(url) && !this.isImmediate(url)) this.cancel(url);
     }
   }
 
@@ -168,6 +211,7 @@ export class DownloadManager {
       this.controllers.delete(segment.url);
       this.activePriority.delete(segment.url);
       this.inFlight.delete(segment.url);
+      this.priorities.delete(segment.url);
       this.pump();
     }
   }
@@ -179,6 +223,7 @@ export class DownloadManager {
     this.inFlight.clear();
     this.controllers.clear();
     this.activePriority.clear();
+    this.priorities.clear();
     this.activeCount = 0;
   }
 }

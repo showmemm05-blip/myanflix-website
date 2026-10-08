@@ -17,8 +17,12 @@ export const moviesInfiniteKey = (query: MovieQuery) => ["movies", "infinite", q
  * whole filtered set: it IS the match count the UI shows, never a page's
  * `items.length`.
  */
-export function useMoviesInfinite(query: MovieQuery = {}) {
+export function useMoviesInfinite(
+  query: MovieQuery = {},
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useInfiniteQuery({
+    enabled,
     queryKey: moviesInfiniteKey(query),
     queryFn: ({ pageParam, signal }) =>
       movieService.getMovies({ ...query, page: pageParam }, { signal }),
@@ -35,32 +39,56 @@ export function useMoviesInfinite(query: MovieQuery = {}) {
 }
 
 /** The filter sheet's option lists — DB-derived, so empty facets can honestly hide their control. */
-export function useMovieFacets() {
+export function useMovieFacets({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ["movies", "facets"],
     queryFn: ({ signal }) => movieService.getFacets({ signal }),
     staleTime: 5 * 60_000,
+    enabled,
   });
 }
 
-export function useMovie(id: string) {
+/**
+ * One title (GET /movies/:id). The detail page keeps the default freshness
+ * (re-checked on every visit); a row that only needs the record for a while
+ * — Home's "Because you watched" — passes `staleTime` so a revisit inside
+ * that window renders from cache without a background re-request.
+ */
+export function useMovie(id: string, { staleTime }: { staleTime?: number } = {}) {
   return useQuery({
     queryKey: ["movie", id],
     queryFn: () => movieService.getMovieById(id),
     enabled: Boolean(id),
+    staleTime,
   });
 }
 
-export function useSimilarMovies(id: string) {
+/**
+ * "More like this". Pass `{ genre: movie?.genre }` when the page already has
+ * the movie (from useMovie): the list is then one GET /movies?genre=… call
+ * that waits for the genre, instead of fetching the same movie a second time
+ * first. Called with just the id it keeps the older two-step lookup.
+ */
+export function useSimilarMovies(id: string, options?: { genre: string | null | undefined }) {
+  const withGenre = options !== undefined;
+  const genre = options?.genre ?? undefined;
   return useQuery({
-    queryKey: ["movie", id, "similar"],
-    queryFn: () => movieService.getSimilarMovies(id),
-    enabled: Boolean(id),
+    queryKey: withGenre ? ["movie", id, "similar", genre] : ["movie", id, "similar"],
+    queryFn: ({ signal }) =>
+      withGenre && genre
+        ? movieService.getSimilarByGenre(id, genre, undefined, { signal })
+        : movieService.getSimilarMovies(id),
+    enabled: withGenre ? Boolean(id && genre) : Boolean(id),
   });
 }
 
-/** In-progress (not-yet-completed) watch history, most recent first — powers the "Continue Watching" row. */
-export function useContinueWatching(enabled: boolean) {
+/**
+ * In-progress (not-yet-completed) watch history, most recent first — powers
+ * the "Continue Watching" row. The title page keeps the default freshness so
+ * its Resume button reflects the latest playback; Home passes `staleTime`
+ * (its rows are kept for five minutes) so a revisit renders from cache.
+ */
+export function useContinueWatching(enabled: boolean, { staleTime }: { staleTime?: number } = {}) {
   return useQuery({
     queryKey: ["continue-watching"],
     queryFn: async () => {
@@ -70,40 +98,6 @@ export function useContinueWatching(enabled: boolean) {
       );
     },
     enabled,
+    staleTime,
   });
-}
-
-export function useHomeRows() {
-  const newReleases = useQuery({ queryKey: ["home", "new"], queryFn: () => movieService.getNewReleases() });
-  const mostPurchased = useQuery({
-    queryKey: ["home", "most-purchased"],
-    queryFn: () => movieService.getMostPurchased(),
-  });
-  const topRated = useQuery({ queryKey: ["home", "top-rated"], queryFn: () => movieService.getTopRated() });
-  const myanmar = useQuery({ queryKey: ["home", "myanmar"], queryFn: () => movieService.getMyanmarMovies() });
-  const international = useQuery({
-    queryKey: ["home", "international"],
-    queryFn: () => movieService.getInternationalMovies(),
-  });
-  const action = useQuery({ queryKey: ["home", "action"], queryFn: () => movieService.getByGenre("Action") });
-  const drama = useQuery({ queryKey: ["home", "drama"], queryFn: () => movieService.getByGenre("Drama") });
-  const comedy = useQuery({ queryKey: ["home", "comedy"], queryFn: () => movieService.getByGenre("Comedy") });
-  const animation = useQuery({
-    queryKey: ["home", "animation"],
-    queryFn: () => movieService.getByGenre("Animation"),
-  });
-  const horror = useQuery({ queryKey: ["home", "horror"], queryFn: () => movieService.getByGenre("Horror") });
-
-  return {
-    newReleases,
-    mostPurchased,
-    topRated,
-    myanmar,
-    international,
-    action,
-    drama,
-    comedy,
-    animation,
-    horror,
-  };
 }

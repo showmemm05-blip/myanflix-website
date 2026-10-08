@@ -2,30 +2,36 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  BookOpen,
-  Bookmark as BookmarkIcon,
-  ChevronLeft,
-  ChevronRight,
-  Maximize,
-  Minimize,
-  Search,
-  Type,
-  X,
-} from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty/EmptyState";
 import { ChapterContent } from "./ChapterContent";
 import {
+  ChapterTurnCards,
+  CloseBookLink,
   ContentsDrawer,
   ContentsToggle,
+  PanelOverline,
   ReaderBar,
   ReaderButton,
   ReaderDimOverlay,
   useReaderChrome,
   type ContentsDrawerTab,
 } from "./ReaderChrome";
+import {
+  BackIcon,
+  BookGlyph,
+  CloudOffReaderIcon,
+  CollapseIcon,
+  DeviceIcon,
+  ExpandIcon,
+  ForwardChevronIcon,
+  Ornament,
+  ReaderSearchIcon,
+  RibbonIcon,
+  TrashIcon,
+  TypeSettingsIcon,
+} from "./reader-icons";
 import { ReaderSettingsPanel } from "./ReaderSettingsPanel";
 import { DEFAULT_READER_SETTINGS, hasMyanmar, LINE_HEIGHT_VALUE, loadReaderSettings, READER_FONT_CLASS, READER_MARGIN_CLASS, READER_THEME_CLASS, READER_WIDTH_CLASS, saveReaderSettings, type ReaderSettingsV2 } from "./reader-settings";
 import { useAnnotations } from "./reader-annotations";
@@ -34,7 +40,7 @@ import {
   minutesLeft,
 } from "./reading-time";
 import { ChapterPaginator, type ChapterPaginatorHandle } from "./ChapterPaginator";
-import { SelectionAnnotator, wrapBlockRange } from "./SelectionAnnotator";
+import { DOT_COLOR, SelectionAnnotator, wrapBlockRange } from "./SelectionAnnotator";
 import { ReaderSearch } from "./ReaderSearch";
 import type { ReaderSearchMatch } from "./reader-search";
 import { composeChapterDoc, sectionIdAtDepth } from "./chapter-sections";
@@ -45,6 +51,9 @@ import { ShortcutsHelp } from "./reader-shortcuts";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import { playText } from "@/lib/i18n/sections/play";
+import { languageLabel } from "@/lib/books/languages";
 import {
   readingProgressKey,
   useBookChapter,
@@ -98,6 +107,7 @@ export function ChapterReader({
 }) {
   const { t } = useLanguage();
   const r = t.book.reader;
+  const p = useSection(playText);
   const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const isAuthed = Boolean(user);
@@ -262,6 +272,7 @@ export function ChapterReader({
     data: chapter,
     isLoading: loadingChapter,
     error,
+    refetch: refetchChapter,
   } = useBookChapter(book.id, edition.id, chapterId);
 
   /** True only once the article holds real text rather than the skeleton. */
@@ -764,28 +775,25 @@ export function ChapterReader({
           key={c.id}
           type="button"
           onClick={() => goTo(c.id)}
-          className="focus-ring flex w-full items-baseline gap-3 rounded-lg px-2 py-2 text-left transition-colors"
-          style={{
-            background: current
-              ? "color-mix(in oklab, var(--ink) 8%, transparent)"
-              : "transparent",
-            color: current ? "var(--ink)" : "var(--ink-soft)",
-          }}
+          aria-current={current ? "true" : undefined}
+          className={cn(
+            "focus-ring flex h-12 w-full cursor-pointer items-center gap-3 rounded-[10px] border-0 px-2 text-left transition-colors",
+            current ? "bg-crimson/12" : "bg-transparent hover:bg-tonal-ghost",
+          )}
         >
-          <span
-            className="w-5 shrink-0 text-xs nums"
-            style={{ color: "var(--ink-faint)" }}
-          >
+          <span className="w-7 shrink-0 text-[13px] leading-[18px] font-bold text-fg-faint tabular-nums">
             {label}
           </span>
-          <span className="font-reading min-w-0 flex-1 text-[0.95rem] leading-snug">
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate text-[15px] leading-[21px] font-semibold",
+              current ? "text-link" : "text-fg",
+            )}
+          >
             {c.title}
           </span>
           {minutes !== null && minutes > 0 && (
-            <span
-              className="shrink-0 text-[11px] nums"
-              style={{ color: "var(--ink-faint)" }}
-            >
+            <span className="shrink-0 text-[12px] leading-4 text-fg-faint tabular-nums">
               {r.estMinutes(minutes)}
             </span>
           )}
@@ -795,69 +803,45 @@ export function ChapterReader({
 
     // Until the numbered tree arrives, the flat list — exactly as before.
     if (!contents) {
-      return (
-        <nav className="space-y-0.5">
-          {chapters.map((c, i) => chapterRow(c, String(i + 1)))}
-        </nav>
-      );
+      return <nav>{chapters.map((c, i) => chapterRow(c, String(i + 1)))}</nav>;
     }
 
     /** A chapter and, indented beneath it, its sections. */
     const chapterBlock = (c: BookChapterSummary) => (
       <div key={c.id}>
         {chapterRow(c, c.number)}
-        {(c.sections ?? []).length > 0 && (
-          <div className="space-y-0.5 pb-1">
-            {c.sections.map((sec) => (
-              <button
-                key={sec.id}
-                type="button"
-                title={r.jumpToSection}
-                onClick={() =>
-                  jumpTo({ chapterId: c.id, kind: "section", sectionId: sec.id })
-                }
-                className="focus-ring flex w-full items-baseline gap-3 rounded-lg py-1.5 pr-2 pl-10 text-left transition-colors"
-                style={{ color: "var(--ink-soft)" }}
-              >
-                <span
-                  className="shrink-0 text-[11px] nums"
-                  style={{ color: "var(--ink-faint)" }}
-                >
-                  {sec.number}
-                </span>
-                <span className="font-reading min-w-0 flex-1 truncate text-sm leading-snug">
-                  {sec.title}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
+        {(c.sections ?? []).length > 0 &&
+          c.sections.map((sec) => (
+            <button
+              key={sec.id}
+              type="button"
+              title={r.jumpToSection}
+              onClick={() =>
+                jumpTo({ chapterId: c.id, kind: "section", sectionId: sec.id })
+              }
+              className="focus-ring flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-[10px] border-0 bg-transparent pr-2 pl-12 text-left transition-colors hover:bg-tonal-ghost"
+            >
+              <span className="min-w-7 shrink-0 text-[13px] leading-[18px] text-fg-faint tabular-nums">
+                {sec.number}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm leading-5 text-fg-body">{sec.title}</span>
+            </button>
+          ))}
       </div>
     );
 
     return (
-      <nav className="space-y-0.5">
+      <nav>
         {/* Unparted chapters read before the first part, under no heading. */}
         {contents.chapters.map(chapterBlock)}
-        {contents.parts.map((part) => {
-          const label = `${r.partLabel(part.number)} · ${part.title}`;
-          return (
-            <div key={part.id}>
-              <p
-                className="px-2 pt-4 pb-1 text-[11px] font-semibold uppercase"
-                style={{
-                  color: "var(--ink-faint)",
-                  // Tracking is the point of this kicker in Latin — and what
-                  // Myanmar script must never get.
-                  letterSpacing: hasMyanmar(label) ? 0 : "0.18em",
-                }}
-              >
-                {label}
-              </p>
-              {part.chapters.map(chapterBlock)}
-            </div>
-          );
-        })}
+        {contents.parts.map((part) => (
+          <div key={part.id}>
+            <PanelOverline className="mx-2 mt-2.5 mb-1">
+              {`${r.partLabel(part.number)} · ${part.title}`}
+            </PanelOverline>
+            {part.chapters.map(chapterBlock)}
+          </div>
+        ))}
       </nav>
     );
     // `chapter` refreshes the cached-minutes chips as chapters load.
@@ -865,10 +849,8 @@ export function ChapterReader({
   }, [chapters, contents, chapterId, goTo, jumpTo, cachedChapterMinutes, chapter, r]);
 
   const localFootnote = (
-    <p
-      className="px-2 pt-3 pb-1 text-[11px]"
-      style={{ color: "var(--ink-faint)" }}
-    >
+    <p className="mx-2 mt-1 mb-1.5 flex items-center gap-2 text-[13px] leading-[18px] text-fg-faint">
+      <DeviceIcon size={16} className="shrink-0" />
       {r.annotationsLocal}
     </p>
   );
@@ -882,120 +864,104 @@ export function ChapterReader({
     [annos.highlights, edition.id],
   );
 
+  const chapterName = (id: string) => {
+    const i = chapters.findIndex((c) => c.id === id);
+    return i >= 0 ? `${r.chapterLabel(i + 1)} · ${chapters[i].title}` : null;
+  };
+
+  const trashButton = (label: string, onClick: () => void) => (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="focus-ring flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-fg-muted transition-colors hover:bg-tonal-ghost hover:text-fg"
+    >
+      <TrashIcon size={18} />
+    </button>
+  );
+
   const bookmarksList = (
     <div>
-      {editionBookmarks.length === 0 ? (
-        <p className="px-2 py-3 text-sm" style={{ color: "var(--ink-faint)" }}>
-          {r.noBookmarks}
-        </p>
-      ) : (
-        <div className="space-y-0.5">
-          {editionBookmarks.map((b) => {
-            const chIndex = chapters.findIndex((c) => c.id === b.chapterId);
-            return (
-              <div key={b.id} className="flex items-start gap-1">
-                <button
-                  type="button"
-                  onClick={() =>
-                    jumpTo({
-                      chapterId: b.chapterId,
-                      kind: "depth",
-                      depth: b.pct ?? 0,
-                    })
-                  }
-                  className="focus-ring min-w-0 flex-1 rounded-lg px-2 py-2 text-left"
-                  style={{ color: "var(--ink-soft)" }}
-                >
-                  <span className="block text-xs font-medium nums">
-                    {chIndex >= 0 ? r.chapterLabel(chIndex + 1) : r.bookmark}
-                    {" · "}
-                    {Math.round((b.pct ?? 0) * 100)}%
-                  </span>
-                  {b.excerpt && (
-                    <span
-                      className="font-reading mt-0.5 block truncate text-xs"
-                      style={{ color: "var(--ink-faint)" }}
-                    >
-                      {b.excerpt}
-                    </span>
-                  )}
-                  <span
-                    className="mt-0.5 block text-[11px] nums"
-                    style={{ color: "var(--ink-faint)" }}
-                  >
-                    {new Date(b.createdAt).toLocaleDateString()}
-                  </span>
-                </button>
-                <ReaderButton
-                  label={r.removeBookmark}
-                  onClick={() => annos.removeBookmark(b.id)}
-                  className="mt-1"
-                >
-                  <X className="size-3.5" />
-                </ReaderButton>
-              </div>
-            );
-          })}
-        </div>
-      )}
       {localFootnote}
+      {editionBookmarks.length === 0 ? (
+        <p className="mx-2 py-3 text-sm text-fg-faint">{r.noBookmarks}</p>
+      ) : (
+        editionBookmarks.map((b) => {
+          const chIndex = chapters.findIndex((c) => c.id === b.chapterId);
+          return (
+            <div key={b.id} className="flex items-center gap-3 px-2 py-3 shadow-[inset_0_-1px_0_var(--mq-hairline)]">
+              <RibbonIcon filled size={18} className="shrink-0 text-crimson" />
+              <button
+                type="button"
+                onClick={() =>
+                  jumpTo({
+                    chapterId: b.chapterId,
+                    kind: "depth",
+                    depth: b.pct ?? 0,
+                  })
+                }
+                className="focus-ring flex min-w-0 flex-1 cursor-pointer flex-col rounded-[8px] border-0 bg-transparent p-0 text-left"
+              >
+                <span className="text-[12px] leading-4 font-bold text-fg-faint tabular-nums">
+                  {chIndex >= 0 ? r.chapterLabel(chIndex + 1) : r.bookmark}
+                  {" · "}
+                  {Math.round((b.pct ?? 0) * 100)}%{" · "}
+                  {new Date(b.createdAt).toLocaleDateString()}
+                </span>
+                {b.excerpt && (
+                  <span className="mt-0.5 line-clamp-2 text-sm leading-5 text-fg-body">{b.excerpt}</span>
+                )}
+              </button>
+              {trashButton(r.removeBookmark, () => annos.removeBookmark(b.id))}
+            </div>
+          );
+        })
+      )}
     </div>
   );
 
   const notesList = (
     <div>
-      {editionHighlights.length === 0 ? (
-        <p className="px-2 py-3 text-sm" style={{ color: "var(--ink-faint)" }}>
-          {r.noAnnotations}
-        </p>
-      ) : (
-        <div className="space-y-0.5">
-          {editionHighlights.map((h) => (
-            <div key={h.id} className="flex items-start gap-1">
-              <button
-                type="button"
-                onClick={() =>
-                  jumpTo({
-                    chapterId: h.chapterId,
-                    kind: "anno",
-                    id: h.id,
-                    blockIndex: h.blockIndex,
-                  })
-                }
-                className="focus-ring flex min-w-0 flex-1 items-start gap-2 rounded-lg px-2 py-2 text-left"
-                style={{ color: "var(--ink-soft)" }}
-              >
-                <span
-                  aria-hidden
-                  className="mt-1 size-2.5 shrink-0 rounded-full"
-                  style={{ background: `var(--hl-${h.color})` }}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="font-reading line-clamp-2 block text-xs leading-relaxed">
-                    {h.excerpt}
-                  </span>
-                  {h.note && (
-                    <span
-                      className="mt-0.5 line-clamp-2 block text-[11px] italic"
-                      style={{ color: "var(--ink-faint)" }}
-                    >
-                      {h.note}
-                    </span>
-                  )}
-                </span>
-              </button>
-              <ReaderButton
-                label={r.removeHighlight}
-                onClick={() => annos.removeHighlight(h.id)}
-                className="mt-1"
-              >
-                <X className="size-3.5" />
-              </ReaderButton>
-            </div>
-          ))}
-        </div>
-      )}
       {localFootnote}
+      {editionHighlights.length === 0 ? (
+        <p className="mx-2 py-3 text-sm text-fg-faint">{r.noAnnotations}</p>
+      ) : (
+        editionHighlights.map((h) => (
+          <div key={h.id} className="flex items-start gap-3 px-2 py-3 shadow-[inset_0_-1px_0_var(--mq-hairline)]">
+            <span
+              aria-hidden
+              className="w-1 shrink-0 self-stretch rounded-[2px]"
+              style={{ background: DOT_COLOR[h.color] }}
+            />
+            <button
+              type="button"
+              onClick={() =>
+                jumpTo({
+                  chapterId: h.chapterId,
+                  kind: "anno",
+                  id: h.id,
+                  blockIndex: h.blockIndex,
+                })
+              }
+              className="focus-ring flex min-w-0 flex-1 cursor-pointer flex-col rounded-[8px] border-0 bg-transparent p-0 text-left"
+            >
+              {chapterName(h.chapterId) && (
+                <span className="truncate text-[12px] leading-4 font-bold text-fg-faint">
+                  {chapterName(h.chapterId)}
+                </span>
+              )}
+              <span className="mt-0.5 line-clamp-2 text-sm leading-5 text-fg">{h.excerpt}</span>
+              {h.note && (
+                <span className="mt-1.5 line-clamp-3 rounded-[8px] bg-raised px-2.5 py-2 text-[13px] leading-[18px] text-fg-body">
+                  {h.note}
+                </span>
+              )}
+            </button>
+            {trashButton(r.removeHighlight, () => annos.removeHighlight(h.id))}
+          </div>
+        ))
+      )}
     </div>
   );
 
@@ -1025,18 +991,16 @@ export function ChapterReader({
 
   if (chapters.length === 0) {
     return (
-      <div className="mx-auto max-w-[1600px] px-4 py-24 sm:px-6 lg:px-8">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-ground px-gutter py-24">
         <EmptyState
-          icon={BookOpen}
+          icon={BookGlyph}
           title={book.title}
           description={r.emptyBook}
+          headingLevel="h2"
           action={
-            <Button
-              render={<Link href={`/books/${book.id}`} />}
-              nativeButton={false}
-            >
+            <Link href={`/books/${book.id}`} className={buttonVariants({ variant: "play", size: "cta" })}>
               {r.backToBook}
-            </Button>
+            </Link>
           }
         />
       </div>
@@ -1051,24 +1015,47 @@ export function ChapterReader({
     settings.textAlign === "left" && "prose-align-left",
   );
 
+  /* The shared skeleton is drawn for the app's near-black ground and would
+     vanish on paper — these lines carry the ink colour instead, so they read
+     on every theme. */
   const skeleton = (
-    <div className="space-y-4 pt-8">
-      <div
-        className="mx-auto h-8 w-2/3 animate-pulse rounded"
-        style={{
-          background: "color-mix(in oklab, var(--ink) 10%, transparent)",
-        }}
-      />
-      {Array.from({ length: 12 }, (_, i) => (
-        <div
+    <div aria-busy="true" className="flex flex-col gap-[18px] pt-2">
+      <p role="status" className="sr-only">
+        {p.loadingChapter}
+      </p>
+      {["100%", "96%", "100%", "92%", "70%", "100%", "98%", "100%", "88%", "60%"].map((width, i) => (
+        <span
           key={i}
-          className="h-4 animate-pulse rounded"
+          aria-hidden
+          className="block h-[15px] animate-mq-pulse rounded-[5px]"
           style={{
-            width: i % 5 === 4 ? "62%" : "100%",
-            background: "color-mix(in oklab, var(--ink) 8%, transparent)",
+            width,
+            background: "color-mix(in oklab, var(--ink) 10%, transparent)",
           }}
         />
       ))}
+    </div>
+  );
+
+  const loadError = (
+    <div role="status" className="flex flex-col items-center px-4 pt-10 text-center font-sans">
+      <span aria-hidden className="flex size-16 items-center justify-center rounded-full bg-danger/14 text-danger">
+        <CloudOffReaderIcon size={28} />
+      </span>
+      <p className="mt-[18px] text-lg leading-[26px] font-extrabold" style={{ color: "var(--ink)" }}>
+        {r.loadError}
+      </p>
+      <p className="mt-1.5 text-[15px] leading-[22px]" style={{ color: "var(--ink-faint)" }}>
+        {t.book.notFoundBody}
+      </p>
+      <button
+        type="button"
+        onClick={() => void refetchChapter()}
+        className="focus-ring mt-5 h-12 cursor-pointer rounded-[12px] border-0 px-7 text-base font-extrabold transition-[opacity,transform] hover:opacity-[0.88] active:scale-[0.97]"
+        style={{ background: "var(--ink)", color: "var(--paper)" }}
+      >
+        {t.common.retry}
+      </button>
     </div>
   );
 
@@ -1079,47 +1066,41 @@ export function ChapterReader({
         /* The chapter opening, set the way a book sets one: the number
            spaced out above, the title below, both centred, with air
            around them instead of a left-ranged page heading. */
-        <header className="mb-12 text-center">
+        <header className="mb-9 text-center font-sans">
           {index >= 0 && (
             <p
-              // 0.32em of tracking is the point of this label in Latin — and
+              // 0.16em of tracking is the point of this label in Latin — and
               // exactly what Myanmar script must never get, so the spacing is
               // conditional on the rendered string, not the locale.
-              className="text-xs uppercase"
+              className="text-[12px] leading-4 font-extrabold uppercase"
               style={{
                 color: "var(--ink-faint)",
-                letterSpacing: hasMyanmar(r.chapterLabel(index + 1)) ? 0 : "0.32em",
+                letterSpacing: hasMyanmar(r.chapterLabel(index + 1)) ? 0 : "0.16em",
               }}
             >
               {r.chapterLabel(index + 1)}
             </p>
           )}
           <h1
-            className="mt-4 text-[1.65rem] leading-snug font-semibold sm:text-[1.9rem]"
-            // leading-snug (1.375) collides stacked marks on a two-line
-            // Burmese title — the same reason .prose-reading floors [lang=my]
+            className="mt-2.5 text-[clamp(30px,2.8vw,40px)] leading-[1.15] font-black"
+            // A two-line Burmese title collides its stacked marks at Latin
+            // leading — the same reason .prose-reading floors [lang=my]
             // leading; this heading sits outside that scope.
             style={{
               color: "var(--ink)",
+              letterSpacing: hasMyanmar(chapter.title) ? 0 : "-0.03em",
               lineHeight: hasMyanmar(chapter.title) ? 1.6 : undefined,
             }}
           >
             {chapter.title}
           </h1>
           {chapterMinutes > 0 && (
-            <p
-              className="mt-3 text-xs nums"
-              style={{ color: "var(--ink-faint)" }}
-            >
+            <p className="mt-2 text-sm leading-5 tabular-nums" style={{ color: "var(--ink-faint)" }}>
               {r.estMinutes(chapterMinutes)}
             </p>
           )}
-          <span
-            aria-hidden
-            className="mt-6 inline-block text-sm tracking-[0.5em]"
-            style={{ color: "var(--ink-faint)" }}
-          >
-            ❦
+          <span className="mt-4 flex justify-center" style={{ color: "var(--ink-faint)" }}>
+            <Ornament />
           </span>
         </header>
       )}
@@ -1141,42 +1122,20 @@ export function ChapterReader({
 
       {/* End-of-chapter turn, in the flow of the text rather than in a
           bar — you reach it by finishing the chapter. */}
-      <div
-        className="mt-16 flex items-center justify-between gap-4 pt-8"
-        style={{ borderTop: "1px solid var(--rule)" }}
-      >
-        {previous ? (
-          <ReaderButton
-            label={previous.title}
-            onClick={() => goTo(previous.id)}
-            className="min-w-0 flex-1 justify-start text-left"
-          >
-            <ChevronLeft className="size-4 shrink-0" />
-            <span className="min-w-0 truncate">{previous.title}</span>
-          </ReaderButton>
-        ) : (
-          <span className="flex-1" />
-        )}
-        {next ? (
-          <ReaderButton
-            label={next.title}
-            onClick={() => goTo(next.id)}
-            className="min-w-0 flex-1 justify-end text-right"
-          >
-            <span className="min-w-0 truncate">{next.title}</span>
-            <ChevronRight className="size-4 shrink-0" />
-          </ReaderButton>
-        ) : (
-          <p
-            className="font-reading flex-1 text-right text-sm italic"
-            style={{ color: "var(--ink-faint)" }}
-          >
-            {r.finished}
-          </p>
-        )}
-      </div>
+      <span className="mt-9 flex justify-center" style={{ color: "var(--ink-faint)" }}>
+        <Ornament />
+      </span>
+      <ChapterTurnCards
+        previous={previous ? { title: previous.title, onClick: () => goTo(previous.id) } : null}
+        next={next ? { title: next.title, onClick: () => goTo(next.id) } : null}
+        previousLabel={r.previousChapter}
+        nextLabel={r.nextChapter}
+        finishedLabel={r.finished}
+      />
     </>
   ) : null;
+
+  const readingIn = languageLabel(edition.language);
 
   return (
     <div
@@ -1194,33 +1153,38 @@ export function ChapterReader({
     >
       {/* Top bar — floats over the page and fades while reading. */}
       <ReaderBar visible={chromeVisible}>
-        <div className="mx-auto flex h-12 w-full max-w-[1600px] items-center gap-1 px-3 sm:gap-2 sm:px-5">
+        <div className="mx-auto flex h-16 w-full items-center gap-1 px-[clamp(8px,2vw,24px)]">
+          <CloseBookLink bookId={book.id} />
           <ContentsToggle
+            expanded={contentsOpen && drawerTab !== "search"}
             onClick={() => {
               setDrawerTab("contents");
               setContentsOpen(true);
             }}
           />
 
-          <p
-            className="font-reading min-w-0 flex-1 truncate text-center text-sm"
-            style={{ color: "var(--ink-soft)" }}
-          >
-            {book.title}
-          </p>
+          <div className="min-w-0 flex-1 text-center max-desk:hidden">
+            <p className="m-0 truncate text-[15px] leading-5 font-extrabold" style={{ color: "var(--ink)" }}>
+              {book.title}
+            </p>
+            {chapter && index >= 0 && (
+              <p className="m-0 truncate text-[12px] leading-[17px] font-semibold" style={{ color: "var(--ink-faint)" }}>
+                {`${r.chapterLabel(index + 1)} · ${chapter.title}`}
+              </p>
+            )}
+          </div>
+          <span aria-hidden className="flex-1 desk:hidden" />
 
           <ReaderButton label={r.searchInBook} onClick={openSearch}>
-            <Search className="size-4" />
+            <ReaderSearchIcon size={21} />
           </ReaderButton>
           <ReaderButton
             label={currentBookmark ? r.removeBookmark : r.addBookmark}
-            active={Boolean(currentBookmark)}
+            pressed={Boolean(currentBookmark)}
             onClick={toggleBookmark}
+            style={currentBookmark ? { color: "var(--mq-crimson)" } : undefined}
           >
-            <BookmarkIcon
-              className="size-4"
-              fill={currentBookmark ? "currentColor" : "none"}
-            />
+            <RibbonIcon size={21} filled={Boolean(currentBookmark)} />
           </ReaderButton>
 
           {/* Trigger + panel share a wrapper so the panel's outside-press
@@ -1229,9 +1193,10 @@ export function ChapterReader({
             <ReaderButton
               label={r.settingsTitle}
               active={settingsOpen}
+              expanded={settingsOpen}
               onClick={() => setSettingsOpen((o) => !o)}
             >
-              <Type className="size-4" />
+              <TypeSettingsIcon size={22} />
             </ReaderButton>
             <ReaderSettingsPanel
               mode="text"
@@ -1248,27 +1213,11 @@ export function ChapterReader({
             <ReaderButton
               label={fullscreen.active ? r.exitFullscreen : r.fullscreen}
               onClick={fullscreen.toggle}
-              className="hidden sm:inline-flex"
+              className="max-desk:hidden"
             >
-              {fullscreen.active ? (
-                <Minimize className="size-4" />
-              ) : (
-                <Maximize className="size-4" />
-              )}
+              {fullscreen.active ? <CollapseIcon size={19} /> : <ExpandIcon size={19} />}
             </ReaderButton>
           )}
-
-          {/* A plain Link, not a ReaderButton wrapping one: an anchor inside
-              a button is invalid, and this is navigation, not an action. */}
-          <Link
-            href={`/books/${book.id}`}
-            aria-label={r.close}
-            title={r.close}
-            className="focus-ring inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 transition-colors"
-            style={{ color: "var(--ink-soft)" }}
-          >
-            <X className="size-4" />
-          </Link>
         </div>
       </ReaderBar>
 
@@ -1278,27 +1227,16 @@ export function ChapterReader({
         {!contentReady ? (
           <article
             className={cn(
-              "mx-auto pt-24 pb-32",
+              "mx-auto pt-28 pb-36",
               fontClass,
               widthClass,
               marginClass,
             )}
           >
-            {error ? (
-              <EmptyState
-                icon={BookOpen}
-                title={r.loadError}
-                description={t.book.notFoundBody}
-              />
-            ) : (
-              /* The shared Skeleton is bg-white/6 — drawn for the app's
-                 near-black background, and invisible on paper. These carry
-                 the ink colour instead, so they read on all themes. */
-              skeleton
-            )}
+            {error ? loadError : skeleton}
           </article>
         ) : paginated ? (
-          <div className="pt-16">
+          <div className="pt-20">
             <ChapterPaginator
               key={chapterId}
               ref={paginatorRef}
@@ -1326,7 +1264,7 @@ export function ChapterReader({
           <article
             ref={articleRef}
             className={cn(
-              "mx-auto pt-24 pb-32",
+              "mx-auto pt-28 pb-36",
               fontClass,
               widthClass,
               marginClass,
@@ -1349,19 +1287,21 @@ export function ChapterReader({
       </div>
 
       {/* Bottom bar — where you are in the book, the way a printed folio
-          sits at the foot of the page. */}
-      <ReaderBar visible={chromeVisible} position="bottom">
-        <div className="mx-auto flex h-10 w-full max-w-[1600px] items-center justify-between gap-2 px-2 sm:px-4">
+          sits at the foot of the page; the crimson line is how far. */}
+      <ReaderBar visible={chromeVisible} position="bottom" progress={overallPct}>
+        <div className="mx-auto flex h-[60px] w-full items-center justify-between gap-1 px-[clamp(8px,2vw,24px)]">
           <ReaderButton
-            label={r.previousChapter}
+            label={previous ? p.previousChapterNamed(previous.title) : r.previousChapter}
             onClick={() => previous && goTo(previous.id)}
             disabled={!previous}
+            className="max-w-[30%] justify-start pr-3.5 pl-2"
           >
-            <ChevronLeft className="size-4" />
+            <BackIcon size={20} className="shrink-0" />
+            {previous && <span className="truncate max-desk:hidden">{previous.title}</span>}
           </ReaderButton>
 
           <p
-            className="min-w-0 truncate text-center text-xs nums"
+            className="m-0 min-w-0 flex-1 truncate text-center text-[13px] leading-[18px] font-semibold tabular-nums"
             style={{ color: "var(--ink-faint)" }}
           >
             {index >= 0 && (
@@ -1381,11 +1321,13 @@ export function ChapterReader({
           </p>
 
           <ReaderButton
-            label={r.nextChapter}
+            label={next ? p.nextChapterNamed(next.title) : r.nextChapter}
             onClick={() => next && goTo(next.id)}
             disabled={!next}
+            className="max-w-[30%] justify-end pr-2 pl-3.5"
           >
-            <ChevronRight className="size-4" />
+            {next && <span className="truncate max-desk:hidden">{next.title}</span>}
+            <ForwardChevronIcon size={20} className="shrink-0" />
           </ReaderButton>
         </div>
       </ReaderBar>
@@ -1396,6 +1338,7 @@ export function ChapterReader({
         bookId={book.id}
         title={book.title}
         author={book.author}
+        readingIn={readingIn}
         tabs={drawerTabs}
         activeTab={drawerTab}
         onTabChange={setDrawerTab}

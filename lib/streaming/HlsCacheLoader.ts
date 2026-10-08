@@ -7,7 +7,9 @@ import type {
   LoaderStats,
 } from "hls.js";
 import type { CacheManager } from "./CacheManager";
-import { SegmentHttpError, type DownloadManager } from "./DownloadManager";
+// Type-only on purpose: with no runtime import this file loads under Node's
+// type-stripping, which is what lib/streaming/*.test.ts run on.
+import type { DownloadManager } from "./DownloadManager";
 import type { SegmentMeta } from "./types";
 
 function emptyStats(): LoaderStats {
@@ -43,10 +45,25 @@ function isMainFragment(context: FragmentLoaderContext): boolean {
  * exactly as before.
  */
 function loaderError(err: unknown): { code: number; text: string } {
+  // DownloadManager's SegmentHttpError and the direct-fetch error below both
+  // carry the HTTP status as `status`; read it structurally rather than by
+  // `instanceof`, which would need a runtime import (see the import note).
+  const status = err instanceof Error ? (err as { status?: unknown }).status : undefined;
   return {
-    code: err instanceof SegmentHttpError ? err.status : 0,
+    code: typeof status === "number" ? status : 0,
     text: err instanceof Error ? err.message : String(err),
   };
+}
+
+/** A non-2xx answer on the direct (non-cached) fetch path, status attached. */
+class DirectFetchError extends Error {
+  readonly status: number;
+
+  constructor(status: number, url: string) {
+    super(`Segment fetch failed: ${status} for ${url}`);
+    this.name = "DirectFetchError";
+    this.status = status;
+  }
 }
 
 /**
@@ -61,13 +78,11 @@ function loaderError(err: unknown): { code: number; text: string } {
  * That applies to the MAIN video timeline only. hls.js routes *every*
  * fragment through `config.fLoader`, subtitle renditions included, but the
  * prefetch system models one timeline: SegmentManager enumerates
- * `levels[currentLevel].details.fragments`, and PrefetchManager reconciles
- * against exactly that set — `downloader.cancelExcept(keepUrls)` aborts
- * anything else in flight. A subtitle fragment can never be in `keepUrls`, so
- * routing it through DownloadManager means the next position tick (~1/s) or
- * any seek kills its download mid-flight. Alt renditions therefore take a
- * plain fetch, which also keeps them out of the single download slot that
- * playback continuity depends on.
+ * `levels[loadLevel].details.fragments`, and PrefetchManager reconciles
+ * against exactly that set (evicting and cancelling background work outside
+ * it). A subtitle "segment" has no place on that video timeline, so alt
+ * renditions take a plain fetch, which also keeps them out of the single
+ * download slot that playback continuity depends on.
  *
  * hls.js wants a loader *class* (it constructs one per load), so this is a
  * factory that closes over the shared manager instances.
@@ -77,6 +92,17 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
     context: FragmentLoaderContext | null = null;
     stats: LoaderStats = emptyStats();
     private aborted = false;
+    /**
+     * True once onSuccess/onError has been delivered. hls.js calls
+     * `destroy()` on every loader right after a successful load, and the
+     * stats object is shared with `frag.stats`: marking it aborted at that
+     * point made AbrController.onFragBuffered skip the bandwidth sample for
+     * EVERY fragment, so the estimate never left its 1 Mbps starting value
+     * and Auto sat on the lowest rendition (owner report, 2026-10-08).
+     * hls.js's own XHR loader only flags `aborted` while the request is still
+     * open; this mirrors that.
+     */
+    private done = false;
     private directFetch: AbortController | null = null;
 
     // hls.js constructs one loader per load and hands it the config; this
@@ -122,6 +148,7 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
         .requestImmediate(segment)
         .then((data) => {
           if (this.aborted) return;
+          this.done = true;
           this.stats.loaded = data.byteLength;
           this.stats.total = data.byteLength;
           this.stats.loading.first = replayDurationMs > 0 ? this.stats.loading.start : performance.now();
@@ -130,6 +157,7 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
         })
         .catch((err: unknown) => {
           if (this.aborted) return;
+          this.done = true;
           callbacks.onError(loaderError(err), context, null, this.stats);
         });
     }
@@ -155,12 +183,13 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
 
       fetch(context.url, { signal: controller.signal, headers })
         .then((response) => {
-          if (!response.ok) throw new SegmentHttpError(response.status, context.url);
+          if (!response.ok) throw new DirectFetchError(response.status, context.url);
           this.stats.loading.first = performance.now();
           return response.arrayBuffer();
         })
         .then((data) => {
           if (this.aborted) return;
+          this.done = true;
           this.stats.loaded = data.byteLength;
           this.stats.total = data.byteLength;
           this.stats.loading.end = performance.now();
@@ -168,11 +197,15 @@ export function createHlsCacheLoader(cache: CacheManager, downloader: DownloadMa
         })
         .catch((err: unknown) => {
           if (this.aborted) return;
+          this.done = true;
           callbacks.onError(loaderError(err), context, null, this.stats);
         });
     }
 
     abort(): void {
+      // Nothing to abort once the result has been delivered — and the stats
+      // must stay un-aborted so the bandwidth sample is taken (see `done`).
+      if (this.done) return;
       this.aborted = true;
       this.stats.aborted = true;
       this.directFetch?.abort();

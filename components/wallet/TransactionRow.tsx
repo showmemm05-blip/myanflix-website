@@ -1,60 +1,39 @@
 "use client";
 
-import type { ElementType } from "react";
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  Crown,
-  RotateCcw,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react";
+import type { ComponentType, ElementType } from "react";
 
-import { LedgerRow } from "@/components/wallet/LedgerRow";
+import { LedgerRow, type LedgerTone } from "@/components/wallet/LedgerRow";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  CrownOutlineIcon,
+  FilmIcon,
+  RefundIcon,
+  WalletLineIcon,
+} from "@/components/wallet/icons";
 import { useLanguage } from "@/lib/context/language-context";
-import { cn } from "@/lib/utils";
+import type { TranslationShape } from "@/lib/i18n/translations";
 import type { Transaction, TransactionType } from "@/types/transaction";
 
 /**
- * THE transaction row — one idiom for both money screens.
- *
- * /wallet ("recent transactions") and /transactions (the full ledger) show the
- * same records; before this they showed them as two different objects, with two
- * different icon maps, two title maps and two layouts. Everything a transaction
- * knows about how it looks now lives here, on top of the shared <LedgerRow>.
+ * Everything a transaction knows about how it looks — one map for both money
+ * screens (the wallet's recent list and the /transactions ledger).
  */
-const ICON: Record<TransactionType, LucideIcon> = {
-  PURCHASE: ArrowUpRight,
-  SUBSCRIPTION: Crown,
-  DEPOSIT: ArrowDownLeft,
-  REFUND: RotateCcw,
-  WITHDRAWAL: ArrowUpRight,
-  ADJUSTMENT_CREDIT: Wallet,
-  ADJUSTMENT_DEBIT: Wallet,
+const KIND: Record<
+  TransactionType,
+  { icon: ComponentType<{ size?: number }>; tone: LedgerTone; credit: boolean }
+> = {
+  PURCHASE: { icon: FilmIcon, tone: "buy", credit: false },
+  SUBSCRIPTION: { icon: CrownOutlineIcon, tone: "sub", credit: false },
+  DEPOSIT: { icon: ArrowDownIcon, tone: "inflow", credit: true },
+  REFUND: { icon: RefundIcon, tone: "inflow", credit: true },
+  WITHDRAWAL: { icon: ArrowUpIcon, tone: "outflow", credit: false },
+  ADJUSTMENT_CREDIT: { icon: WalletLineIcon, tone: "adj", credit: true },
+  ADJUSTMENT_DEBIT: { icon: WalletLineIcon, tone: "adj", credit: false },
 };
 
-/** Money in: everything else is money out and reads red with a minus. */
-const CREDIT_TYPES: ReadonlySet<TransactionType> = new Set([
-  "DEPOSIT",
-  "REFUND",
-  "ADJUSTMENT_CREDIT",
-]);
-
-export function TransactionRow({
-  transaction,
-  meta,
-  as,
-}: {
-  transaction: Transaction;
-  /** The date line — relative on the wallet's recent list, absolute in the ledger. */
-  meta?: string;
-  /** `li` when the caller wraps the rows in a real list. */
-  as?: ElementType;
-}) {
-  const { t } = useLanguage();
-  const Icon = ICON[transaction.type];
-  const credit = CREDIT_TYPES.has(transaction.type);
-
+/** Icon, tile colour, direction and the row label for a transaction type. */
+export function transactionKind(type: TransactionType, t: TranslationShape) {
   const label: Record<TransactionType, string> = {
     PURCHASE: t.transactions.rowPurchase,
     SUBSCRIPTION: t.transactions.rowSubscription,
@@ -64,27 +43,40 @@ export function TransactionRow({
     ADJUSTMENT_CREDIT: t.transactions.rowAdjustment,
     ADJUSTMENT_DEBIT: t.transactions.rowAdjustment,
   };
+  return { ...KIND[type], label: label[type] };
+}
 
+/** THE transaction row (the wallet's "Recent transactions" list). */
+export function TransactionRow({
+  transaction,
+  meta,
+  as,
+  masked,
+  className,
+}: {
+  transaction: Transaction;
+  /** The detail line, e.g. "Movie purchase · 2:14 PM". */
+  meta?: string;
+  /** `li` when the caller wraps the rows in a real list. */
+  as?: ElementType;
+  masked?: boolean;
+  className?: string;
+}) {
+  const { t } = useLanguage();
+  const kind = transactionKind(transaction.type, t);
+  const Icon = kind.icon;
   return (
     <LedgerRow
       as={as}
-      leading={
-        <Icon
-          className={cn(
-            "size-4",
-            transaction.type === "SUBSCRIPTION"
-              ? "text-premium"
-              : credit
-                ? "text-success"
-                : "text-destructive",
-          )}
-        />
-      }
-      title={transaction.movieTitle ?? label[transaction.type]}
+      className={className}
+      leading={<Icon size={20} />}
+      tone={kind.tone}
+      title={transaction.movieTitle ?? kind.label}
       meta={meta}
       amount={transaction.amount}
-      credit={credit}
+      credit={kind.credit}
       status={transaction.status}
+      masked={masked}
     />
   );
 }

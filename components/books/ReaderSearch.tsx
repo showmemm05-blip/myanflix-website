@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "@/lib/context/language-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import { playText } from "@/lib/i18n/sections/play";
+import { CloseBookIcon, ReaderSearchIcon } from "./reader-icons";
 import { bookService } from "@/services/api/bookService";
 import type { BookChapterSummary } from "@/types/book";
 import {
@@ -43,6 +45,7 @@ export function ReaderSearch({
 }) {
   const { t } = useLanguage();
   const r = t.book.reader;
+  const p = useSection(playText);
   const queryClient = useQueryClient();
 
   const [query, setQuery] = useState("");
@@ -150,13 +153,23 @@ export function ReaderSearch({
     return groups;
   }, [results, chapters, t]);
 
+  const statusLine =
+    status === "tooShort"
+      ? r.searchTooShort
+      : status === "searching"
+        ? `${r.searching} ${progress.done}/${progress.total}`
+        : status === "done"
+          ? results.length === 0
+            ? r.searchNoResults
+            : r.searchCount(results.length)
+          : null;
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="relative">
-        <Search
-          aria-hidden
-          className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2"
-          style={{ color: "var(--ink-faint)" }}
+    <div className="flex flex-col">
+      <div className="relative mx-1 mt-1">
+        <ReaderSearchIcon
+          size={20}
+          className="pointer-events-none absolute top-3.5 left-3.5 text-fg-faint"
         />
         <input
           ref={inputRef}
@@ -165,64 +178,40 @@ export function ReaderSearch({
           onChange={(e) => setQuery(e.target.value)}
           placeholder={r.searchPlaceholder}
           aria-label={r.searchInBook}
-          className="focus-ring w-full rounded-lg py-2 pr-2.5 pl-8 text-sm"
-          style={{
-            background: "color-mix(in oklab, var(--ink) 6%, transparent)",
-            border: "1px solid var(--rule)",
-            color: "var(--ink)",
-          }}
+          className="block h-12 w-full rounded-[12px] border-0 bg-raised px-11 text-base text-fg outline-none placeholder:text-fg-faint focus:shadow-[inset_0_0_0_1.5px_var(--mq-crimson)] [&::-webkit-search-cancel-button]:hidden"
         />
+        {query.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              inputRef.current?.focus();
+            }}
+            aria-label={p.clearSearch}
+            className="focus-ring absolute top-1.5 right-1.5 flex size-9 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-fg-muted transition-colors hover:bg-tonal-ghost hover:text-fg"
+          >
+            <CloseBookIcon size={16} strokeWidth={2} />
+          </button>
+        )}
       </div>
 
-      {status === "tooShort" && (
-        <p className="px-1 text-xs" style={{ color: "var(--ink-faint)" }}>
-          {r.searchTooShort}
-        </p>
-      )}
-
-      {status === "searching" && (
-        <p className="px-1 text-xs" style={{ color: "var(--ink-faint)" }}>
-          {r.searching}{" "}
-          <span className="nums">
-            {progress.done}/{progress.total}
-          </span>
-        </p>
-      )}
-
-      {status === "done" && (
-        <p className="px-1 text-xs" style={{ color: "var(--ink-faint)" }}>
-          {results.length === 0 ? r.searchNoResults : r.searchCount(results.length)}
-        </p>
-      )}
+      <p role="status" className="mx-2 mt-3 mb-1 text-[13px] leading-[18px] font-bold text-fg-faint tabular-nums empty:hidden">
+        {statusLine}
+      </p>
 
       {grouped.map((group) => (
-        <section key={group.chapterId}>
-          <p
-            className="font-reading truncate px-1 pb-1 text-xs font-semibold"
-            style={{ color: "var(--ink-soft)" }}
-          >
-            {group.title}
-          </p>
-          <div className="space-y-0.5">
+        <section key={group.chapterId} className="mt-1">
+          <p className="m-0 truncate px-2 pt-1.5 text-[12px] leading-4 font-bold text-fg-faint">{group.title}</p>
+          <div>
             {group.matches.map((match) => (
               <button
                 key={`${match.chapterId}:${match.occurrenceInChapter}`}
                 type="button"
                 onClick={() => onJump(match)}
-                className="focus-ring w-full rounded-lg px-2 py-1.5 text-left text-xs leading-relaxed transition-colors"
-                style={{ color: "var(--ink-soft)" }}
+                className="focus-ring block w-full cursor-pointer rounded-[10px] border-0 bg-transparent px-2 py-2.5 text-left text-sm leading-5 text-fg-body transition-colors hover:bg-tonal-ghost"
               >
                 {match.before}
-                <mark
-                  className="rounded-sm"
-                  style={{
-                    background: "var(--hl-yellow)",
-                    color: "inherit",
-                    padding: 0,
-                  }}
-                >
-                  {match.term}
-                </mark>
+                <mark className="rounded-[3px] bg-crimson/28 px-0.5 text-fg">{match.term}</mark>
                 {match.after}
               </button>
             ))}

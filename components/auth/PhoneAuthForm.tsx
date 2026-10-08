@@ -1,33 +1,51 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, Lock, Loader2, Phone, ShieldCheck } from "lucide-react";
+import { useForm, useWatch, type UseFormRegisterReturn } from "react-hook-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Surface } from "@/components/system";
 import { GoogleSignIn } from "@/components/auth/GoogleSignIn";
+import { OtpMethodButtons, type OtpChannel } from "@/components/auth/OtpChannelPicker";
 import {
-  OtpChannelIcon,
-  OtpChannelPicker,
-  type OtpChannel,
-} from "@/components/auth/OtpChannelPicker";
+  AuthError,
+  BackIcon,
+  ClockIcon,
+  CodeCells,
+  DoneNote,
+  FieldHelpText,
+  FieldLabel,
+  Hairline,
+  PasswordInput,
+  PhoneChip,
+  PhoneInput,
+  RefreshIcon,
+  SlidersIcon,
+  SmsSampleCard,
+  STEP_SUBTITLE_CLASS,
+  STEP_TITLE_CLASS,
+  StepFootnote,
+  StepHeading,
+  StepRail,
+  TextAction,
+} from "@/components/auth/auth-ui";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import {
+  authText,
+  formatMyanmarPhone,
+  normalizeTypedPhone,
+  validationMessage,
+} from "@/lib/i18n/sections/auth";
 import { authErrorMessage, isStepTokenRefusal } from "@/lib/auth/auth-errors";
 import { handedOffPhoneOrEmpty, handOffPhone } from "@/lib/auth/phone-handoff";
 import { ApiError } from "@/services/api/apiClient";
-import { hasMyanmar } from "@/components/books/reader-settings";
-import { cn } from "@/lib/utils";
 import {
-  phoneSchema,
-  otpCodeSchema,
-  loginPasswordSchema,
-  createPasswordSchema,
+  phoneResolver,
+  otpCodeResolver,
+  loginPasswordResolver,
+  createPasswordResolver,
   type PhoneValues,
   type OtpCodeValues,
   type LoginPasswordValues,
@@ -36,81 +54,54 @@ import {
 
 export const RESEND_COOLDOWN_SECONDS = 60;
 
-// Exported so the forgot-password form (ForgotPasswordForm) wears the same
-// fields as this one.
-export const fieldClasses = "h-11 rounded-xl border-white/10 bg-white/[0.04] px-3.5";
-/** Same field, with room carved out for the leading affordance icon. */
-export const iconFieldClasses = cn(fieldClasses, "pl-10");
-export const iconClasses =
-  "pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground";
-export const submitClasses = "mt-1 h-11 w-full rounded-full text-sm font-semibold";
-// The negative margin keeps the comfortable tap area from stretching the row.
-export const linkButtonClasses =
-  "focus-ring -my-1 shrink-0 rounded-md px-1 py-2 text-xs font-medium text-muted-foreground underline-offset-4 transition-colors duration-150 ease-out hover:text-foreground hover:underline";
-export const errorTextClasses = "text-xs text-destructive";
+/**
+ * What the phone box hands to the form check and the server: spaces and
+ * dashes dropped, and a number typed after the fixed "+95" without its 0
+ * given the 0 back, so the server never mistakes "95…" for the country code
+ * (see normalizeTypedPhone).
+ */
+export const compactPhone = (value: unknown) =>
+  typeof value === "string" ? normalizeTypedPhone(value) : value;
 
 /**
- * Three segments: completed reads violet, the current one carries the aurora
- * gradient, upcoming stays a hairline. The labels underneath are the same
- * eyebrow treatment used everywhere else in the app.
+ * The code field keeps only the digits of whatever is typed or pasted (the
+ * SMS reads "MyanFlix: 482 913" — pasting the whole text works), at most six.
+ * Rewrites the input itself too, so the six cells and the field never disagree.
  */
-function StepIndicator({
-  current,
-  labels,
-}: {
-  current: number;
-  labels: string[];
-}) {
-  return (
-    <ol className="flex items-start gap-2">
-      {labels.map((label, index) => (
-        <li
-          key={label}
-          aria-current={index === current ? "step" : undefined}
-          className="flex flex-1 flex-col gap-1.5"
-        >
-          <span
-            className={cn(
-              "h-1 rounded-full transition-colors duration-300 ease-out",
-              index < current
-                ? "bg-primary/70"
-                : index === current
-                  ? "bg-gradient-to-r from-primary to-info"
-                  : "bg-white/10",
-            )}
-          />
-          <span
-            style={{ letterSpacing: hasMyanmar(label) ? 0 : undefined }}
-            className={cn(
-              "text-[10px] font-semibold tracking-[0.14em] uppercase transition-colors duration-300 ease-out",
-              index === current
-                ? "text-foreground"
-                : index < current
-                  ? "text-primary"
-                  : "text-muted-foreground",
-            )}
-          >
-            {label}
-          </span>
-        </li>
-      ))}
-    </ol>
-  );
+export function registerCodeField(registration: UseFormRegisterReturn) {
+  return {
+    ...registration,
+    onChange: (event: ChangeEvent<HTMLInputElement>) => {
+      const digits = event.target.value.replace(/\D/g, "").slice(0, 6);
+      if (event.target.value !== digits) event.target.value = digits;
+      return registration.onChange(event);
+    },
+  };
 }
 
 /**
  * The one and only sign-in surface — login and signup share this same
- * three-step flow, branching only at the password step: an existing phone
- * enters its password, a new phone creates one. Either way the OTP step at
- * the end is what actually creates the session — login and signup are the
+ * four-step flow, branching only at the password step: an existing phone
+ * enters its password, a new phone creates one. Then "Get your code": no
+ * code is ever requested until the user taps a method there (only SMS
+ * works today). Either way the OTP step at the end is what actually creates
+ * the session — login and signup are the
  * same backend call (verifying the code either logs into the existing
  * account or creates one), so /login and /register both just render this.
  *
  * `returnTo` is where a successful sign-in lands — the page a guest was
  * bounced off (already validated as a same-origin path by the caller), or
- * the home screen when there is none.
+ * the home screen when there is none. `mode` only changes the first step's
+ * words (Login board: "Welcome back"; Register board: "Create your account").
+ *
+ * Marquee look (Login / Register / LoginCode boards): the crimson step rail,
+ * one h1 per step, the "+95 … · Change" chip, errors under the field they
+ * belong to, six code cells and the quiet resend row.
  */
-export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
+export function PhoneAuthForm({
+  returnTo,
+  mode = "signIn",
+}: { returnTo?: string | null; mode?: "signIn" | "signUp" } = {}) {
   const {
     checkPhoneExists,
     verifyPassword,
@@ -119,9 +110,12 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
     loginWithGoogle,
   } = useAuth();
   const { t } = useLanguage();
+  const a = useSection(authText);
   const router = useRouter();
 
-  const [step, setStep] = useState<"phone" | "password" | "code">("phone");
+  const [step, setStep] = useState<"phone" | "password" | "method" | "code">(
+    "phone",
+  );
   const [phone, setPhone] = useState("");
   const [isNewAccount, setIsNewAccount] = useState(false);
   // Only meaningful for a new account — carried forward to the final OTP
@@ -132,21 +126,14 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
   // the code without it. Memory only, never stored; valid 10 minutes.
   const stepTokenRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Where the board shows the error: under the Google button for a Google
+  // failure, otherwise under the current step's field.
+  const [errorFromGoogle, setErrorFromGoogle] = useState(false);
   const [cooldown, setCooldown] = useState(0);
-  // The app picked for the current code — SMS by default, or the chat app
-  // the user picked on the code step. UI only for now: nothing about the
-  // channel is put on the wire (the API rejects fields it doesn't know), and
-  // no code is delivered yet (C-2), so the text only ever says a code was
-  // requested and never names the app. When the backend learns about
-  // channels, pass `channel` into requestOtp inside sendCode below.
-  const [channel, setChannel] = useState<OtpChannel>("sms");
-  // The tile the user has picked on the code step. Picking never requests —
-  // only the "Request a new code" button does — so this can differ from
-  // `channel` until they confirm.
-  const [pickedChannel, setPickedChannel] = useState<OtpChannel>("sms");
+  // The method whose code request is in flight (only SMS can be today).
+  // Nothing about the method is put on the wire — the API rejects fields it
+  // doesn't know — so the request is exactly the one it always was.
   const [sendingChannel, setSendingChannel] = useState<OtpChannel | null>(null);
-  const channelTitleId = useId();
-  const channelHintId = useId();
   // What the screen reader hears after a confirmed send — the visible
   // identity row changes too, but it is not a live region.
   const [announce, setAnnounce] = useState("");
@@ -161,19 +148,30 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
   const googleInFlight = useRef(false);
 
   const phoneForm = useForm<PhoneValues>({
-    resolver: zodResolver(phoneSchema),
+    resolver: phoneResolver,
     // Back from "Forgot password?": the number is already known.
     defaultValues: { phone: handedOffPhoneOrEmpty() },
   });
   const loginPasswordForm = useForm<LoginPasswordValues>({
-    resolver: zodResolver(loginPasswordSchema),
+    resolver: loginPasswordResolver,
   });
   const createPasswordForm = useForm<CreatePasswordValues>({
-    resolver: zodResolver(createPasswordSchema),
+    resolver: createPasswordResolver,
   });
   const codeForm = useForm<OtpCodeValues>({
-    resolver: zodResolver(otpCodeSchema),
+    resolver: otpCodeResolver,
   });
+  const codeValue = useWatch({ control: codeForm.control, name: "code" }) ?? "";
+
+  /** Every error but Google's shows under the current step's field. */
+  const showError = (message: string, fromGoogle = false) => {
+    setError(message);
+    setErrorFromGoogle(fromGoogle);
+  };
+  const clearError = () => {
+    setError(null);
+    setErrorFromGoogle(false);
+  };
 
   const startCooldown = () => {
     setCooldown(RESEND_COOLDOWN_SECONDS);
@@ -207,14 +205,14 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
   }, [step]);
 
   const onSubmitPhone = async (values: PhoneValues) => {
-    setError(null);
+    clearError();
     try {
       const exists = await checkPhoneExists(values.phone);
       setPhone(values.phone);
       setIsNewAccount(!exists);
       setStep("password");
     } catch (err) {
-      setError(authErrorMessage(err, t));
+      showError(authErrorMessage(err, t));
     }
   };
 
@@ -222,50 +220,71 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
     setSendingChannel(via);
     try {
       await requestOtp(phone);
-      setChannel(via);
-      setAnnounce(t.auth.otpRequested(phone));
+      setAnnounce(t.auth.otpRequested(formatMyanmarPhone(phone)));
       setStep("code");
       startCooldown();
       codeForm.reset();
     } catch (err) {
-      setError(authErrorMessage(err, t));
+      showError(authErrorMessage(err, t));
     } finally {
       setSendingChannel(null);
     }
   };
 
+  /**
+   * Never sends anything: the user picks how to get the code first. The one
+   * exception is a code already requested whose resend cooldown is still
+   * running (sent back here when the step token ran out, or via "Back"): it
+   * is still good, and asking for another inside the wait would only be
+   * refused — so go straight back to typing it.
+   */
+  const afterPasswordStep = () => {
+    setStep(cooldown > 0 ? "code" : "method");
+  };
+
   const onSubmitLoginPassword = async (values: LoginPasswordValues) => {
-    setError(null);
+    clearError();
     try {
       stepTokenRef.current = await verifyPassword(phone, values.password);
-      // Sent back here from the code step (the step token ran out): the code
-      // already on its way is still good while the resend cooldown runs, and
-      // asking for another inside it would only be refused — so go straight
-      // back to typing it.
-      if (cooldown > 0) {
-        setStep("code");
-        return;
-      }
-      await sendCode();
+      afterPasswordStep();
     } catch (err) {
-      setError(authErrorMessage(err, t));
+      showError(authErrorMessage(err, t));
     }
   };
 
-  const onSubmitCreatePassword = async (values: CreatePasswordValues) => {
-    setError(null);
+  const onSubmitCreatePassword = (values: CreatePasswordValues) => {
+    clearError();
     setPendingPassword(values.password);
-    await sendCode();
+    afterPasswordStep();
+  };
+
+  /** A method tapped on the "Get your code" step (only SMS ever arrives here). */
+  const onPickMethod = (via: OtpChannel) => {
+    if (sendingChannel) return;
+    clearError();
+    // Same rule as afterPasswordStep: the code already requested is still
+    // good while the cooldown runs.
+    if (cooldown > 0) {
+      setStep("code");
+      return;
+    }
+    void sendCode(via);
   };
 
   const onConfirmSend = () => {
     if (cooldown > 0 || sendingChannel) return;
-    setError(null);
-    void sendCode(pickedChannel);
+    clearError();
+    void sendCode("sms");
+  };
+
+  const chooseAnotherMethod = () => {
+    if (sendingChannel) return;
+    clearError();
+    setStep("method");
   };
 
   const onSubmitCode = async (values: OtpCodeValues) => {
-    setError(null);
+    clearError();
     try {
       await verifyOtp(
         phone,
@@ -284,10 +303,10 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
         stepTokenRef.current = null;
         loginPasswordForm.reset();
         setStep("password");
-        setError(t.auth.passwordAgain);
+        showError(t.auth.passwordAgain);
         return;
       }
-      setError(authErrorMessage(err, t));
+      showError(authErrorMessage(err, t));
     }
   };
 
@@ -299,19 +318,20 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
     if (googleInFlight.current || phoneForm.formState.isSubmitting) return;
     googleInFlight.current = true;
     setGoogleBusy(true);
-    setError(null);
+    clearError();
     try {
       await loginWithGoogle({ code });
       // Deliberately still busy — we are navigating away, exactly like the
       // code step after a successful verify.
       router.push(returnTo ?? "/");
     } catch (err) {
-      setError(
+      showError(
         err instanceof ApiError
           ? err.status === 503
             ? t.auth.googleNotConfigured
             : err.message
           : t.auth.googleFailed,
+        true,
       );
       googleInFlight.current = false;
       setGoogleBusy(false);
@@ -320,17 +340,15 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
 
   const onGoogleError = () => {
     if (googleInFlight.current) return;
-    setError(t.auth.googleFailed);
+    showError(t.auth.googleFailed, true);
   };
 
   const changePhone = () => {
     setStep("phone");
-    setError(null);
+    clearError();
     setCooldown(0);
     setPendingPassword("");
     stepTokenRef.current = null;
-    setChannel("sms");
-    setPickedChannel("sms");
     setAnnounce("");
     if (cooldownInterval.current) clearInterval(cooldownInterval.current);
     loginPasswordForm.reset();
@@ -338,90 +356,58 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
     codeForm.reset();
   };
 
-  const errorRow = error ? (
-    <div
-      role="alert"
-      className="flex items-start gap-2.5 rounded-xl bg-destructive/10 px-3.5 py-3 text-sm text-destructive ring-1 ring-destructive/25 ring-inset"
-    >
-      <AlertCircle className="mt-0.5 size-4 shrink-0" />
-      <p>{error}</p>
-    </div>
-  ) : null;
-
-  /**
-   * Which number this is all about, plus the way back out of it. Every step
-   * past the first shows the same row, so "wrong number?" is answered in the
-   * same place whether you're on the password step or the code step.
-   */
-  const identityRow = (message: string, icon?: ReactNode) => (
-    <Surface
-      tone="subtle"
-      radius="lg"
-      className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 px-3.5 py-3"
-    >
-      <p className="flex min-w-0 flex-1 items-start gap-2 text-sm text-muted-foreground">
-        {icon ?? (
-          <Phone
-            aria-hidden
-            className="mt-0.5 size-3.5 shrink-0 text-primary"
-          />
-        )}
-        <span className="min-w-0">{message}</span>
-      </p>
-      <button
-        type="button"
-        onClick={changePhone}
-        disabled={sendingChannel !== null}
-        className={cn(
-          linkButtonClasses,
-          "disabled:cursor-not-allowed disabled:opacity-60",
-        )}
-      >
-        {t.auth.changePhone}
-      </button>
-    </Surface>
+  const shownPhone = formatMyanmarPhone(phone);
+  const chipLabel = isNewAccount ? a.chipCreating(shownPhone) : a.chipSigningIn(shownPhone);
+  const chip = (
+    <PhoneChip
+      phone={phone}
+      label={chipLabel}
+      onChange={changePhone}
+      disabled={sendingChannel !== null}
+    />
   );
+  /** A server error shown under the current step's field (Google's has its own place). */
+  const fieldServerError = error && !errorFromGoogle ? error : null;
 
-  let form: ReactNode;
+  let content: ReactNode;
 
   if (step === "phone") {
     // One sign-in at a time: a Google exchange locks the phone field and its
     // Continue; a phone check dims the Google button (see GoogleSignIn).
     const busy =
       googleBusy || googlePopupOpen || phoneForm.formState.isSubmitting;
-    form = (
-      <div className="flex flex-col gap-4">
-        <form
-          onSubmit={phoneForm.handleSubmit(onSubmitPhone)}
-          className="flex flex-col gap-4"
-        >
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="phone">{t.auth.phoneLabel}</Label>
-            <div className="relative">
-              <Phone aria-hidden className={iconClasses} />
-              <Input
-                id="phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder={t.auth.phonePlaceholder}
-                className={cn(iconFieldClasses, "nums")}
-                disabled={googleBusy || googlePopupOpen}
-                {...phoneForm.register("phone")}
-              />
-            </div>
-            {phoneForm.formState.errors.phone && (
-              <p className={errorTextClasses}>
-                {phoneForm.formState.errors.phone.message}
-              </p>
-            )}
-          </div>
-          <Button type="submit" disabled={busy} className={submitClasses}>
-            {phoneForm.formState.isSubmitting ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Phone className="size-4" />
-            )}
+    const phoneError =
+      validationMessage(a, phoneForm.formState.errors.phone?.message) ?? fieldServerError;
+    content = (
+      <div key="phone" className="mq-rise">
+        <StepHeading
+          title={mode === "signUp" ? t.auth.registerTitle : t.auth.signInTitle}
+          subtitle={mode === "signUp" ? t.auth.registerSubtitle : t.auth.signInSubtitle}
+        />
+        <form onSubmit={phoneForm.handleSubmit(onSubmitPhone)} className="mt-8">
+          <FieldLabel htmlFor="phone">{t.auth.phoneLabel}</FieldLabel>
+          <PhoneInput
+            id="phone"
+            placeholder={a.phonePlaceholder}
+            disabled={googleBusy || googlePopupOpen}
+            aria-invalid={phoneError ? true : undefined}
+            aria-describedby={phoneError ? "phone-err" : "phone-help"}
+            {...phoneForm.register("phone", { setValueAs: compactPhone })}
+          />
+          {phoneError ? (
+            <AuthError id="phone-err">{phoneError}</AuthError>
+          ) : (
+            <FieldHelpText id="phone-help">{a.phoneHelp}</FieldHelpText>
+          )}
+          <Button
+            type="submit"
+            variant="commit"
+            size="block"
+            disabled={busy}
+            busy={phoneForm.formState.isSubmitting}
+            busyLabel={a.checkingNumber}
+            className="mt-6"
+          >
             {t.auth.continue}
           </Button>
         </form>
@@ -431,83 +417,83 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
           onCode={onGoogleCode}
           onError={onGoogleError}
           onPopupChange={setGooglePopupOpen}
-          className={submitClasses}
         />
+        {error && errorFromGoogle && <AuthError id="google-err">{error}</AuthError>}
+        <StepFootnote>{mode === "signUp" ? a.signUpFootnote : a.signInFootnote}</StepFootnote>
       </div>
     );
   } else if (step === "password" && isNewAccount) {
-    form = (
-      <form
-        onSubmit={(event) =>
-          createPasswordForm.handleSubmit(onSubmitCreatePassword)(event)
-        }
-        className="flex flex-col gap-4"
-      >
-        {identityRow(t.auth.creatingAccountFor(phone))}
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="password">{t.auth.newPasswordLabel}</Label>
-          <div className="relative">
-            <Lock aria-hidden className={iconClasses} />
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              placeholder={t.auth.newPasswordPlaceholder}
-              className={iconFieldClasses}
-              {...createPasswordForm.register("password")}
-            />
-          </div>
-          {createPasswordForm.formState.errors.password && (
-            <p className={errorTextClasses}>
-              {createPasswordForm.formState.errors.password.message}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="confirmPassword">{t.auth.confirmPasswordLabel}</Label>
-          <div className="relative">
-            <Lock aria-hidden className={iconClasses} />
-            <Input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              placeholder={t.auth.confirmPasswordPlaceholder}
-              className={iconFieldClasses}
-              {...createPasswordForm.register("confirmPassword")}
-            />
-          </div>
-          {createPasswordForm.formState.errors.confirmPassword && (
-            <p className={errorTextClasses}>
-              {createPasswordForm.formState.errors.confirmPassword.message}
-            </p>
-          )}
-        </div>
-        <Button
-          type="submit"
-          disabled={createPasswordForm.formState.isSubmitting}
-          className={submitClasses}
+    const { errors, isSubmitting } = createPasswordForm.formState;
+    const passwordError = validationMessage(a, errors.password?.message);
+    const confirmError =
+      validationMessage(a, errors.confirmPassword?.message) ?? fieldServerError;
+    content = (
+      <div key="create" className="mq-rise">
+        <StepHeading title={t.auth.registerTitle} subtitle={a.createSubtitle} />
+        {chip}
+        <form
+          onSubmit={(event) =>
+            createPasswordForm.handleSubmit(onSubmitCreatePassword)(event)
+          }
         >
-          {createPasswordForm.formState.isSubmitting ? (
-            <Loader2 className="size-4 animate-spin" />
+          <FieldLabel htmlFor="password" className="mt-6">
+            {t.auth.newPasswordLabel}
+          </FieldLabel>
+          <PasswordInput
+            id="password"
+            autoComplete="new-password"
+            showLabel={a.showNewPassword}
+            aria-invalid={passwordError ? true : undefined}
+            aria-describedby={passwordError ? "password-err" : "password-help"}
+            {...createPasswordForm.register("password")}
+          />
+          {passwordError ? (
+            <AuthError id="password-err">{passwordError}</AuthError>
           ) : (
-            <Lock className="size-4" />
+            <FieldHelpText id="password-help">{a.passwordHelp}</FieldHelpText>
           )}
-          {t.auth.continue}
-        </Button>
-      </form>
+          <FieldLabel htmlFor="confirmPassword" className="mt-6">
+            {t.auth.confirmPasswordLabel}
+          </FieldLabel>
+          <PasswordInput
+            id="confirmPassword"
+            autoComplete="new-password"
+            icon="shield"
+            showLabel={a.showConfirmPassword}
+            aria-invalid={confirmError ? true : undefined}
+            aria-describedby={confirmError ? "confirm-err" : undefined}
+            {...createPasswordForm.register("confirmPassword")}
+          />
+          {confirmError && <AuthError id="confirm-err">{confirmError}</AuthError>}
+          <Button
+            type="submit"
+            variant="commit"
+            size="block"
+            busy={isSubmitting}
+            busyLabel={t.auth.continue}
+            className="mt-6"
+          >
+            {t.auth.continue}
+          </Button>
+        </form>
+        <StepFootnote>{a.createFootnote}</StepFootnote>
+      </div>
     );
   } else if (step === "password") {
-    form = (
-      <form
-        onSubmit={(event) =>
-          loginPasswordForm.handleSubmit(onSubmitLoginPassword)(event)
-        }
-        className="flex flex-col gap-4"
-      >
-        {identityRow(t.auth.signingInAs(phone))}
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-3">
-            <Label htmlFor="password">{t.auth.passwordLabel}</Label>
+    const { errors, isSubmitting } = loginPasswordForm.formState;
+    const passwordError =
+      validationMessage(a, errors.password?.message) ?? fieldServerError;
+    content = (
+      <div key="password" className="mq-rise">
+        <StepHeading title={t.auth.signInTitle} subtitle={a.passwordSubtitle} />
+        {chip}
+        <form
+          onSubmit={(event) =>
+            loginPasswordForm.handleSubmit(onSubmitLoginPassword)(event)
+          }
+        >
+          <div className="mt-6 flex items-end justify-between gap-3">
+            <FieldLabel htmlFor="password">{t.auth.passwordLabel}</FieldLabel>
             {/* H-8: the way out for a forgotten password — the same code
                 service as sign-in, on its own page, number carried over. */}
             <Link
@@ -517,157 +503,189 @@ export function PhoneAuthForm({ returnTo }: { returnTo?: string | null } = {}) {
                   : "/forgot-password"
               }
               onClick={() => handOffPhone(phone)}
-              className={linkButtonClasses}
+              className="mq-link shrink-0 rounded-[4px] text-sm leading-[18px] font-extrabold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
             >
               {t.auth.forgotPassword}
             </Link>
           </div>
-          <div className="relative">
-            <Lock aria-hidden className={iconClasses} />
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              placeholder={t.auth.passwordPlaceholder}
-              className={iconFieldClasses}
-              {...loginPasswordForm.register("password")}
-            />
-          </div>
-          {loginPasswordForm.formState.errors.password && (
-            <p className={errorTextClasses}>
-              {loginPasswordForm.formState.errors.password.message}
-            </p>
-          )}
-        </div>
-        <Button
-          type="submit"
-          disabled={loginPasswordForm.formState.isSubmitting}
-          className={submitClasses}
+          <PasswordInput
+            id="password"
+            autoComplete="current-password"
+            placeholder={t.auth.passwordPlaceholder}
+            showLabel={a.showPassword}
+            aria-invalid={passwordError ? true : undefined}
+            aria-describedby={passwordError ? "password-err" : undefined}
+            {...loginPasswordForm.register("password")}
+          />
+          {passwordError && <AuthError id="password-err">{passwordError}</AuthError>}
+          <Button
+            type="submit"
+            variant="commit"
+            size="block"
+            busy={isSubmitting}
+            busyLabel={a.checkingPassword}
+            className="mt-6"
+          >
+            {t.auth.continue}
+          </Button>
+        </form>
+        <StepFootnote>{a.passwordFootnote}</StepFootnote>
+      </div>
+    );
+  } else if (step === "method") {
+    content = (
+      <div key="method" className="mq-rise">
+        <h1
+          id="otp-method-title"
+          className={STEP_TITLE_CLASS}
         >
-          {loginPasswordForm.formState.isSubmitting ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Lock className="size-4" />
-          )}
-          {t.auth.continue}
-        </Button>
-      </form>
+          {t.auth.otpMethodTitle}
+        </h1>
+        <p id="otp-method-subtitle" className={STEP_SUBTITLE_CLASS}>
+          {t.auth.otpMethodSubtitle}
+        </p>
+        {chip}
+        <DoneNote>{isNewAccount ? a.passwordChosen : a.passwordAccepted}</DoneNote>
+        <OtpMethodButtons
+          labelledBy="otp-method-title"
+          describedBy="otp-method-subtitle"
+          labels={t.auth.otpMethods}
+          comingSoon={t.auth.otpComingSoon}
+          unavailableHint={t.auth.otpMethodUnavailable}
+          requestingLabel={t.auth.otpRequesting}
+          sending={sendingChannel}
+          disabled={sendingChannel !== null}
+          onSelect={onPickMethod}
+        />
+        {fieldServerError && <AuthError id="method-err">{fieldServerError}</AuthError>}
+        <span aria-live="polite" className="sr-only">
+          {sendingChannel ? t.auth.otpRequesting : ""}
+        </span>
+        <TextAction
+          tone="plain"
+          className="mt-4"
+          locked={sendingChannel !== null}
+          icon={<BackIcon size={18} />}
+          onClick={() => {
+            clearError();
+            setStep("password");
+          }}
+        >
+          {t.common.back}
+        </TextAction>
+      </div>
     );
   } else {
-    form = (
-      <form
-        onSubmit={(event) => codeForm.handleSubmit(onSubmitCode)(event)}
-        className="flex flex-col gap-4"
-      >
-        {identityRow(
-          t.auth.otpRequested(phone),
-          <OtpChannelIcon
-            channel={channel}
-            className="size-5 [&>svg]:size-3"
-          />,
-        )}
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="code">{t.auth.otpLabel}</Label>
-          <Input
+    const { errors, isSubmitting } = codeForm.formState;
+    const codeError = validationMessage(a, errors.code?.message) ?? fieldServerError;
+    const resendLocked = cooldown > 0 || sendingChannel !== null;
+    content = (
+      <div key="code" className="mq-rise">
+        <StepHeading title={a.codeTitle} subtitle={t.auth.otpRequested(shownPhone)} />
+        {chip}
+        <DoneNote>{isNewAccount ? a.passwordChosen : a.passwordAccepted}</DoneNote>
+        <SmsSampleCard />
+        <form onSubmit={(event) => codeForm.handleSubmit(onSubmitCode)(event)}>
+          <FieldLabel htmlFor="code" className="mt-6">
+            {a.codeLabel}
+          </FieldLabel>
+          <CodeCells
             id="code"
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            placeholder="123456"
-            className={cn(
-              fieldClasses,
-              "nums h-12 text-center text-lg tracking-[0.35em] md:text-lg",
-            )}
+            value={codeValue}
+            invalid={Boolean(codeError)}
+            busy={isSubmitting}
+            maxLength={20}
+            aria-describedby={codeError ? "code-err" : "code-help"}
             data-1p-ignore
             data-lpignore="true"
             data-bwignore="true"
             data-form-type="other"
-            {...codeForm.register("code")}
-          />
-          {codeForm.formState.errors.code && (
-            <p className={cn(errorTextClasses, "text-center")}>
-              {codeForm.formState.errors.code.message}
-            </p>
-          )}
-        </div>
-        <Button
-          type="submit"
-          disabled={codeForm.formState.isSubmitting}
-          className={submitClasses}
-        >
-          {codeForm.formState.isSubmitting ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <ShieldCheck className="size-4" />
-          )}
-          {isNewAccount ? t.auth.verifyAndCreate : t.auth.verifyAndSignIn}
-        </Button>
-        <div className="mt-1 flex flex-col gap-2.5">
-          <div className="flex flex-col gap-0.5">
-            <p
-              id={channelTitleId}
-              className="text-sm font-medium text-foreground"
-            >
-              {t.auth.otpChannelTitle}
-            </p>
-            <p id={channelHintId} className="text-xs text-muted-foreground">
-              {t.auth.otpChannelHint}
-            </p>
-          </div>
-          <OtpChannelPicker
-            value={pickedChannel}
-            labels={t.auth.otpChannels}
-            labelledBy={channelTitleId}
-            describedBy={channelHintId}
-            onChange={setPickedChannel}
-          />
-          {/* focusableWhenDisabled keeps keyboard focus on the button while
-              it is locked (sending / cooldown) instead of dropping to body. */}
-          <Button
-            type="button"
-            variant="outline"
-            size="pill-sm"
-            onClick={onConfirmSend}
-            disabled={cooldown > 0 || sendingChannel !== null}
-            focusableWhenDisabled
-            className="w-full font-semibold aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
-          >
-            {sendingChannel ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <OtpChannelIcon
-                channel={pickedChannel}
-                className="size-5 [&>svg]:size-3"
-              />
+            {...registerCodeField(
+              codeForm.register("code", {
+                // The SMS shows "MyanFlix: 482 913"; keep only the digits of
+                // whatever is typed or pasted (even the whole message).
+                setValueAs: (value: unknown) =>
+                  typeof value === "string" ? value.replace(/\D/g, "") : value,
+              }),
             )}
-            {sendingChannel ? t.auth.otpRequesting : t.auth.otpRequestAgain}
-          </Button>
-          {/* Always rendered so the card doesn't jump when the countdown
-              ends. It ticks every second, so it is deliberately NOT a live
-              region — the sr-only span below announces the state changes. */}
-          <p
-            aria-hidden={cooldown === 0 || sendingChannel !== null}
-            className="nums min-h-4 text-center text-xs text-muted-foreground"
+          />
+          {codeError ? (
+            <AuthError id="code-err">{codeError}</AuthError>
+          ) : (
+            <FieldHelpText id="code-help">{a.codeHelp}</FieldHelpText>
+          )}
+          <Button
+            type="submit"
+            variant="commit"
+            size="block"
+            busy={isSubmitting}
+            busyLabel={a.verifying}
+            className="mt-6"
           >
-            {cooldown > 0 && !sendingChannel ? t.auth.resendIn(cooldown) : ""}
-          </p>
-          <span aria-live="polite" className="sr-only">
-            {sendingChannel ? t.auth.otpRequesting : announce}
-          </span>
+            {isNewAccount ? t.auth.verifyAndCreate : t.auth.verifyAndSignIn}
+          </Button>
+        </form>
+        <Hairline />
+        <p className="mt-5 text-[15px] leading-[22px] font-bold text-fg">
+          {t.auth.otpChannelTitle}
+        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-7 gap-y-1">
+          {/* ONE button through all three states (wait · requesting · ready),
+              kept focusable while locked, so keyboard focus never drops to
+              the page when the countdown starts or ends. The countdown
+              ticks every second, so it is deliberately NOT a live region —
+              the sr-only span below announces the state changes. */}
+          <TextAction
+            tone={cooldown > 0 && !sendingChannel ? "muted" : "link"}
+            locked={resendLocked}
+            onClick={onConfirmSend}
+            icon={
+              cooldown > 0 && !sendingChannel ? (
+                <ClockIcon size={18} />
+              ) : (
+                <RefreshIcon size={18} />
+              )
+            }
+          >
+            {sendingChannel
+              ? t.auth.otpRequesting
+              : cooldown > 0
+                ? t.auth.resendIn(cooldown)
+                : t.auth.otpRequestAgain}
+          </TextAction>
+          {/* Back to "Get your code" — sends nothing by itself. */}
+          <TextAction
+            locked={sendingChannel !== null}
+            onClick={chooseAnotherMethod}
+            icon={<SlidersIcon size={18} />}
+          >
+            {t.auth.otpChooseAnother}
+          </TextAction>
         </div>
-      </form>
+        <span aria-live="polite" className="sr-only">
+          {sendingChannel ? t.auth.otpRequesting : announce}
+        </span>
+      </div>
     );
   }
 
+  const stepIndex =
+    step === "phone" ? 0 : step === "password" ? 1 : step === "method" ? 2 : 3;
+  const signingUp = step === "phone" ? mode === "signUp" : isNewAccount;
+
   return (
-    <div className="flex flex-col gap-6">
-      <StepIndicator
-        current={step === "phone" ? 0 : step === "password" ? 1 : 2}
-        labels={[t.auth.stepPhone, t.auth.stepPassword, t.auth.stepVerify]}
+    <div>
+      <StepRail
+        label={signingUp ? a.stepsSignUp : a.stepsSignIn}
+        current={stepIndex}
+        steps={[
+          t.auth.stepPhone,
+          t.auth.stepPassword,
+          t.auth.stepCode,
+          t.auth.stepVerify,
+        ]}
       />
-      {errorRow}
-      {form}
+      {content}
     </div>
   );
 }

@@ -1,58 +1,39 @@
 "use client";
 
-import { useCallback, useId, useRef, useState } from "react";
-import {
-  ArrowDownWideNarrow,
-  LayoutGrid,
-  LoaderCircle,
-  Rows3,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useCallback, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+
+import { ChevronLeftIcon, CloseIcon, GridComfortableIcon, GridCompactIcon, SearchIcon } from "@/components/system/icons";
 import { SEARCH_MIN_LENGTH } from "@/hooks/use-search-term";
 import { useLanguage } from "@/lib/context/language-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import { searchText } from "@/lib/i18n/sections/search";
+import { shellText } from "@/lib/i18n/sections/shell";
 import { cn } from "@/lib/utils";
 import type { GridDensity } from "./PosterGrid";
-import { SearchSuggestions, type SearchSuggestionsHandle } from "./SearchSuggestions";
+import { SearchSuggestions, suggestKey, type SearchSuggestionsHandle } from "./SearchSuggestions";
 
 export type BrowseTab = "movies" | "series" | "books" | "music";
 export const BROWSE_TABS: BrowseTab[] = ["movies", "series", "books", "music"];
 
-/** Sentinel for the genre select's "every genre" row (see genreValue below). */
-const ALL_GENRES = "__all__";
-
-/** Every pill-shaped control on the bar, so the row reads as one kit. */
-const CONTROL =
-  "focus-ring flex h-9 items-center justify-center rounded-full bg-white/5 text-muted-foreground ring-1 ring-white/10 transition-colors duration-150 ease-out ring-inset hover:bg-white/10 hover:text-foreground hover:ring-white/16";
+/** The round, focus-ringed look every small control on this page shares. */
+const FOCUS = "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link";
 
 /**
- * THE BROWSE BAR — one line, and only one.
+ * THE SEARCH HEADER (Search / SearchResults boards).
  *
- * It used to be two full-width bands stacked on top of each other: a row of
- * filled tabs plus icon buttons, and beneath it a second row of genre chips.
- * Two bars of chrome before a single frame of artwork, with genre offered in
- * two places at once (ten chips here, fifteen in the filter sheet) — the same
- * question answered differently depending on where you asked it.
+ * One block at the top of the browse surface: an optional heading, the search
+ * field, a helper line, and the scope tabs (Movies · Series · Books ·
+ * Music SOON) as white/raised chips.
  *
- * Now: the four modes are quiet underlined words on the left, the way a
- * publication labels its sections; every *filter* — genre, sort, the rest —
- * is a compact control on the right, and genre reads from the same list the
- * filter sheet does. Grid density moved out entirely, next to the result count
- * it actually changes (see `DensityToggle`).
+ * `size="hero"` is the Search page before a search runs — a 68px field
+ * (56px on phones). `size="compact"` is the results view and the /media
+ * catalog — a 56px field, with a Back button when `onBack` is given. It is
+ * the SAME input element in both sizes, so typing never loses focus when the
+ * page turns from "search" into "results" under the user's fingers.
  *
- * Search still expands from an icon rather than sitting open, because on a
- * browse page the verb is "browse"; on the Search destination it is pinned
- * open, because there the verb is "search".
+ * Movies get the suggestion panel under the field (arrow keys, Enter,
+ * Escape — the input forwards its keys to it).
  */
 export function BrowseBar({
   tab,
@@ -60,72 +41,73 @@ export function BrowseBar({
   tabs: allowedTabs = BROWSE_TABS,
   search,
   onSearchChange,
-  genre,
-  genreOptions,
-  onGenreChange,
-  sort,
-  onSortChange,
-  sortOptions,
-  onOpenFilters,
-  activeFilterCount,
-  searchAlwaysOpen = false,
+  size = "compact",
+  intro,
+  onBack,
+  tabCounts,
+  tabsLabel,
+  controlsId,
   isSearching = false,
   isTooShort = false,
+  onCommitSearch,
+  onSeeAllResults,
+  settledTerm,
 }: {
   tab: BrowseTab;
   onTabChange: (tab: BrowseTab) => void;
-  /** Which modes this surface offers — the /media catalog carries movies|series only. */
+  /** Which scopes this surface offers — the /media catalog carries movies|series only. */
   tabs?: BrowseTab[];
   search: string;
   onSearchChange: (value: string) => void;
-  /** Undefined means "every genre" — the select's own reset option. */
-  genre: string | undefined;
-  /** DB-derived (facets), never a hard-coded list — the same values the filter sheet offers. */
-  genreOptions: string[];
-  onGenreChange: (genre: string | undefined) => void;
-  sort: string;
-  onSortChange: (sort: string) => void;
-  /** Supplied by the surface from t.filters.sort* — series get the shorter honest subset. */
-  sortOptions: { value: string; label: string }[];
-  onOpenFilters: () => void;
-  activeFilterCount: number;
-  /** The Search destination keeps the field unfolded even when it's empty. */
-  searchAlwaysOpen?: boolean;
+  size?: "hero" | "compact";
+  /** Rendered above the field (the Search page's title + subtitle). */
+  intro?: ReactNode;
+  /** Shows the round Back button before the field (results view). */
+  onBack?: () => void;
+  /** Result counts shown inside the tab chips (only the ones that are known). */
+  tabCounts?: Partial<Record<BrowseTab, number>>;
+  /** Accessible name of the tab row. */
+  tabsLabel: string;
+  /** The id of the region the tabs control. */
+  controlsId?: string;
+  /**
+   * The term the results grid already shows (the settled search). Focusing
+   * the field on exactly that term does not open the suggestion panel unless
+   * its suggestions are already loaded: the grid is showing those results,
+   * so asking the server again would only repeat them.
+   */
+  settledTerm?: string;
   /**
    * A search is on its way — INCLUDING the debounce window, which is most of
    * the wait and the part the user would otherwise experience as the page
    * quietly ignoring them.
    */
   isSearching?: boolean;
-  /** The term is 1 character: nothing was sent, and the field says why. */
+  /** The term is 1 character: nothing was sent, and the helper line says why. */
   isTooShort?: boolean;
+  /** The user committed a term (Enter, a suggestion, See all) — file it as a recent search. */
+  onCommitSearch?: (term: string) => void;
+  /** The suggestion panel's "See all results" was pressed. */
+  onSeeAllResults?: () => void;
 }) {
   const { t } = useLanguage();
-  // Books included: the books grid honours the search term, and a search
-  // page where the Books tab cannot START a search was a reviewer-flagged
-  // dead end (the term was only clearable, never typeable, from there).
-  const searchable = tab === "movies" || tab === "series" || tab === "books";
+  const sx = useSection(searchText);
+  const s = useSection(shellText);
+  const hero = size === "hero";
   const hintId = useId();
-
-  // UI-only state: whether the user unfolded the field. The field also counts
-  // as open whenever a query is active (e.g. restored from the URL), so what
-  // the list is filtered by is always visible.
-  const [searchOpen, setSearchOpen] = useState(false);
+  const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const open = searchAlwaysOpen || searchOpen || search.trim().length > 0;
 
-  const openSearch = () => {
-    setSearchOpen(true);
-    requestAnimationFrame(() => inputRef.current?.focus());
-  };
-  const closeSearch = () => {
-    onSearchChange("");
-    setSearchOpen(false);
-  };
+  // Books included: the books grid honours the search term. Music has nothing
+  // to search yet, but the field stays (the board keeps it; typing there is
+  // harmless — the term carries over to the other tabs).
+  const placeholder =
+    tab === "series" ? t.browse.searchSeries : tab === "books" ? sx.searchBooks : t.browse.searchMovies;
 
   // The suggestion panel under the field (movies only). The bar says WHEN it
   // may show — on focus and on typing — and forwards the input's keys to it;
   // the panel itself owns the results and the highlighted row.
+  const queryClient = useQueryClient();
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [activeOptionId, setActiveOptionId] = useState<string | null>(null);
   const closeSuggest = useCallback(() => setSuggestOpen(false), []);
@@ -133,6 +115,9 @@ export function BrowseBar({
   const suggestRef = useRef<SearchSuggestionsHandle>(null);
   const listboxId = useId();
   const suggestable = tab === "movies";
+  const suggestExpanded = suggestable && suggestOpen && search.trim().length >= SEARCH_MIN_LENGTH;
+
+  const commit = () => onCommitSearch?.(search);
 
   const tabLabels: Record<BrowseTab, string> = {
     movies: t.search.movies,
@@ -140,229 +125,286 @@ export function BrowseBar({
     books: t.search.books,
     music: t.search.music,
   };
-  const tabs: { value: BrowseTab; label: string }[] = allowedTabs.map((value) => ({
-    value,
-    label: tabLabels[value],
-  }));
 
-  const placeholder = tab === "movies" ? t.browse.searchMovies : t.browse.searchSeries;
-  // base-ui treats an empty string as "no value" (it would render the
-  // placeholder), so the reset row carries an explicit sentinel instead.
-  const genreValue = genre ?? ALL_GENRES;
+  const helpText = isTooShort
+    ? t.browse.searchMinLength(SEARCH_MIN_LENGTH)
+    : tab === "movies"
+      ? sx.helpMovies
+      : sx.helpOther;
+  // The helper line always shows on the Search page; in the results view and
+  // the catalog it only appears to say why a 1-letter term did nothing.
+  const showHelp = hero || isTooShort;
 
   return (
-    <div className="sticky top-14 z-30 border-b lg:top-0 border-white/[0.06] bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
-        <div className="relative flex items-center gap-4">
-          {/* Modes: underlined words, not buttons. The rule sits on the bar's
-              own bottom border, so the active section looks attached to the
-              page below it. */}
-          <div className="scrollbar-none -mb-px flex min-w-0 shrink items-center gap-5 overflow-x-auto sm:gap-6">
-            {tabs.map((option) => {
-              const active = tab === option.value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => onTabChange(option.value)}
-                  aria-pressed={active}
-                  className={cn(
-                    "focus-ring relative shrink-0 border-b-2 py-3.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 ease-out",
-                    active
-                      ? "border-primary text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
+    <section
+      aria-label={hero ? undefined : s.search}
+      className={cn(
+        "relative z-10 px-gutter",
+        hero ? "pt-[clamp(28px,3.4vw,52px)]" : "pt-[clamp(20px,2.4vw,32px)]",
+      )}
+    >
+      {intro}
 
-          {searchable && (
-            <div className="ml-auto flex shrink-0 items-center gap-1.5 py-2">
-              {!open && (
-                <button
-                  type="button"
-                  onClick={openSearch}
-                  aria-label={placeholder}
-                  title={placeholder}
-                  className={cn(CONTROL, "w-9")}
-                >
-                  <Search className="size-4" />
-                </button>
+      <div
+        role="search"
+        className={cn("flex items-center gap-2", hero ? "mt-6 max-w-[960px]" : "max-w-[840px]")}
+      >
+        {onBack && (
+          <button
+            type="button"
+            onClick={() => {
+              onBack();
+              // The button disappears with the results view — keep the caret in the field.
+              inputRef.current?.focus();
+            }}
+            aria-label={sx.backToSearch}
+            className={cn(
+              "flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-tonal-faint text-fg transition-colors duration-150 hover:bg-tonal-soft",
+              FOCUS,
+            )}
+          >
+            <ChevronLeftIcon size={22} />
+          </button>
+        )}
+
+        <div ref={searchWrapRef} className="relative min-w-0 flex-1">
+          <label htmlFor={inputId} className="sr-only">
+            {placeholder}
+          </label>
+          {/* The field's own glyph doubles as its progress indicator: the
+              search icon pulses while a search is on its way. */}
+          <SearchIcon
+            size={hero ? 24 : 22}
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute top-1/2 -translate-y-1/2 transition-colors duration-150",
+              hero ? "left-5 max-desk:left-4" : "left-[18px]",
+              isSearching ? "animate-pulse text-link" : "text-fg-faint",
+            )}
+          />
+          <input
+            ref={inputRef}
+            id={inputId}
+            type="search"
+            autoComplete="off"
+            enterKeyHint="search"
+            value={search}
+            onChange={(e) => {
+              onSearchChange(e.target.value);
+              setSuggestOpen(true);
+            }}
+            onFocus={() => {
+              const current = search.trim();
+              const alreadyShown =
+                Boolean(settledTerm) &&
+                current === settledTerm &&
+                queryClient.getQueryData(suggestKey(current)) === undefined;
+              if (!alreadyShown) setSuggestOpen(true);
+            }}
+            onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+              if (e.key === "Enter") commit();
+              // Arrows/Enter/Escape go to the panel first; Escape only
+              // clears the field once the panel is already gone.
+              if (suggestRef.current?.handleKeyDown(e)) return;
+              if (e.key === "Escape" && search.length > 0) {
+                e.preventDefault();
+                onSearchChange("");
+              }
+            }}
+            onBlur={(e) => {
+              // Leaving the field for anything but the panel itself counts as
+              // having searched for what's in it.
+              if (!searchWrapRef.current?.contains(e.relatedTarget as Node | null)) commit();
+            }}
+            placeholder={placeholder}
+            aria-busy={isSearching}
+            aria-describedby={showHelp ? hintId : undefined}
+            role={suggestable ? "combobox" : undefined}
+            aria-autocomplete={suggestable ? "list" : undefined}
+            aria-expanded={suggestable ? suggestExpanded : undefined}
+            aria-controls={suggestable ? listboxId : undefined}
+            aria-activedescendant={suggestable ? (activeOptionId ?? undefined) : undefined}
+            className={cn(
+              "block w-full min-w-0 rounded-[12px] border-0 bg-raised font-semibold text-fg outline-none transition-shadow duration-150",
+              "placeholder:font-medium placeholder:text-fg-faint focus:shadow-[inset_0_0_0_1.5px_var(--mq-crimson)]",
+              "[&::-webkit-search-cancel-button]:hidden",
+              hero
+                ? "h-[68px] pr-16 pl-[60px] text-[20px] max-desk:h-14 max-desk:rounded-[14px] max-desk:pl-[52px] max-desk:text-[17px]"
+                : "h-14 pr-[60px] pl-[54px] text-[18px] max-desk:text-[17px]",
+              suggestExpanded && "shadow-[inset_0_0_0_1.5px_var(--mq-crimson)]",
+            )}
+          />
+          {search.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                onSearchChange("");
+                inputRef.current?.focus();
+              }}
+              aria-label={t.browse.clearSearch}
+              className={cn(
+                "absolute top-1/2 right-2 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent",
+                FOCUS,
               )}
-
-              {/* Genre: the shortcut that used to be a second row of chips. */}
-              <Select
-                value={genreValue}
-                onValueChange={(v) =>
-                  onGenreChange(String(v) === ALL_GENRES ? undefined : String(v))
-                }
-              >
-                <SelectTrigger
-                  className={cn(
-                    "hidden h-9 w-auto gap-1.5 rounded-full px-3.5 text-sm hover:bg-white/10 sm:flex",
-                    genre &&
-                      "border-primary/40 bg-primary/15 text-foreground hover:border-primary/60 hover:bg-primary/25",
-                  )}
-                  aria-label={t.filters.genre}
-                >
-                  <SelectValue>
-                    {(value) => (String(value) === ALL_GENRES ? t.browse.allGenres : String(value))}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent align="end">
-                  <SelectItem value={ALL_GENRES}>{t.browse.allGenres}</SelectItem>
-                  <SelectSeparator />
-                  {genreOptions.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={sort} onValueChange={(v) => v && onSortChange(String(v))}>
-                <SelectTrigger
-                  className="h-9 w-auto gap-1.5 rounded-full px-3.5 text-sm hover:bg-white/10"
-                  aria-label={t.browse.sort}
-                >
-                  <ArrowDownWideNarrow className="size-4 sm:hidden" />
-                  {/* base-ui renders the raw value by default — map it back to
-                      the translated label. Icon-only below sm to keep one row. */}
-                  <span className="hidden sm:inline">
-                    <SelectValue>
-                      {(value) => sortOptions.find((o) => o.value === value)?.label ?? String(value)}
-                    </SelectValue>
-                  </span>
-                </SelectTrigger>
-                <SelectContent align="end">
-                  {sortOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <button
-                type="button"
-                onClick={onOpenFilters}
-                // The label is hidden below sm, so the button needs a name of
-                // its own or it reads as an unlabelled icon to a screen reader.
-                aria-label={t.browse.filters}
-                className={cn(
-                  CONTROL,
-                  "gap-1.5 px-3.5 text-sm font-medium",
-                  activeFilterCount > 0 &&
-                    "bg-primary/15 text-foreground ring-primary/40 hover:bg-primary/25 hover:ring-primary/60",
-                )}
-              >
-                <SlidersHorizontal className="size-4" />
-                <span className="hidden lg:inline">{t.browse.filters}</span>
-                {activeFilterCount > 0 && (
-                  <span className="flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground nums">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-            </div>
+            >
+              <span className="flex size-[26px] items-center justify-center rounded-full bg-tonal text-fg">
+                <CloseIcon size={14} strokeWidth={2.2} />
+              </span>
+            </button>
           )}
-
-          {/* Expanded search. On phones it overlays the whole strip (the tabs
-              would otherwise leave it ~100px); from sm up it docks inline on
-              the right at a sane width. */}
-          {searchable && open && (
-            <div className="absolute inset-0 z-10 flex items-center gap-1.5 bg-background sm:static sm:z-auto sm:order-last sm:ml-1.5 sm:w-64 sm:bg-transparent">
-              <div ref={searchWrapRef} className="relative min-w-0 flex-1">
-                {/* The field's own glyph doubles as its progress indicator —
-                    the search icon spins in place. Nothing moves, nothing is
-                    added to the row, and the signal is where the user is
-                    already looking. */}
-                {isSearching ? (
-                  <LoaderCircle
-                    aria-hidden="true"
-                    className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 animate-spin text-primary"
-                  />
-                ) : (
-                  <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
-                )}
-                <Input
-                  ref={inputRef}
-                  value={search}
-                  onChange={(e) => {
-                    onSearchChange(e.target.value);
-                    setSuggestOpen(true);
-                  }}
-                  onFocus={() => {
-                    setSearchOpen(true);
-                    setSuggestOpen(true);
-                  }}
-                  onKeyDown={(e) => {
-                    // Arrows/Enter/Escape go to the panel first; Escape only
-                    // clears the field once the panel is already gone.
-                    if (suggestRef.current?.handleKeyDown(e)) return;
-                    if (e.key === "Escape") closeSearch();
-                  }}
-                  onBlur={() => {
-                    if (search.trim().length === 0) setSearchOpen(false);
-                  }}
-                  placeholder={placeholder}
-                  aria-busy={isSearching}
-                  aria-describedby={isTooShort ? hintId : undefined}
-                  role={suggestable ? "combobox" : undefined}
-                  aria-autocomplete={suggestable ? "list" : undefined}
-                  aria-expanded={suggestable ? suggestOpen && search.trim().length >= SEARCH_MIN_LENGTH : undefined}
-                  aria-controls={suggestable ? listboxId : undefined}
-                  aria-activedescendant={activeOptionId ?? undefined}
-                  className="h-9 rounded-full pr-3 pl-10"
-                />
-                {suggestable && (
-                  <SearchSuggestions
-                    ref={suggestRef}
-                    term={search}
-                    tab={tab}
-                    open={suggestOpen}
-                    onClose={closeSuggest}
-                    anchorRef={searchWrapRef}
-                    listboxId={listboxId}
-                    onActiveChange={setActiveOptionId}
-                  />
-                )}
-                {/* Why nothing happened, said quietly and next to the cause.
-                    It hangs below the bar rather than widening it, so a stray
-                    keystroke never reflows the whole strip. */}
-                {isTooShort && (
-                  <p
-                    id={hintId}
-                    role="status"
-                    className="pointer-events-none absolute top-full left-2 z-10 mt-1.5 rounded-full bg-background/95 px-2.5 py-1 text-[11px] whitespace-nowrap text-muted-foreground ring-1 ring-white/10 ring-inset backdrop-blur-md"
-                  >
-                    {t.browse.searchMinLength(SEARCH_MIN_LENGTH)}
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={closeSearch}
-                aria-label={t.browse.clearSearch}
-                className={cn(CONTROL, "w-9 shrink-0")}
-              >
-                <X className="size-4" />
-              </button>
-            </div>
+          {suggestable && (
+            <SearchSuggestions
+              ref={suggestRef}
+              term={search}
+              tab={tab}
+              open={suggestOpen}
+              onClose={closeSuggest}
+              anchorRef={searchWrapRef}
+              listboxId={listboxId}
+              onActiveChange={setActiveOptionId}
+              onPick={commit}
+              onSeeAll={() => {
+                commit();
+                onSeeAllResults?.();
+              }}
+            />
           )}
         </div>
       </div>
+
+      {showHelp && (
+        <p
+          id={hintId}
+          role={isTooShort ? "status" : undefined}
+          className={cn("mt-2.5 text-[13px] leading-[18px]", isTooShort ? "text-gold" : "text-fg-faint")}
+        >
+          {helpText}
+        </p>
+      )}
+
+      {allowedTabs.length > 1 && (
+        <ScopeTabs
+          tabs={allowedTabs}
+          tab={tab}
+          labels={tabLabels}
+          counts={tabCounts}
+          onChange={onTabChange}
+          label={tabsLabel}
+          controlsId={controlsId}
+          className={hero ? "mt-3.5" : "mt-4"}
+        />
+      )}
+    </section>
+  );
+}
+
+/**
+ * The scope chips as a real tab row: one tab stop, arrows/Home/End move and
+ * select, each tab names its count ("Movies, 31 results") or "coming soon".
+ */
+function ScopeTabs({
+  tabs,
+  tab,
+  labels,
+  counts,
+  onChange,
+  label,
+  controlsId,
+  className,
+}: {
+  tabs: BrowseTab[];
+  tab: BrowseTab;
+  labels: Record<BrowseTab, string>;
+  counts?: Partial<Record<BrowseTab, number>>;
+  onChange: (tab: BrowseTab) => void;
+  label: string;
+  controlsId?: string;
+  className?: string;
+}) {
+  const sx = useSection(searchText);
+  const s = useSection(shellText);
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const last = tabs.length - 1;
+    let next = -1;
+    if (event.key === "ArrowRight") next = index === last ? 0 : index + 1;
+    else if (event.key === "ArrowLeft") next = index === 0 ? last : index - 1;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = last;
+    if (next < 0) return;
+    event.preventDefault();
+    onChange(tabs[next]);
+    refs.current[next]?.focus();
+  };
+
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      className={cn("mq-rail -mx-gutter flex items-center gap-2 overflow-x-auto px-gutter", className)}
+    >
+      {tabs.map((value, index) => {
+        const on = value === tab;
+        const soon = value === "music";
+        const count = counts?.[value];
+        const hasCount = count !== undefined && !soon;
+        return (
+          <button
+            key={value}
+            ref={(el) => {
+              refs.current[index] = el;
+            }}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            aria-controls={controlsId}
+            tabIndex={on ? 0 : -1}
+            aria-label={
+              hasCount ? sx.tabWithCount(labels[value], count) : soon ? sx.tabComingSoon(labels[value]) : undefined
+            }
+            onClick={() => onChange(value)}
+            onKeyDown={(e) => onKeyDown(e, index)}
+            className={cn(
+              "mq-snap inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-full border-0 pl-4 text-sm whitespace-nowrap transition-colors duration-150",
+              hasCount || soon ? "pr-2" : "pr-4",
+              on ? "bg-play font-extrabold text-ink" : "bg-raised font-semibold text-fg hover:bg-raised-hover",
+              FOCUS,
+            )}
+          >
+            {labels[value]}
+            {hasCount && (
+              <span
+                aria-hidden
+                className={cn(
+                  "h-6 min-w-6 rounded-full px-2 text-center text-xs leading-6 font-extrabold nums",
+                  on ? "bg-ink/10" : "bg-white/10",
+                )}
+              >
+                {count}
+              </span>
+            )}
+            {soon && (
+              <span
+                aria-hidden
+                className={cn(
+                  "h-[18px] rounded-[9px] px-1.5 text-[10px] leading-[18px] font-extrabold tracking-[0.06em]",
+                  on ? "bg-ink/12" : "bg-white/12",
+                )}
+              >
+                {s.soon}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 /**
- * Grid density, docked beside the result count rather than orbiting the
- * toolbar: it changes how many cards fit a row, so it belongs to the grid, not
- * to the page's chrome. Desktop only — a phone grid is one column either way.
+ * Grid density: a two-button segmented pill (comfortable / compact) beside
+ * the sort control. Desktop only — phones always get three posters a row.
  */
 export function DensityToggle({
   density,
@@ -371,18 +413,33 @@ export function DensityToggle({
   density: GridDensity;
   onChange: (density: GridDensity) => void;
 }) {
-  const { t } = useLanguage();
-  const label = density === "comfortable" ? t.browse.compactView : t.browse.comfortableView;
-
+  const sx = useSection(searchText);
+  const options: { value: GridDensity; label: string; icon: ReactNode }[] = [
+    { value: "comfortable", label: sx.comfortableGrid, icon: <GridComfortableIcon size={18} /> },
+    { value: "compact", label: sx.compactGrid, icon: <GridCompactIcon size={18} /> },
+  ];
   return (
-    <button
-      type="button"
-      onClick={() => onChange(density === "comfortable" ? "compact" : "comfortable")}
-      aria-label={label}
-      title={label}
-      className={cn(CONTROL, "hidden size-9 lg:flex")}
-    >
-      {density === "comfortable" ? <Rows3 className="size-4" /> : <LayoutGrid className="size-4" />}
-    </button>
+    <div role="group" aria-label={sx.gridDensity} className="flex gap-0.5 rounded-full bg-raised p-[3px] max-desk:hidden">
+      {options.map((option) => {
+        const on = density === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-label={option.label}
+            title={option.label}
+            aria-pressed={on}
+            onClick={() => onChange(option.value)}
+            className={cn(
+              "flex h-8 w-9 cursor-pointer items-center justify-center rounded-full border-0 transition-colors duration-150",
+              on ? "bg-play text-ink" : "bg-transparent text-fg-muted hover:text-fg",
+              FOCUS,
+            )}
+          >
+            {option.icon}
+          </button>
+        );
+      })}
+    </div>
   );
 }

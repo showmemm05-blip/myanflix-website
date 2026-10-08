@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import type { Comment, CommentTarget } from "@/types/comment";
+import { REPLY_PAGE_SIZE, type Comment, type CommentTarget, type ReplyPage } from "@/types/comment";
 
 /**
  * Comments on a movie, a series or a book.
@@ -19,6 +19,16 @@ export const commentService = {
    */
   list: (target: CommentTarget) =>
     apiClient.get<Comment[]>("/comments", { params: target, skipAuth: true }),
+
+  /**
+   * One page of a comment's replies beyond the REPLY_PAGE_SIZE a thread read
+   * carries, oldest first. Public like the thread, hence `skipAuth` again.
+   */
+  replies: (commentId: string, page: number) =>
+    apiClient.get<ReplyPage>(`/comments/${commentId}/replies`, {
+      params: { page, limit: REPLY_PAGE_SIZE },
+      skipAuth: true,
+    }),
 
   /**
    * Posts a comment, or a reply when `parentId` is given. Authenticated —

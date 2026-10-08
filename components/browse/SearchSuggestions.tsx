@@ -13,14 +13,16 @@ import {
   type RefObject,
 } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ChevronRight, Film, Star } from "lucide-react";
+import { AnimatePresence, LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
 
+import { Artwork } from "@/components/system/Artwork";
+import { CrownIcon, SearchIcon, StarIcon, ChevronRightIcon } from "@/components/system/icons";
 import { SEARCH_MIN_LENGTH, SEARCH_STALE_TIME_MS } from "@/hooks/use-search-term";
 import { useLanguage } from "@/lib/context/language-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import { searchText } from "@/lib/i18n/sections/search";
 import { cn } from "@/lib/utils";
 import { movieService } from "@/services/api/movieService";
 import type { Movie } from "@/types/movie";
@@ -31,9 +33,14 @@ const SUGGEST_LIMIT = 8;
 /**
  * The panel's own, shorter debounce. The grid waits 400ms (`SEARCH_DEBOUNCE_MS`)
  * because re-rendering sixty posters is expensive; eight text rows are not, so
- * suggestions may feel immediate without asking the server once per keystroke.
+ * suggestions may feel quick without asking the server once per keystroke.
+ * 250ms (was 150) still lands well before the grid's 400ms, but skips the
+ * in-between requests of ordinary typing.
  */
-const SUGGEST_DEBOUNCE_MS = 150;
+const SUGGEST_DEBOUNCE_MS = 250;
+
+/** The suggestion query's cache key — BrowseBar checks it before reopening the panel. */
+export const suggestKey = (term: string) => ["search-suggest", term] as const;
 
 /** Keys the browse bar's input forwards; `true` means the panel consumed the key. */
 export interface SearchSuggestionsHandle {
@@ -41,7 +48,9 @@ export interface SearchSuggestionsHandle {
 }
 
 /**
- * THE SUGGESTION PANEL — matches under the search field, as you type.
+ * THE SUGGESTION PANEL — matches under the search field, as you type
+ * (Search board, "typing" state: a popover slab under the field, two columns
+ * of rows on desktop, one on phones, the matched letters set bold).
  *
  * It hangs off the browse bar's input and answers a narrower question than
  * the grid beneath it: "which of these is the one I mean?" So it fetches its
@@ -65,6 +74,8 @@ export function SearchSuggestions({
   anchorRef,
   listboxId,
   onActiveChange,
+  onPick,
+  onSeeAll,
   ref,
 }: {
   /** The raw field value — this component trims and debounces it itself. */
@@ -79,9 +90,14 @@ export function SearchSuggestions({
   listboxId: string;
   /** The highlighted row's element id (null when none) — for the input's `aria-activedescendant`. */
   onActiveChange?: (id: string | null) => void;
+  /** A suggestion was opened (click or Enter) — the page files the term as a recent search. */
+  onPick?: () => void;
+  /** "See all results for …": the grid under the panel already holds them; the page decides what else happens. */
+  onSeeAll?: () => void;
   ref?: Ref<SearchSuggestionsHandle>;
 }) {
   const { t } = useLanguage();
+  const sx = useSection(searchText);
   const router = useRouter();
   const reducedMotion = useReducedMotion();
   const optionIdPrefix = useId();
@@ -103,7 +119,7 @@ export function SearchSuggestions({
   }, [trimmed, longEnough, debounced]);
 
   const query = useQuery({
-    queryKey: ["search-suggest", debounced],
+    queryKey: suggestKey(debounced),
     queryFn: ({ signal }) =>
       movieService.getMovies(
         { search: debounced, limit: SUGGEST_LIMIT, sort: "relevance" },
@@ -176,6 +192,7 @@ export function SearchSuggestions({
             onClose();
             if (!movie) return false;
             e.preventDefault();
+            onPick?.();
             router.push(`/movie/${movie.id}`);
             return true;
           }
@@ -188,7 +205,7 @@ export function SearchSuggestions({
         }
       },
     }),
-    [visible, items, active, setActive, onClose, router],
+    [visible, items, active, setActive, onClose, onPick, router],
   );
 
   // Outside click. Capture phase, so a click that also re-renders its target
@@ -205,91 +222,118 @@ export function SearchSuggestions({
 
   const panelTransition = reducedMotion
     ? { duration: 0 }
-    : { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
-  const rowTransition = reducedMotion ? { duration: 0 } : { duration: 0.15, ease: "easeOut" as const };
+    : { duration: 0.2, ease: [0.22, 1, 0.36, 1] as const };
 
   const isInitialLoading = query.isPending;
   const isRefreshing = query.isFetching && !query.isPending;
 
+  // LazyMotion + `m` loads only the DOM animation features this panel uses,
+  // not the whole motion library.
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          key="panel"
-          initial={{ opacity: 0, y: -6, scale: 0.985 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -4, scale: 0.985 }}
-          transition={panelTransition}
-          style={{ transformOrigin: "top" }}
-          className="glass-card absolute top-full right-0 left-0 z-40 mt-2 overflow-hidden rounded-2xl sm:left-auto sm:w-[22rem] sm:min-w-full"
-        >
-          <div
-            className={cn(
-              "scrollbar-thin max-h-[min(60vh,420px)] overflow-y-auto overscroll-contain p-1.5 transition-opacity duration-150",
-              isRefreshing && "opacity-70",
-            )}
+    <LazyMotion features={domAnimation}>
+      <AnimatePresence>
+        {visible && (
+          <m.div
+            key="panel"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={panelTransition}
+            className="absolute top-[calc(100%+8px)] right-0 left-0 z-40 rounded-[16px] bg-popover p-2 shadow-e2"
           >
-            {isInitialLoading ? (
-              <SkeletonRows />
-            ) : query.isError ? (
-              <div className="flex flex-col items-start gap-2 px-3 py-4">
-                <p className="text-sm text-muted-foreground">{t.search.suggestError}</p>
-                <button
-                  type="button"
-                  onClick={() => query.refetch()}
-                  className="focus-ring rounded-full bg-white/8 px-3 py-1 text-xs font-medium text-foreground ring-1 ring-white/12 transition-colors ring-inset hover:bg-white/14"
+            <div className="flex items-center justify-between gap-3 px-2.5 pt-1.5 pb-2">
+              <span id={`${listboxId}-label`} className="text-kicker">
+                {t.search.suggestionsLabel}
+              </span>
+              <span className="text-xs leading-4 text-fg-faint max-desk:hidden">{sx.suggestKeysHint}</span>
+            </div>
+
+            <div
+              className={cn(
+                "max-h-[min(60vh,440px)] overflow-y-auto overscroll-contain transition-opacity duration-150",
+                isRefreshing && "opacity-70",
+              )}
+            >
+              {isInitialLoading ? (
+                <SkeletonRows label={sx.loadingSuggestions} />
+              ) : query.isError ? (
+                <div className="flex flex-wrap items-center gap-3 px-2.5 pt-3.5 pb-3">
+                  <p className="text-[15px] leading-[22px] text-fg-muted">{t.search.suggestError}</p>
+                  <button
+                    type="button"
+                    onClick={() => query.refetch()}
+                    className="mq-link rounded-[6px] text-sm outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+                  >
+                    {t.common.retry}
+                  </button>
+                </div>
+              ) : items.length === 0 ? (
+                <div role="status" className="flex items-center gap-3 px-2.5 pt-3.5 pb-3">
+                  <SearchIcon size={20} className="shrink-0 text-fg-faint" />
+                  <p className="text-[15px] leading-[22px] text-fg-muted">{t.search.suggestNoResults(debounced)}</p>
+                </div>
+              ) : (
+                <ul
+                  ref={listRef}
+                  id={listboxId}
+                  role="listbox"
+                  aria-labelledby={`${listboxId}-label`}
+                  className="grid grid-cols-2 gap-x-2 gap-y-0.5 max-desk:grid-cols-1"
                 >
-                  {t.common.retry}
-                </button>
-              </div>
-            ) : items.length === 0 ? (
-              <p className="px-3 py-4 text-sm text-muted-foreground">
-                {t.search.suggestNoResults(debounced)}
-              </p>
-            ) : (
-              <ul
-                ref={listRef}
-                id={listboxId}
-                role="listbox"
-                aria-label={t.search.suggestionsLabel}
-                className="flex flex-col"
-              >
-                <AnimatePresence initial={false} mode="popLayout">
                   {items.map((movie, index) => (
-                    <motion.li
-                      key={movie.id}
-                      layout={!reducedMotion}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={rowTransition}
-                      role="presentation"
-                    >
+                    <li key={movie.id} role="presentation" className="min-w-0">
                       <SuggestionRow
                         id={`${optionIdPrefix}${index}`}
                         movie={movie}
                         term={debounced}
                         active={index === active}
+                        a11yLabel={sx.titleA11y({
+                          title: movie.title,
+                          year: movie.releaseYear > 0 ? movie.releaseYear : undefined,
+                          genre: movie.genre,
+                          rating: movie.rating > 0 ? movie.rating.toFixed(1) : undefined,
+                          premium: movie.accessType === "SUBSCRIPTION",
+                        })}
                         onHover={() => setActive(index)}
-                        onSelect={onClose}
+                        onSelect={() => {
+                          onPick?.();
+                          onClose();
+                        }}
                       />
-                    </motion.li>
+                    </li>
                   ))}
-                </AnimatePresence>
-              </ul>
-            )}
-          </div>
+                </ul>
+              )}
+            </div>
 
-          {!isInitialLoading && !query.isError && total > items.length && (
-            <p className="border-t border-white/[0.06] px-3.5 py-2 text-[11px] text-muted-foreground">
-              <span className="nums">{t.search.suggestShowingOf(items.length, total)}</span>
-              <span className="mx-1.5 opacity-50">·</span>
-              {t.search.suggestPressEnter}
-            </p>
-          )}
-        </motion.div>
-      )}
-    </AnimatePresence>
+            {!isInitialLoading && !query.isError && items.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-2.5 pt-2.5 pb-1 shadow-[inset_0_1px_0_var(--mq-hairline)]">
+                <span role="status" className="text-[13px] leading-[18px] text-fg-faint nums">
+                  {t.search.suggestShowingOf(items.length, total)}
+                  {total > items.length && (
+                    <>
+                      <span aria-hidden> · </span>
+                      {t.search.suggestPressEnter}
+                    </>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onSeeAll?.();
+                  }}
+                  className="mq-link inline-flex items-center gap-1.5 rounded-[6px] text-sm leading-5 font-extrabold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+                >
+                  {sx.seeAllResultsFor(debounced)}
+                  <ChevronRightIcon size={16} />
+                </button>
+              </div>
+            )}
+          </m.div>
+        )}
+      </AnimatePresence>
+    </LazyMotion>
   );
 }
 
@@ -298,6 +342,7 @@ function SuggestionRow({
   movie,
   term,
   active,
+  a11yLabel,
   onHover,
   onSelect,
 }: {
@@ -305,12 +350,14 @@ function SuggestionRow({
   movie: Movie;
   term: string;
   active: boolean;
+  a11yLabel: string;
   onHover: () => void;
   onSelect: () => void;
 }) {
   const meta: string[] = [];
   if (movie.releaseYear > 0) meta.push(String(movie.releaseYear));
   if (movie.genre) meta.push(movie.genre);
+  const premium = movie.accessType === "SUBSCRIPTION";
 
   return (
     <Link
@@ -318,81 +365,72 @@ function SuggestionRow({
       href={`/movie/${movie.id}`}
       role="option"
       aria-selected={active}
+      aria-label={a11yLabel}
       tabIndex={-1}
       onPointerMove={onHover}
       onClick={onSelect}
       className={cn(
-        "group/row flex items-center gap-3 rounded-xl px-2 py-1.5 outline-none transition-colors duration-100 ease-out",
-        active ? "bg-white/10" : "hover:bg-white/6 active:bg-white/10",
+        "flex min-h-[72px] items-center gap-3 rounded-[10px] py-1.5 pr-2.5 pl-1.5 text-fg outline-none transition-colors duration-150",
+        active ? "bg-tonal-ghost" : "hover:bg-tonal-ghost",
       )}
     >
-      <div className="relative aspect-2/3 w-11 shrink-0 overflow-hidden rounded-md bg-secondary/60 ring-1 ring-white/8 ring-inset">
-        {movie.posterUrl ? (
-          <Image src={movie.posterUrl} alt="" fill sizes="44px" className="object-cover" />
-        ) : (
-          <Film className="absolute top-1/2 left-1/2 size-4 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/60" />
-        )}
-      </div>
+      <span aria-hidden className="relative h-[60px] w-10 shrink-0 overflow-hidden rounded-[6px] bg-raised">
+        <Artwork src={movie.posterUrl} seed={movie.title} variant="poster" sizes="40px" zoomOnHover={false} />
+      </span>
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">
+      <span aria-hidden className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] leading-5 font-medium text-fg-muted">
           <Highlight text={movie.title} term={term} />
-        </p>
-        <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-          {meta.map((part, i) => (
-            <span key={part} className="contents">
-              {i > 0 && <span className="opacity-50">·</span>}
-              <span className={i === 0 && movie.releaseYear > 0 ? "nums" : undefined}>{part}</span>
-            </span>
-          ))}
+        </span>
+        <span className="flex items-center gap-[5px] truncate text-[13px] leading-[18px] text-fg-faint nums">
           {movie.rating > 0 && (
             <>
-              {meta.length > 0 && <span className="opacity-50">·</span>}
-              <span className="inline-flex items-center gap-0.5 nums">
-                <Star className="size-3 fill-current text-premium" aria-hidden="true" />
-                {movie.rating.toFixed(1)}
-              </span>
+              <StarIcon size={12} className="shrink-0 text-gold" />
+              <span className="font-bold text-fg">{movie.rating.toFixed(1)}</span>
+              {meta.length > 0 && <span> · </span>}
             </>
           )}
-        </p>
-      </div>
+          {meta.join(" · ")}
+        </span>
+      </span>
 
-      <ChevronRight
-        aria-hidden="true"
-        className={cn(
-          "size-4 shrink-0 text-muted-foreground transition-[opacity,transform] duration-150 ease-out",
-          active ? "translate-x-0 opacity-100" : "-translate-x-1 opacity-0 group-hover/row:translate-x-0 group-hover/row:opacity-100",
-        )}
-      />
+      {premium && (
+        <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-[6px] bg-gold/16 text-gold">
+          <CrownIcon size={14} />
+        </span>
+      )}
     </Link>
   );
 }
 
-/** The matched substring, marked — plain text when the term isn't in the title at all. */
+/** The matched letters in bold white; the rest of the title stays muted. */
 function Highlight({ text, term }: { text: string; term: string }) {
   const at = term ? text.toLowerCase().indexOf(term.toLowerCase()) : -1;
   if (at < 0) return <>{text}</>;
   return (
     <>
       {text.slice(0, at)}
-      <mark className="rounded-sm bg-primary/25 text-inherit">{text.slice(at, at + term.length)}</mark>
+      <strong className="font-extrabold text-fg">{text.slice(at, at + term.length)}</strong>
       {text.slice(at + term.length)}
     </>
   );
 }
 
-function SkeletonRows() {
+function SkeletonRows({ label }: { label: string }) {
   return (
-    <div role="status" aria-busy="true" className="flex flex-col">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 px-2 py-1.5">
-          <div className="aspect-2/3 w-11 shrink-0 animate-pulse rounded-md bg-white/8" />
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="h-3.5 w-3/5 animate-pulse rounded bg-white/8" />
-            <div className="h-3 w-2/5 animate-pulse rounded bg-white/6" />
-          </div>
+    <div aria-busy="true" className="grid grid-cols-2 gap-x-2 max-desk:grid-cols-1">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="flex min-h-[72px] items-center gap-3 py-1.5 pr-2.5 pl-1.5">
+          <span className="mq-skeleton h-[60px] w-10 shrink-0 rounded-[6px]" />
+          <span className="flex min-w-0 flex-1 flex-col gap-2">
+            <span className="mq-skeleton block h-3.5 w-3/5 rounded-[5px]" />
+            <span className="mq-skeleton block h-3 w-2/5 rounded-[5px]" />
+          </span>
         </div>
       ))}
+      <p role="status" className="sr-only">
+        {label}
+      </p>
     </div>
   );
 }

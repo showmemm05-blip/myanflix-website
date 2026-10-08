@@ -1,45 +1,55 @@
-import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 
-import { AuroraBackdrop } from "@/components/system/AuroraBackdrop";
-import { Surface } from "@/components/system/Surface";
 import { cn } from "@/lib/utils";
 
 /**
- * "There is nothing here" is a screen state, not an error — so it gets the
- * warm treatment: a contained aurora blush behind an icon disc, the message,
- * and whatever single action gets the user out of the dead end.
+ * MARQUEE EMPTY STATE (SHELL.md §16): a 64px disc (8% white) with a 28px
+ * muted icon, a 22/28 · 800 title, a 15/23 muted line (max 360px) and at
+ * most one way out — usually a white button (`<Button variant="play" size="cta">`).
+ *
+ * `framed` puts it on a surface panel (radius 16) for use inside a page
+ * section; by default it sits straight on the ground.
  */
 export function EmptyState({
   icon: Icon,
   title,
   description,
   action,
+  framed = false,
+  tone = "neutral",
+  headingLevel = "h3",
   className,
 }: {
-  icon: LucideIcon;
+  icon: ComponentType<{ className?: string; size?: number }>;
   title: string;
-  description?: string;
+  description?: ReactNode;
   action?: ReactNode;
+  framed?: boolean;
+  /** "danger" = the error look (red disc and icon). */
+  tone?: "neutral" | "danger";
+  headingLevel?: "h2" | "h3";
   className?: string;
 }) {
+  const Heading = headingLevel;
   return (
-    <Surface
-      tone="subtle"
+    <div
       className={cn(
-        "isolate flex flex-col items-center justify-center gap-4 overflow-hidden px-6 py-16 text-center",
+        "flex flex-col items-center px-4 py-14 text-center",
+        framed && "rounded-[16px] bg-surface px-7 py-10",
         className,
       )}
     >
-      <AuroraBackdrop variant="panel" className="opacity-60" />
-      <div className="flex size-14 items-center justify-center rounded-full bg-white/6 text-muted-foreground ring-1 ring-white/10 backdrop-blur-md ring-inset">
-        <Icon className="size-6" />
-      </div>
-      <div>
-        <p className="font-heading text-base font-semibold tracking-tight">{title}</p>
-        {description && <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">{description}</p>}
-      </div>
-      {action}
-    </Surface>
+      <span
+        className={cn(
+          "flex size-16 shrink-0 items-center justify-center rounded-full",
+          tone === "danger" ? "bg-danger/14 text-danger" : "bg-tonal-faint text-fg-muted",
+        )}
+      >
+        <Icon size={28} className="size-7" />
+      </span>
+      <Heading className="mt-[18px] text-section-title text-fg">{title}</Heading>
+      {description && <p className="mt-1.5 max-w-[360px] text-[15px] leading-[23px] text-fg-muted">{description}</p>}
+      {action && <div className="mt-5 flex flex-wrap items-center justify-center gap-3">{action}</div>}
+    </div>
   );
 }

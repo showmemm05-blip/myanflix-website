@@ -1,21 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Clapperboard, ListVideo, Play } from "lucide-react";
 import { EmptyState } from "@/components/empty/EmptyState";
 import { SignInEmptyState } from "@/components/empty/SignInEmptyState";
-import { chipClass } from "@/components/system/Chip";
+import { Artwork, CheckIcon, CloseIcon, FilterChip } from "@/components/system";
 import { seriesService } from "@/services/api/seriesService";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import { playText } from "@/lib/i18n/sections/play";
+import { shellText } from "@/lib/i18n/sections/shell";
 import { formatDuration, UNKNOWN_DURATION } from "@/lib/format";
-import { FALLBACK_COVER_URL } from "@/lib/placeholder";
 import { resumeHref } from "@/lib/player/resume";
 import { cn } from "@/lib/utils";
 import type { PlayerEpisode } from "@/types/series";
+import { CloudOffGlyph, EmptyBoxIcon, EpisodesIcon } from "./player-icons";
+import styles from "./player.module.css";
 
 const COMPLETED_THRESHOLD = 95;
 const SKELETON_COUNT = 5;
@@ -23,11 +25,11 @@ const SKELETON_COUNT = 5;
 /** Reads as "sound is coming out of this one" faster than any icon or label does. */
 function NowPlayingBars() {
   return (
-    <span aria-hidden className="flex h-3.5 items-end gap-[2px]">
+    <span aria-hidden className="flex h-[18px] items-end gap-[3px]">
       {[0, 150, 300].map((delay) => (
         <span
           key={delay}
-          className="animate-eq-bar w-[3px] rounded-full bg-primary"
+          className="animate-eq-bar w-1 rounded-[2px] bg-crimson"
           style={{ height: "100%", animationDelay: `${delay}ms` }}
         />
       ))}
@@ -45,9 +47,11 @@ function EpisodeRow({
   rowRef?: React.Ref<HTMLAnchorElement>;
 }) {
   const { t } = useLanguage();
+  const p = useSection(playText);
   const progressPercent = episode.watchProgress?.progressPercent ?? 0;
   const isCompleted = progressPercent >= COMPLETED_THRESHOLD;
   const isInProgress = progressPercent > 0 && !isCompleted;
+  const runtime = formatDuration(episode.duration) ?? UNKNOWN_DURATION;
 
   return (
     <Link
@@ -62,77 +66,85 @@ function EpisodeRow({
       }
       aria-current={isCurrent ? "true" : undefined}
       className={cn(
-        "group flex gap-3 rounded-2xl p-2 outline-none transition-colors duration-150 ease-out",
-        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-        isCurrent ? "bg-primary/12 ring-1 ring-primary/40 ring-inset" : "hover:bg-white/[0.06]",
+        "group/card flex items-center gap-3 rounded-[12px] p-2 text-fg outline-none transition-colors duration-150 ease-out",
+        "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-link",
+        isCurrent ? "bg-crimson/12" : "hover:bg-tonal-ghost",
       )}
     >
-      <div className="relative aspect-video w-28 shrink-0 overflow-hidden rounded-xl bg-muted ring-1 ring-white/8 ring-inset">
-        <Image
-          src={episode.thumbnailUrl ?? episode.posterUrl ?? FALLBACK_COVER_URL}
-          alt=""
-          fill
-          sizes="112px"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+      <span
+        className={cn(
+          "relative aspect-video w-32 shrink-0 overflow-hidden rounded-card bg-raised",
+          isCurrent && "shadow-[inset_0_0_0_2px_var(--mq-crimson)]",
+        )}
+      >
+        <Artwork
+          src={episode.thumbnailUrl ?? episode.posterUrl}
+          seed={episode.title}
+          variant="landscape"
+          sizes="128px"
         />
 
-        {isCurrent ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/55">
+        {isCurrent && (
+          <span className="absolute inset-0 flex items-center justify-center bg-[rgba(8,8,11,0.55)] shadow-[inset_0_0_0_2px_var(--mq-crimson)]">
             <NowPlayingBars />
-          </div>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-[background-color,opacity] duration-200 ease-out group-hover:bg-black/45 group-hover:opacity-100">
-            <span className="flex size-8 items-center justify-center rounded-full bg-white text-black shadow-e2">
-              <Play className="size-3.5 translate-x-px fill-current" />
-            </span>
-          </div>
+          </span>
         )}
 
         {isCompleted && !isCurrent && (
-          <span className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/70 text-primary ring-1 ring-white/12 backdrop-blur-md ring-inset">
-            <CheckCircle2 className="size-3.5" />
+          <span
+            aria-hidden
+            className="absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-money text-ink"
+          >
+            <CheckIcon size={12} strokeWidth={3} />
           </span>
         )}
 
         {isInProgress && (
-          <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/60">
-            <div className="h-full bg-primary" style={{ width: `${progressPercent}%` }} />
-          </div>
+          <span aria-hidden className="absolute inset-x-0 bottom-0 h-[3px] bg-[rgba(8,8,11,0.6)]">
+            <span className="block h-full bg-crimson" style={{ width: `${progressPercent}%` }} />
+          </span>
         )}
-      </div>
+      </span>
 
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 pr-1">
-        <p
+      <span className="min-w-0 flex-1">
+        <span
           className={cn(
-            "truncate text-sm font-semibold",
-            isCurrent ? "text-primary" : "text-foreground",
+            "block truncate text-[15px] leading-5 font-bold",
+            isCurrent ? "text-link" : "text-fg",
           )}
         >
           {episode.episodeNumber != null && (
-            <span className="text-muted-foreground nums">{episode.episodeNumber}. </span>
+            <span className="text-fg-faint tabular-nums">{episode.episodeNumber}. </span>
           )}
           {episode.title}
-        </p>
-        <p className={cn("text-xs text-muted-foreground", !isCurrent && !isInProgress && "nums")}>
+        </span>
+        <span
+          className={cn(
+            "mt-0.5 block text-[13px] leading-[18px] font-semibold tabular-nums",
+            isCurrent ? "text-link" : "text-fg-faint",
+          )}
+        >
           {isCurrent
             ? t.player.episodes.nowPlaying
             : isInProgress
-              ? t.player.episodes.continueWatching
-              : (formatDuration(episode.duration) ?? UNKNOWN_DURATION)}
-        </p>
-      </div>
+              ? p.continuePercent(Math.round(progressPercent))
+              : isCompleted
+                ? `${runtime} · ${p.watched}`
+                : runtime}
+        </span>
+      </span>
     </Link>
   );
 }
 
 function EpisodeRowSkeleton() {
   return (
-    <div className="flex gap-3 p-2">
-      <div className="aspect-video w-28 shrink-0 animate-pulse rounded-xl bg-muted" />
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
-        <div className="h-3.5 w-4/5 animate-pulse rounded bg-muted" />
-        <div className="h-3 w-14 animate-pulse rounded bg-muted" />
-      </div>
+    <div aria-hidden className="flex items-center gap-3 p-2">
+      <span className="mq-skeleton aspect-video w-32 shrink-0 rounded-card" />
+      <span className="flex-1">
+        <span className="mq-skeleton block h-3.5 w-4/5 rounded-[5px]" />
+        <span className="mq-skeleton mt-2 block h-3 w-2/5 rounded-[5px]" />
+      </span>
     </div>
   );
 }
@@ -140,22 +152,34 @@ function EpisodeRowSkeleton() {
 interface EpisodeRailProps {
   seriesId: string;
   currentEpisodeId: string;
-  /** `sidebar` caps its own height and scrolls internally; `inline` flows with the page. */
-  variant?: "sidebar" | "inline";
+  /**
+   * `framed` — the solid panel beside the framed video; `floating` — the
+   * frosted panel over the full-window (theater) stage. Both fill their cell
+   * and scroll the list inside.
+   */
+  variant?: "framed" | "floating";
+  /** Shows the round close button in the header. */
+  onClose?: () => void;
   className?: string;
 }
 
 /**
- * The series queue, parked beside the picture instead of buried under the fold —
- * so choosing the next episode never costs a scroll away from what's playing.
+ * The series queue, parked beside (or over) the picture instead of buried
+ * under the fold — so choosing the next episode never costs a scroll away
+ * from what's playing.
  *
  * Shares its query key with the player page's own episode lookup, so mounting
  * this adds no extra network round trip.
+ *
+ * Memoised: the player page re-renders with its clock several times a second
+ * during playback, and none of that touches the episode list — its props
+ * (ids, variant, a stable close callback) only change on a real change.
  */
-export function EpisodeRail({
+export const EpisodeRail = memo(function EpisodeRail({
   seriesId,
   currentEpisodeId,
-  variant = "sidebar",
+  variant = "framed",
+  onClose,
   className,
 }: EpisodeRailProps) {
   const { t } = useLanguage();
@@ -193,48 +217,68 @@ export function EpisodeRail({
 
   const episodeCount = activeSeason?.episodes.length ?? 0;
 
+  const p = useSection(playText);
+  const shell = useSection(shellText);
+
   return (
     <section
+      id="episode-rail"
+      aria-labelledby="episode-rail-title"
       className={cn(
-        "flex flex-col overflow-hidden rounded-3xl bg-card/60 ring-1 ring-white/8 backdrop-blur-xl ring-inset",
-        variant === "sidebar" && "lg:max-h-[calc(100vh-7rem)]",
+        "absolute inset-0 flex flex-col overflow-hidden rounded-dialog text-fg",
+        variant === "floating"
+          ? "bg-[rgba(18,18,23,0.86)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)] backdrop-blur-[24px] backdrop-saturate-[1.4]"
+          : "bg-surface",
+        styles.rise,
         className,
       )}
     >
-      <header className="flex items-center gap-2.5 border-b border-white/[0.06] px-4 py-3.5">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25 ring-inset">
-          <ListVideo className="size-3.5" />
-        </span>
-        <h2 className="font-heading text-sm font-semibold tracking-tight">{t.player.episodes.title}</h2>
+      <div className="flex items-center gap-2.5 pt-4 pr-3 pb-3 pl-5">
+        <h2 id="episode-rail-title" className="text-xl leading-[26px] font-extrabold tracking-[-0.01em] text-fg">
+          {t.player.episodes.title}
+        </h2>
         {episodeCount > 0 && (
-          <span className="ml-auto text-xs text-muted-foreground nums">
+          <span className="text-[13px] leading-[18px] text-fg-faint tabular-nums">
             {t.player.episodes.count(episodeCount)}
           </span>
         )}
-      </header>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={p.closeEpisodes}
+            className="ml-auto flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-tonal-faint text-fg outline-none transition-[background-color,transform] duration-150 hover:bg-white/14 active:scale-[0.92] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+          >
+            <CloseIcon size={18} />
+          </button>
+        )}
+      </div>
 
       {seasons.length > 1 && (
-        <div className="scrollbar-none flex shrink-0 gap-1.5 overflow-x-auto border-b border-white/[0.06] px-3 py-2.5">
+        <div role="group" aria-label={p.seasons} className="mq-rail flex shrink-0 gap-2 overflow-x-auto px-5 pb-3.5">
           {seasons.map((season) => {
             const isActive = season.seasonNumber === activeSeasonNumber;
             return (
-              <button
+              <FilterChip
                 key={season.seasonNumber}
-                type="button"
+                selected={isActive}
                 onClick={() => setSelectedSeason(season.seasonNumber)}
-                aria-pressed={isActive}
-                className={chipClass({ tone: "mono", size: "md", selected: isActive })}
               >
                 {t.player.episodes.season(season.seasonNumber)}
-              </button>
+              </FilterChip>
             );
           })}
         </div>
       )}
 
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-2">
+      <div aria-hidden className="h-px shrink-0 bg-hairline" />
+
+      <div className={cn("min-h-0 flex-1 overflow-y-auto p-2", styles.vscroll)}>
         {(isLoading || isAuthLoading) && (
-          <div className="flex flex-col">
+          <div aria-busy="true">
+            <p role="status" className="sr-only">
+              {shell.loading}
+            </p>
             {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
               <EpisodeRowSkeleton key={index} />
             ))}
@@ -243,17 +287,17 @@ export function EpisodeRail({
 
         {isGuest && (
           <SignInEmptyState
-            icon={ListVideo}
+            icon={EpisodesIcon}
             title={t.player.state.signInTitle}
             description={t.player.state.signInBody}
             returnTo={`/player/${currentEpisodeId}`}
           />
         )}
 
-        {isError && <EmptyState icon={AlertTriangle} title={t.player.episodes.loadError} />}
+        {isError && <EmptyState icon={CloudOffGlyph} tone="danger" title={t.player.episodes.loadError} />}
 
         {isAuthenticated && !isLoading && !isError && episodeCount === 0 && (
-          <EmptyState icon={Clapperboard} title={t.player.episodes.emptyState} />
+          <EmptyState icon={EmptyBoxIcon} title={t.player.episodes.emptyState} />
         )}
 
         {!isLoading &&
@@ -272,4 +316,4 @@ export function EpisodeRail({
       </div>
     </section>
   );
-}
+});

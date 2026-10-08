@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { translations, type Language, type TranslationShape } from "@/lib/i18n/translations";
 
 const STORAGE_KEY = "myanflix-language";
@@ -15,27 +15,59 @@ interface LanguageContextValue {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  // Starts at the real default on both server and client, then syncs to
-  // whatever was previously chosen once mounted — avoids a hydration
-  // mismatch from reading localStorage during the initial render.
-  const [language, setLanguageState] = useState<Language>(DEFAULT_LANGUAGE);
+// ─ The chosen language as a tiny external store for useSyncExternalStore.
+// Read from storage once (on the client's first read), then changed only by
+// setLanguage — which tells the subscribers.
+const listeners = new Set<() => void>();
+let clientLanguage: Language | null = null;
 
-  useEffect(() => {
+function readStoredLanguage(): Language {
+  try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "en" || stored === "mm") setLanguageState(stored);
-  }, []);
+    if (stored === "en" || stored === "mm") return stored;
+  } catch {
+    // Storage blocked — the default stands.
+  }
+  return DEFAULT_LANGUAGE;
+}
+
+function subscribeLanguage(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function getLanguageSnapshot(): Language {
+  if (clientLanguage === null) clientLanguage = readStoredLanguage();
+  return clientLanguage;
+}
+
+function getServerLanguageSnapshot(): Language {
+  return DEFAULT_LANGUAGE;
+}
+
+export function LanguageProvider({ children }: { children: ReactNode }) {
+  // The server renders the real default, and so does the hydrating client
+  // (getServerLanguageSnapshot), so there is no hydration mismatch; React
+  // then switches to the stored choice. No lazy useState initialiser reading
+  // localStorage (that WOULD mismatch) and no mount effect re-rendering the
+  // whole tree.
+  const language = useSyncExternalStore(subscribeLanguage, getLanguageSnapshot, getServerLanguageSnapshot);
 
   const setLanguage = useCallback((next: Language) => {
-    setLanguageState(next);
-    localStorage.setItem(STORAGE_KEY, next);
+    clientLanguage = next;
+    try {
+      localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      // Storage blocked — the choice still holds for this visit.
+    }
+    for (const listener of listeners) listener();
   }, []);
 
-  return (
-    <LanguageContext.Provider value={{ language, setLanguage, t: translations[language] }}>
-      {children}
-    </LanguageContext.Provider>
-  );
+  const value = useMemo(() => ({ language, setLanguage, t: translations[language] }), [language, setLanguage]);
+
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 
 export function useLanguage(): LanguageContextValue {

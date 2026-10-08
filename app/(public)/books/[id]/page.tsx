@@ -1,110 +1,95 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useId, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  ArrowLeft,
-  ArrowUpDown,
-  BookOpen,
-  CalendarDays,
-  FileText,
-  Layers,
-  User,
-  type LucideIcon,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowUpDown, BookOpen, Languages, ListOrdered, LogIn } from "lucide-react";
+
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/empty/EmptyState";
-import { Chip, Kicker } from "@/components/system";
-import { LanguagePanel } from "@/components/books/LanguagePanel";
+import { BookCard } from "@/components/cards";
 import { CommentsSection } from "@/components/comments/CommentsSection";
+import { ShareDialog } from "@/components/modals/ShareDialog";
+import { Artwork, CheckIcon, ChevronRightIcon, PlayIcon, Row, ShareIcon } from "@/components/system";
+import { hasMyanmar } from "@/components/books/reader-settings";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import { titlesText } from "@/lib/i18n/sections/titles";
 import {
   useBook,
   useBookChapters,
   useBookContents,
+  useBooks,
   useReadingProgress,
 } from "@/hooks/use-books";
 import {
   languageLabel,
+  languageSubLabel,
   loadPreferredLanguage,
   pickEdition,
   savePreferredLanguage,
 } from "@/lib/books/languages";
+import { loginHref } from "@/lib/auth/return-to";
 import { cn } from "@/lib/utils";
-import { hasMyanmar } from "@/components/books/reader-settings";
-import type {
-  BookChapterSummary,
-  BookEdition,
-  BookSectionSummary,
-} from "@/types/book";
+import type { BookChapterSummary, BookEdition, BookSectionSummary } from "@/types/book";
+import { DetailHero, HeroProgress, HeroSynopsisToggle } from "../../movie/_detail/DetailHero";
+import {
+  DetailColumns,
+  DetailsPanel,
+  TitleNotFound,
+  TitleSkeleton,
+  type DetailFact,
+} from "../../movie/_detail/DetailPanels";
 
-const FALLBACK_COVER = "https://picsum.photos/seed/myanflix-book/480/672";
-
-function DetailRow({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-2.5">
-      <span className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Icon className="size-4" />
-        {label}
-      </span>
-      <span className="text-right text-sm font-medium nums">{value}</span>
-    </div>
-  );
-}
+const BOOKS_HREF = "/media/books";
+/** The Books hub narrowed to one category (BooksView reads `?category=` on load). */
+const booksInCategoryHref = (categoryId: string) =>
+  `${BOOKS_HREF}?category=${encodeURIComponent(categoryId)}`;
 
 /**
- * THE BOOK DETAIL PAGE.
+ * THE BOOK DETAIL PAGE (BookDetail board).
  *
- * A title band over its own cover art, then the contents on the left and the
- * facts about the edition on the right — the shape a serialised-fiction site
- * uses, because it answers the two questions a reader actually arrives with:
- * "what language can I read this in" and "where do I start".
+ * The cover over a backdrop in the book's own colours, then the contents on
+ * the left and the facts about the edition on the right — the shape a
+ * serialised-fiction site uses, because it answers the two questions a
+ * reader actually arrives with: "what language can I read this in" and
+ * "where do I start".
  *
  * Language is the organising axis, not a setting: chapters, pages and the
  * bookmark all belong to one edition, so choosing a language re-points the
  * whole page rather than filtering it.
+ *
+ * Every /books read needs an account, so a signed-out visitor gets the
+ * sign-in screen instead of a page that could only fail.
  */
-export default function BookDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function BookDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { t } = useLanguage();
-  const { user } = useAuth();
+  const s = useSection(titlesText);
+  const titleId = useId();
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const isAuthed = Boolean(user);
 
   const { data: book, isLoading } = useBook(id);
 
-  const [editionId, setEditionId] = useState<string | null>(null);
+  const [chosenEditionId, setChosenEditionId] = useState<string | null>(null);
   const [ascending, setAscending] = useState(true);
+  const [shareOpen, setShareOpen] = useState(false);
 
-  // Resolve the language once the book arrives: the reader's standing
-  // preference if this title has it, otherwise whatever it does have.
-  useEffect(() => {
-    if (!book || editionId) return;
-    const chosen = pickEdition(book.editions, loadPreferredLanguage());
-    if (chosen) setEditionId(chosen.id);
-  }, [book, editionId]);
-
-  const edition = useMemo(
-    () => book?.editions.find((e) => e.id === editionId) ?? null,
-    [book, editionId],
-  );
+  // The language being read: the one picked on this page, else the reader's
+  // standing preference if this title has it, otherwise whatever it does have.
+  const edition = useMemo(() => {
+    if (!book) return null;
+    return (
+      book.editions.find((e) => e.id === chosenEditionId) ??
+      pickEdition(book.editions, loadPreferredLanguage())
+    );
+  }, [book, chosenEditionId]);
+  const editionId = edition?.id ?? null;
 
   const selectLanguage = (next: BookEdition) => {
-    setEditionId(next.id);
+    setChosenEditionId(next.id);
     savePreferredLanguage(next.language);
   };
 
@@ -112,14 +97,21 @@ export default function BookDetailPage({
   // The chapter is the unit of content for BOTH types now: a written chapter
   // holds its text, a scanned one holds its own release of pages. So there is
   // one list, and the pages themselves belong to the reader.
-  const { data: chapters, isLoading: loadingChapters } = useBookChapters(
-    id,
-    editionId,
-  );
+  const { data: chapters, isLoading: loadingChapters } = useBookChapters(id, editionId);
   const { data: progress } = useReadingProgress(id, editionId, isAuthed);
   // The numbered tree — parts, chapters, sections. The flat list above is
   // the fallback while it loads (or fails), so the page never goes blank.
   const { data: contents } = useBookContents(id, editionId);
+
+  // "More in {category}": the library filtered to this book's first category.
+  const categoryId = book?.categories[0]?.id;
+  // The shared loader keeps the previous result on screen while a new one
+  // loads; here that would be the LAST book's category under THIS book's
+  // heading, so a placeholder result is never shown (isPlaceholderData).
+  const { data: sameCategory, isPlaceholderData: sameCategoryIsStale } = useBooks(
+    { categoryId, limit: 13 },
+    { enabled: Boolean(categoryId) && isAuthenticated },
+  );
 
   const orderedChapters = useMemo(() => {
     const list = chapters ?? [];
@@ -138,8 +130,7 @@ export default function BookDetailPage({
       part: { id: string; title: string; number: number } | null;
       chapters: BookChapterSummary[];
     }[] = [];
-    if (contents.chapters.length > 0)
-      list.push({ part: null, chapters: contents.chapters });
+    if (contents.chapters.length > 0) list.push({ part: null, chapters: contents.chapters });
     for (const part of contents.parts)
       if (part.chapters.length > 0) list.push({ part, chapters: part.chapters });
     if (ascending) return list;
@@ -155,271 +146,412 @@ export default function BookDetailPage({
     [chapters],
   );
 
-  if (isLoading) return <DetailSkeleton />;
+  if (isAuthLoading) return <TitleSkeleton kind="book" label={s.loadingBook} />;
 
-  if (!book || !edition) {
+  if (!isAuthenticated) {
     return (
-      <div className="mx-auto max-w-[1600px] px-4 py-24 sm:px-6 lg:px-8">
-        <EmptyState
-          icon={BookOpen}
-          title={t.book.notFoundTitle}
-          description={t.book.notFoundBody}
-          action={
-            <Button render={<Link href="/media/books" />} nativeButton={false}>
-              {t.book.backToLibrary}
-            </Button>
-          }
-        />
-      </div>
+      <section className="flex flex-col items-center px-gutter pt-[clamp(80px,10vw,140px)] pb-10 text-center">
+        <span aria-hidden className="flex size-16 items-center justify-center rounded-full bg-tonal-faint text-fg-muted">
+          <BookOpen className="size-7" strokeWidth={1.75} />
+        </span>
+        <h1 className="mt-[18px] text-section-title text-fg">{s.signInToReadTitle}</h1>
+        <p className="mt-1.5 max-w-[380px] text-[15px] leading-[23px] text-fg-muted">{s.signInToReadBody}</p>
+        <Link href={loginHref(`/books/${id}`)} className={cn(buttonVariants({ variant: "play", size: "cta" }), "mt-5")}>
+          <LogIn aria-hidden strokeWidth={1.75} />
+          {t.nav.signIn}
+        </Link>
+        <Link href="/register" className="mq-link mt-3.5 rounded-[6px] text-[15px] leading-5 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link">
+          {s.createAccount}
+        </Link>
+      </section>
     );
   }
 
-  const cover = book.coverUrl ?? FALLBACK_COVER;
+  if (isLoading) return <TitleSkeleton kind="book" label={s.loadingBook} />;
+
+  if (!book || !edition) {
+    return (
+      <TitleNotFound
+        icon={<BookOpen className="size-7" strokeWidth={1.75} />}
+        title={t.book.notFoundTitle}
+        body={t.book.notFoundBody}
+        backHref={BOOKS_HREF}
+        backLabel={t.book.backToLibrary}
+      />
+    );
+  }
+
   // Where "Read" goes: back to the bookmark when there is one, and always
   // into the language currently selected.
   const readHref = `/read/${book.id}?edition=${edition.id}${
     progress?.chapterId ? `&chapter=${progress.chapterId}` : ""
   }`;
   const hasProgress = Boolean(progress && progress.progress > 0);
+  const readLabel = hasProgress ? t.book.continueReading : t.book.startReading;
+  const formatLabel = isWritten ? t.book.formatEditor : t.book.formatPdf;
+  const chapterNumberOf = (chapter: BookChapterSummary) => Number(chapter.number) || chapter.order;
+  const bookmarkChapter = progress?.chapterId ? (chapters ?? []).find((c) => c.id === progress.chapterId) : undefined;
+  const readyCount = (chapters ?? []).filter((c) => c.status === "READY").length;
+  const totalCount = chapters?.length ?? 0;
+  const publishedDate = edition.publishedAt ? new Date(edition.publishedAt).toLocaleDateString() : null;
+
+  const facts: DetailFact[] = [
+    { label: t.book.author, value: book.author },
+    { label: t.book.format, value: formatLabel },
+    ...(book.categories.length > 0
+      ? [{ label: t.book.categories, value: book.categories.map((c) => c.name).join(", ") }]
+      : []),
+    { label: t.book.chapters, value: String(edition.chapterCount) },
+    ...(sectionCount > 0 ? [{ label: t.book.sections, value: String(sectionCount) }] : []),
+    ...(publishedDate ? [{ label: t.book.published, value: publishedDate }] : []),
+  ];
+
+  const moreBooks = sameCategoryIsStale
+    ? []
+    : (sameCategory?.items ?? []).filter((b) => b.id !== book.id).slice(0, 12);
+  const firstCategory = book.categories[0];
+
+  const chapterHref = (chapter: BookChapterSummary) =>
+    `/read/${book.id}?edition=${edition.id}&chapter=${chapter.id}`;
+
+  const renderChapter = (chapter: BookChapterSummary, withSections: boolean) => (
+    <li key={chapter.id}>
+      <ChapterRow
+        chapter={chapter}
+        number={chapterNumberOf(chapter)}
+        href={chapterHref(chapter)}
+        current={progress?.chapterId === chapter.id}
+      />
+      {withSections && chapter.status === "READY" && (chapter.sections ?? []).length > 0 && (
+        <SectionList
+          chapterNumber={chapterNumberOf(chapter)}
+          sections={ascending ? chapter.sections : chapter.sections.slice().reverse()}
+          isWritten={isWritten}
+          hrefFor={(section) =>
+            `${chapterHref(chapter)}&${isWritten ? `section=${section.id}` : `page=${section.startPage ?? 1}`}`
+          }
+        />
+      )}
+    </li>
+  );
 
   return (
-    <div className="pb-16">
-      {/* ── Title band ─────────────────────────────────────────────────────
-          The cover doubles as its own backdrop: blurred and darkened, it
-          gives the band the book's colours without pretending a portrait
-          cover is a landscape hero image. */}
-      <header className="relative isolate overflow-hidden">
-        <div aria-hidden className="absolute inset-0 -z-10">
-          <Image
-            src={cover}
-            alt=""
-            fill
+    <div className="flex flex-col">
+      <DetailHero
+        seed={book.title}
+        backHref={BOOKS_HREF}
+        backLabel={t.book.backToLibrary}
+        titleId={titleId}
+        className="min-h-0 pt-[calc(var(--shell-bar-h)+56px)]"
+        copyClassName="max-w-none"
+        backdrop={
+          // The cover doubles as its own backdrop: blurred and darkened, it
+          // gives the band the book's colours without pretending a portrait
+          // cover is a landscape hero image.
+          <Artwork
+            src={book.coverUrl}
+            seed={book.title}
+            variant="hero"
+            sizes="100vw"
             priority
-            unoptimized
-            className="scale-110 object-cover blur-2xl brightness-[0.35] saturate-150"
+            zoomOnHover={false}
+            className={book.coverUrl ? "scale-110 blur-2xl brightness-[0.5] saturate-150" : undefined}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/85 to-background/50" />
-        </div>
-
-        <div className="mx-auto max-w-[1600px] px-4 pt-6 pb-10 sm:px-6 lg:px-8">
-          <Link
-            href="/media/books"
-            className="focus-ring mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        }
+      >
+        <div className="mt-6 grid items-end gap-x-[clamp(24px,3.4vw,56px)] gap-y-7 desk:grid-cols-[auto_minmax(0,1fr)]">
+          <span
+            role="img"
+            aria-label={s.coverOf(book.title, book.author)}
+            className="relative block aspect-[5/7] w-[clamp(132px,38vw,168px)] overflow-hidden rounded-[4px_14px_14px_4px] bg-raised desk:w-[clamp(168px,16vw,232px)]"
           >
-            <ArrowLeft className="size-4" />
-            {t.book.backToLibrary}
-          </Link>
-
-          <div className="flex flex-col gap-6 sm:flex-row sm:gap-8">
-            <div className="relative aspect-[5/7] w-40 shrink-0 self-center overflow-hidden rounded-xl shadow-e3 ring-1 ring-white/12 ring-inset sm:w-48 sm:self-start lg:w-56">
-              <Image
-                src={cover}
-                alt={book.title}
-                fill
-                priority
-                unoptimized
-                sizes="224px"
-                className="object-cover"
-              />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <h1 className="text-display">{book.title}</h1>
-              <p className="mt-2 text-lg text-muted-foreground">
-                {book.author}
-              </p>
-
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <Chip tone="info">
-                  {isWritten ? t.book.formatEditor : t.book.formatPdf}
-                </Chip>
-                {book.categories.map((category) => (
-                  <Chip key={category.id}>{category.name}</Chip>
-                ))}
-              </div>
-
-              {book.description && (
-                <div className="mt-6 max-w-3xl">
-                  <Kicker className="mb-2">{t.book.summary}</Kicker>
-                  <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
-                    {book.description}
-                  </p>
-                </div>
-              )}
-
-              <div className="mt-7 flex flex-wrap items-center gap-3">
-                <Button
-                  size="lg"
-                  render={<Link href={readHref} />}
-                  nativeButton={false}
-                >
-                  <BookOpen className="size-4" />
-                  {hasProgress ? t.book.continueReading : t.book.startReading}
-                </Button>
-                {book.editions.length > 1 && (
-                  <span className="text-sm text-muted-foreground">
-                    {t.book.readingIn(languageLabel(edition.language))}
-                  </span>
-                )}
-              </div>
-
-              {hasProgress && (
-                <div className="mt-5 max-w-sm">
-                  <div
-                    role="progressbar"
-                    aria-valuenow={Math.round(progress!.progress)}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    className="h-1.5 overflow-hidden rounded-full bg-white/10"
-                  >
-                    <div
-                      className="h-full rounded-full bg-primary"
-                      style={{ width: `${Math.min(100, progress!.progress)}%` }}
-                    />
-                  </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground nums">
-                    {Math.round(progress!.progress)}%
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Contents + the facts ──────────────────────────────────────────── */}
-      <div className="mx-auto grid max-w-[1600px] gap-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:px-8">
-        <main className="min-w-0">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <h2 className="text-title">{t.book.chapterList}</h2>
-            {(chapters?.length ?? 0) > 1 && (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={t.book.sortOrder}
-                title={t.book.sortOrder}
-                onClick={() => setAscending((a) => !a)}
+            <Artwork src={book.coverUrl} seed={book.title} variant="book" sizes="232px" priority zoomOnHover={false}>
+              <span
+                aria-hidden
+                className="absolute top-[9%] right-[8%] left-[12%] line-clamp-3 text-[clamp(18px,1.8vw,26px)] leading-[1.08] font-black tracking-[-0.01em] text-white"
               >
-                <ArrowUpDown className="size-4" />
+                {book.title}
+              </span>
+              <span
+                aria-hidden
+                className="absolute top-[40%] right-[8%] left-[12%] line-clamp-1 text-[clamp(10px,0.9vw,13px)] leading-[1.2] font-bold tracking-[0.08em] text-white/80 uppercase"
+              >
+                {book.author}
+              </span>
+            </Artwork>
+          </span>
+
+          <div className="min-w-0 max-w-[720px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex h-[22px] items-center rounded-[4px] bg-info/16 px-[7px] text-[11px] font-extrabold tracking-[0.06em] text-info uppercase [&:lang(my)]:tracking-normal">
+                {formatLabel}
+              </span>
+              {book.categories.map((category) => (
+                <Link
+                  key={category.id}
+                  href={booksInCategoryHref(category.id)}
+                  className="h-[22px] rounded-[4px] bg-hairline-strong px-2 text-xs leading-[22px] font-bold text-fg outline-none transition-colors duration-150 hover:bg-tonal-hover motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+                >
+                  {category.name}
+                </Link>
+              ))}
+              <span className="text-sm leading-5 font-semibold text-fg-body">{s.book}</span>
+            </div>
+
+            <h1 id={titleId} className="mt-3.5 text-display text-balance text-fg">
+              {book.title}
+            </h1>
+            <p className="mt-2 text-lg leading-6 text-fg-body">{t.book.byAuthor(book.author)}</p>
+            <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] leading-[22px] text-fg-muted tabular-nums">
+              <span>{t.book.chapterCount(edition.chapterCount)}</span>
+              <span>{s.sectionCount(sectionCount)}</span>
+              {publishedDate && <span>{s.publishedOn(publishedDate)}</span>}
+            </p>
+
+            {book.description && <HeroSynopsisToggle>{book.description}</HeroSynopsisToggle>}
+
+            <div className="mt-[22px] flex flex-wrap items-center gap-3">
+              <Link
+                href={readHref}
+                aria-label={s.readA11y(readLabel, book.title)}
+                className={cn(buttonVariants({ variant: "play", size: "hero" }), "px-[26px]")}
+              >
+                {hasProgress ? <PlayIcon /> : <BookOpen aria-hidden strokeWidth={1.75} />}
+                {readLabel}
+              </Link>
+              <a href="#chapters" className={cn(buttonVariants({ variant: "tonal", size: "hero" }), "px-[22px] text-base font-bold")}>
+                <ListOrdered aria-hidden strokeWidth={1.75} />
+                {t.book.chapters}
+              </a>
+              <Button
+                variant="tonal"
+                size="icon-hero"
+                aria-haspopup="dialog"
+                aria-label={s.share(book.title)}
+                onClick={() => setShareOpen(true)}
+              >
+                <ShareIcon size={22} />
               </Button>
+              <span className="text-sm leading-5 text-fg-muted">{t.book.readingIn(languageLabel(edition.language))}</span>
+            </div>
+
+            {hasProgress && progress && (
+              <HeroProgress
+                percent={progress.progress}
+                label={s.readLabel}
+                caption={
+                  bookmarkChapter
+                    ? s.readProgress(
+                        Math.round(progress.progress),
+                        s.chapterNamed(chapterNumberOf(bookmarkChapter), bookmarkChapter.title),
+                      )
+                    : `${Math.round(progress.progress)}%`
+                }
+              />
             )}
           </div>
+        </div>
+      </DetailHero>
 
-          {loadingChapters ? (
-            <ul className="space-y-2">
-              {Array.from({ length: 5 }, (_, i) => (
-                <Skeleton key={i} className="h-[5.5rem] w-full rounded-xl" />
-              ))}
-            </ul>
-          ) : orderedChapters.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t.book.noChapters}</p>
-          ) : groups ? (
-            <div className="space-y-6">
-              {groups.map((group) => {
-                const label = group.part
-                  ? `${t.book.part(group.part.number)} · ${group.part.title}`
-                  : null;
-                return (
-                  <section key={group.part?.id ?? "unparted"}>
-                    {label && (
-                      <Kicker
-                        className="mb-2"
-                        // Tracking is the point of a kicker in Latin — and
-                        // what Myanmar script must never get.
-                        style={{ letterSpacing: hasMyanmar(label) ? 0 : undefined }}
-                      >
-                        {label}
-                      </Kicker>
-                    )}
-                    <ul className="space-y-2">
-                      {group.chapters.map((chapter) => (
-                        <li key={chapter.id}>
-                          <ChapterRow
-                            chapter={chapter}
-                            href={`/read/${book.id}?edition=${edition.id}&chapter=${chapter.id}`}
-                            current={progress?.chapterId === chapter.id}
-                          />
-                          {chapter.status === "READY" &&
-                            (chapter.sections ?? []).length > 0 && (
-                              <SectionList
-                                sections={chapter.sections}
-                                isWritten={isWritten}
-                                hrefFor={(s) =>
-                                  `/read/${book.id}?edition=${edition.id}&chapter=${chapter.id}&${
-                                    isWritten ? `section=${s.id}` : `page=${s.startPage ?? 1}`
-                                  }`
-                                }
-                              />
-                            )}
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                );
-              })}
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {orderedChapters.map((chapter) => (
-                <li key={chapter.id}>
-                  <ChapterRow
-                    chapter={chapter}
-                    href={`/read/${book.id}?edition=${edition.id}&chapter=${chapter.id}`}
-                    current={progress?.chapterId === chapter.id}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {/* The thread carries the page gutters itself (movie/series mount it
-              at page level); this column already sits inside them, so cancel
-              them here to keep the thread flush with the chapter list. */}
-          <div className="-mx-4 sm:-mx-6 lg:-mx-8">
-            <CommentsSection bookId={book.id} />
-          </div>
-        </main>
-
-        <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-          <LanguagePanel
-            editions={book.editions}
-            selectedId={edition.id}
-            onSelect={selectLanguage}
-          />
-
-          <section className="glass-card p-5">
-            <Kicker className="mb-1">{t.book.details}</Kicker>
-            <div className="divide-y divide-white/6">
-              <DetailRow icon={User} label={t.book.author} value={book.author} />
-              <DetailRow
-                icon={FileText}
-                label={t.book.format}
-                value={isWritten ? t.book.formatEditor : t.book.formatPdf}
-              />
-              <DetailRow
-                icon={Layers}
-                label={t.book.chapters}
-                value={String(edition.chapterCount)}
-              />
-              {sectionCount > 0 && (
-                <DetailRow
-                  icon={Layers}
-                  label={t.book.sections}
-                  value={String(sectionCount)}
-                />
+      <div className="mt-10 flex flex-col gap-[clamp(36px,3.4vw,52px)]">
+        <DetailColumns
+          asideLabel={s.aboutBook}
+          aside={
+            <>
+              <EditionsPanel editions={book.editions} selectedId={edition.id} onSelect={selectLanguage} />
+              <DetailsPanel facts={facts} />
+            </>
+          }
+        >
+          <section
+            id="chapters"
+            aria-labelledby={`${titleId}-chapters`}
+            className="min-w-0 scroll-mt-[calc(var(--shell-bar-h)+24px)]"
+          >
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <h2
+                  id={`${titleId}-chapters`}
+                  className="text-[clamp(24px,2.2vw,30px)] leading-[1.2] font-black tracking-[-0.02em] text-fg"
+                >
+                  {t.book.chapterList}
+                </h2>
+                {totalCount > 0 && (
+                  <p className="mt-1 text-sm leading-5 text-fg-faint tabular-nums">
+                    {readyCount === totalCount
+                      ? t.book.chapterCount(totalCount)
+                      : s.chaptersReady(readyCount, totalCount - readyCount)}
+                  </p>
+                )}
+              </div>
+              {totalCount > 1 && (
+                <Button
+                  variant="tonal"
+                  size="toolbar"
+                  aria-pressed={!ascending}
+                  aria-label={t.book.sortOrder}
+                  title={t.book.sortOrder}
+                  onClick={() => setAscending((a) => !a)}
+                  className="px-3.5"
+                >
+                  <ArrowUpDown aria-hidden strokeWidth={1.75} />
+                  <span className="max-desk:hidden">{ascending ? s.firstChapterFirst : s.lastChapterFirst}</span>
+                </Button>
               )}
-              {edition.publishedAt && (
-                <DetailRow
-                  icon={CalendarDays}
-                  label={t.book.published}
-                  value={new Date(edition.publishedAt).toLocaleDateString()}
-                />
+            </div>
+
+            <div className="mt-5">
+              {loadingChapters ? (
+                <ul aria-hidden className="m-0 flex list-none flex-col gap-1.5 p-0">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <li key={i}>
+                      <Skeleton className="h-[88px] w-full rounded-[16px]" />
+                    </li>
+                  ))}
+                </ul>
+              ) : orderedChapters.length === 0 ? (
+                <p className="rounded-[16px] bg-surface px-6 py-8 text-center text-[15px] text-fg-muted">{t.book.noChapters}</p>
+              ) : groups ? (
+                <div className="flex flex-col gap-7">
+                  {groups.map((group) => {
+                    const label = group.part ? `${t.book.part(group.part.number)} · ${group.part.title}` : null;
+                    const list = (
+                      <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
+                        {group.chapters.map((chapter) => renderChapter(chapter, true))}
+                      </ol>
+                    );
+                    if (!label) return <div key="unparted">{list}</div>;
+                    return (
+                      <section key={group.part!.id} aria-label={label}>
+                        <h3
+                          className="mb-2.5 ml-1 text-xs leading-4 font-extrabold tracking-[0.1em] text-fg-faint uppercase"
+                          // Tracking is the point of an overline in Latin —
+                          // and what Myanmar script must never get.
+                          style={{ letterSpacing: hasMyanmar(label) ? 0 : undefined }}
+                        >
+                          {label}
+                        </h3>
+                        {list}
+                      </section>
+                    );
+                  })}
+                </div>
+              ) : (
+                <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
+                  {orderedChapters.map((chapter) => renderChapter(chapter, false))}
+                </ol>
               )}
             </div>
           </section>
-        </aside>
+        </DetailColumns>
+
+        {moreBooks.length > 0 && (
+          <Row
+            title={firstCategory ? s.moreInCategory(firstCategory.name) : s.moreBooks}
+            seeAllHref={firstCategory ? booksInCategoryHref(firstCategory.id) : BOOKS_HREF}
+          >
+            {moreBooks.map((item) => {
+              const chaptersInFirst = item.editions[0]?.chapterCount ?? 0;
+              return (
+                <BookCard
+                  key={item.id}
+                  layout="rail"
+                  title={item.title}
+                  author={item.author}
+                  href={`/books/${item.id}`}
+                  coverUrl={item.coverUrl}
+                  meta={chaptersInFirst > 0 ? `${item.author} · ${t.book.chapterCount(chaptersInFirst)}` : item.author}
+                />
+              );
+            })}
+          </Row>
+        )}
+
+        <CommentsSection
+          bookId={book.id}
+          className="max-w-[calc(820px+2*clamp(16px,4vw,56px))] px-gutter"
+        />
       </div>
+
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title={book.title}
+        url={typeof window !== "undefined" ? window.location.href : ""}
+      />
     </div>
+  );
+}
+
+/**
+ * "AVAILABLE LANGUAGES" — the languages a book is actually published in, and
+ * the one being read. A panel rather than a dropdown: on a translated title
+ * the language is a headline fact about what you are getting. A
+ * single-language book states the fact instead of offering a choice that
+ * isn't one.
+ */
+function EditionsPanel({
+  editions,
+  selectedId,
+  onSelect,
+}: {
+  editions: BookEdition[];
+  selectedId: string;
+  onSelect: (edition: BookEdition) => void;
+}) {
+  const { t } = useLanguage();
+  const headingId = useId();
+  if (editions.length === 0) return null;
+
+  return (
+    <section aria-labelledby={headingId} className="rounded-[16px] bg-surface px-5 pt-5 pb-4">
+      <h2
+        id={headingId}
+        className="mb-3 ml-1 flex items-center gap-2 text-label font-extrabold tracking-[0.1em] text-fg-faint uppercase [&:lang(my)]:tracking-normal"
+      >
+        <Languages aria-hidden className="size-4" strokeWidth={1.75} />
+        {t.book.availableLanguages}
+      </h2>
+      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+        {editions.map((edition) => {
+          const selected = edition.id === selectedId;
+          const sub = languageSubLabel(edition.language);
+          const inner = (
+            <>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] leading-5 font-extrabold text-fg">
+                  {languageLabel(edition.language)}
+                </span>
+                {sub && <span className="block truncate text-[13px] leading-5 text-fg-muted">{sub}</span>}
+              </span>
+              <span className="shrink-0 text-[13px] leading-[18px] text-fg-faint tabular-nums">
+                {t.book.chapterCount(edition.chapterCount)}
+              </span>
+              {selected && editions.length > 1 && <CheckIcon size={18} strokeWidth={2.2} className="shrink-0 text-link" />}
+            </>
+          );
+          return (
+            <li key={edition.id}>
+              {editions.length === 1 ? (
+                <div className="flex w-full items-center gap-3 rounded-[12px] bg-raised px-3 py-2.5">{inner}</div>
+              ) : (
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => onSelect(edition)}
+                  className={cn(
+                    "flex w-full cursor-pointer items-center gap-3 rounded-[12px] border-0 px-3 py-2.5 text-left transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link",
+                    selected ? "bg-crimson/14" : "bg-raised hover:bg-raised-hover",
+                  )}
+                >
+                  {inner}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -437,89 +569,68 @@ export default function BookDetailPage({
  */
 function ChapterRow({
   chapter,
+  number,
   href,
   current,
 }: {
   chapter: BookChapterSummary;
+  number: number;
   href: string;
   current: boolean;
 }) {
   const { t } = useLanguage();
+  const s = useSection(titlesText);
   const openable = chapter.status === "READY";
   const hasPages = chapter.pageCount > 0;
+  const pages = hasPages ? t.book.chapterPages(chapter.pageCount) : null;
 
   const body = (
     <>
-      <span className="relative block h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-white/6 ring-1 ring-white/10 ring-inset">
+      <span className="relative flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-raised text-fg-faint">
         {chapter.imageUrl ? (
-          <Image
-            src={chapter.imageUrl}
-            alt=""
-            fill
-            unoptimized
-            loading="lazy"
-            sizes="96px"
-            className="object-cover"
-          />
+          <Image src={chapter.imageUrl} alt="" fill loading="lazy" sizes="96px" className="object-cover" />
         ) : (
-          <span className="flex size-full items-center justify-center text-muted-foreground">
-            <BookOpen className="size-5" />
-          </span>
+          <BookOpen aria-hidden className="size-6" strokeWidth={1.75} />
         )}
       </span>
 
       <span className="min-w-0 flex-1">
-        <span className="block text-xs font-semibold text-muted-foreground nums">
-          {/* The server's reading-order number — equal to `order` for every
-              existing book, continuous across parts once a book has them. */}
-          {t.book.chapterNumber(Number(chapter.number) || chapter.order)}
+        {/* The server's reading-order number — equal to `order` for every
+            existing book, continuous across parts once a book has them. */}
+        <span className="block text-[13px] leading-[18px] font-bold text-fg-faint tabular-nums">
+          {t.book.chapterNumber(number)}
         </span>
-        <span className="mt-0.5 block truncate font-medium">
-          {chapter.title}
-        </span>
+        <span className="mt-px block truncate text-base leading-[22px] font-extrabold text-fg">{chapter.title}</span>
         {(hasPages || !openable || current) && (
-          <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            {hasPages && (
-              <span className="text-muted-foreground nums">
-                {t.book.chapterPages(chapter.pageCount)}
-              </span>
-            )}
-            {!openable && (
-              <span className="text-muted-foreground">
-                {t.media.comingSoon}
-              </span>
-            )}
-            {current && openable && (
-              <span className="text-primary">{t.book.continueReading}</span>
-            )}
+          <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[13px] leading-[18px] tabular-nums">
+            {pages && <span className="text-fg-faint">{pages}</span>}
+            {!openable && <span className="text-fg-faint">{t.media.comingSoon}</span>}
+            {current && openable && <span className="font-bold text-link">{t.book.continueReading}</span>}
           </span>
         )}
       </span>
+      {openable && <ChevronRightIcon size={20} className="shrink-0 text-fg-faint" />}
     </>
   );
 
-  const base = "flex items-center gap-4 rounded-xl p-3 transition-colors";
+  const base = "flex items-center gap-4 rounded-[16px] p-3";
 
   if (!openable) {
     return (
-      <span
-        aria-disabled="true"
-        className={cn(base, "cursor-default bg-white/[0.02] opacity-60")}
-      >
+      <div aria-disabled="true" className={cn(base, "opacity-55")}>
         {body}
-      </span>
+      </div>
     );
   }
 
   return (
     <Link
       href={href}
+      aria-label={s.chapterA11y({ number, title: chapter.title, pages, current })}
       className={cn(
-        "focus-ring",
         base,
-        current
-          ? "bg-primary/12 ring-1 ring-primary/25 ring-inset"
-          : "bg-white/[0.03] hover:bg-white/[0.06]",
+        "transition-colors duration-150 outline-none hover:bg-popover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link",
+        current ? "bg-crimson/12" : "bg-transparent",
       )}
     >
       {body}
@@ -534,52 +645,43 @@ function ChapterRow({
  * anchor is invalid markup.
  */
 function SectionList({
+  chapterNumber,
   sections,
   isWritten,
   hrefFor,
 }: {
+  chapterNumber: number;
   sections: BookSectionSummary[];
   isWritten: boolean;
   hrefFor: (section: BookSectionSummary) => string;
 }) {
   const { t } = useLanguage();
+  const s = useSection(titlesText);
   return (
-    <ul className="mt-1 ml-[7.75rem] space-y-0.5 pr-3">
-      {sections.map((section) => (
-        <li key={section.id}>
-          <Link
-            href={hrefFor(section)}
-            className="focus-ring flex items-baseline gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground"
-          >
-            <span className="shrink-0 text-xs nums">{section.number}</span>
-            <span className="min-w-0 flex-1 truncate">{section.title}</span>
-            {!isWritten && section.startPage !== null && (
-              <span className="shrink-0 text-xs nums">
-                {t.book.pageRange(
-                  section.startPage,
-                  section.endPage ?? section.startPage,
-                )}
-              </span>
-            )}
-          </Link>
-        </li>
-      ))}
+    <ul
+      aria-label={s.sectionsOf(chapterNumber)}
+      className="m-0 mt-1 mb-2 flex list-none flex-col gap-0.5 py-0 pr-0 pl-[clamp(16px,9vw,124px)]"
+    >
+      {sections.map((section) => {
+        const page = !isWritten ? section.startPage : null;
+        return (
+          <li key={section.id}>
+            <Link
+              href={hrefFor(section)}
+              aria-label={s.sectionA11y(section.number, section.title, page)}
+              className="flex items-baseline gap-2.5 rounded-[10px] px-3 py-[7px] text-sm leading-5 text-fg-body transition-colors outline-none hover:bg-popover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+            >
+              <span className="shrink-0 text-xs font-bold text-fg-faint tabular-nums">{section.number}</span>
+              <span className="min-w-0 flex-1 truncate">{section.title}</span>
+              {page !== null && (
+                <span className="shrink-0 text-xs text-fg-faint tabular-nums">
+                  {t.book.pageRange(page, section.endPage ?? page)}
+                </span>
+              )}
+            </Link>
+          </li>
+        );
+      })}
     </ul>
-  );
-}
-
-function DetailSkeleton() {
-  return (
-    <div className="mx-auto max-w-[1600px] px-4 pt-6 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-8 sm:flex-row">
-        <Skeleton className="aspect-[5/7] w-40 shrink-0 rounded-xl sm:w-48 lg:w-56" />
-        <div className="flex-1 space-y-4 pt-2">
-          <Skeleton className="h-10 w-2/3" />
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-24 w-full max-w-3xl" />
-          <Skeleton className="h-11 w-40" />
-        </div>
-      </div>
-    </div>
   );
 }

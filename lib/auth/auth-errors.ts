@@ -1,5 +1,8 @@
 import { ApiError } from "@/services/api/apiClient";
-import { STEP_TOKEN_REFUSED_MESSAGE } from "@/services/api/authService";
+import {
+  SMS_UNAVAILABLE_MESSAGE,
+  STEP_TOKEN_REFUSED_MESSAGE,
+} from "@/services/api/authService";
 import type { TranslationShape } from "@/lib/i18n/translations";
 
 /**
@@ -18,6 +21,9 @@ const KNOWN_AUTH_MESSAGES: Record<string, (t: TranslationShape) => string> = {
   "No account was found for this phone number.": (t) =>
     t.auth.errors.noAccountForPhone,
   [STEP_TOKEN_REFUSED_MESSAGE]: (t) => t.auth.passwordAgain,
+  // 503 from a code request (sign-in, resend, forgot password): the SMS
+  // gateway phone is offline or the day's SMS cap is reached.
+  [SMS_UNAVAILABLE_MESSAGE]: (t) => t.auth.errors.smsUnavailable,
 };
 
 /** One user-facing sentence for a failed auth call. */
@@ -25,6 +31,10 @@ export function authErrorMessage(err: unknown, t: TranslationShape): string {
   if (!(err instanceof ApiError)) return t.auth.genericError;
   const known = KNOWN_AUTH_MESSAGES[err.message];
   if (known) return known(t);
+  // No answer at all (offline, timeout, DNS) — the client reports status 0.
+  if (err.status === 0) return t.auth.errors.network;
+  // The HTTP rate limit's own English sentence names a wait in seconds.
+  if (err.status === 429) return t.auth.errors.rateLimited;
   return err.message || t.auth.genericError;
 }
 

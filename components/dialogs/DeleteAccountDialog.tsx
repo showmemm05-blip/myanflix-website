@@ -1,27 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Loader2, Trash2, Wallet } from "lucide-react";
+import Link from "next/link";
 
+import { Modal } from "@/components/system";
+import { AlertCircleIcon, WalletIcon } from "@/components/system/icons";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Surface } from "@/components/system";
 import { useLanguage } from "@/lib/context/language-context";
 import { formatKyat } from "@/lib/currency";
-
-// The dialog idioms this app already uses everywhere else — plus a height cap,
-// because this one carries a whole list and must still fit a small phone.
-const dialogContentClass =
-  "max-h-[calc(100dvh-2rem)] gap-5 overflow-y-auto rounded-3xl p-5 ring-white/10 sm:max-w-md sm:p-6";
-const dialogFooterClass = "mx-0 mb-0 border-0 bg-transparent p-0 pt-1";
 
 /**
  * "Delete account" (H-16/H-25) — the one irreversible action on the site, so
@@ -31,6 +17,9 @@ const dialogFooterClass = "mx-0 mb-0 border-0 bg-transparent p-0 pt-1";
  * The wallet check shown here is a heads-up from the profile's last known
  * balance; the server makes the real decision and its refusal (`error`) is
  * shown in place, in the reader's language.
+ *
+ * Marquee dialog frame (Settings board): centred on desktop, a bottom sheet
+ * on phones; it cannot be dismissed while the deletion is running.
  */
 export function DeleteAccountDialog({
   open,
@@ -58,87 +47,99 @@ export function DeleteAccountDialog({
     onOpenChange(next);
   };
 
+  const listClass = "mt-2.5 flex flex-col gap-2";
+  const itemClass = "flex gap-2.5 text-sm leading-[21px] text-fg-body";
+  const dot = <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-fg-decor" />;
+
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className={dialogContentClass}>
-        <DialogHeader>
-          <div className="flex size-11 items-center justify-center rounded-full bg-destructive/15 text-destructive ring-1 ring-destructive/30 ring-inset">
-            <AlertTriangle className="size-5" />
-          </div>
-          <DialogTitle className="text-section-title">{t.settings.deleteConfirmTitle}</DialogTitle>
-          <DialogDescription>{t.settings.deleteConfirmDescription}</DialogDescription>
-        </DialogHeader>
-
-        <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-foreground">{t.settings.deleteEffectsTitle}</h3>
-          <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-muted-foreground marker:text-muted-foreground/60">
-            {t.settings.deleteEffects.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-foreground">{t.settings.deleteRequirementsTitle}</h3>
-          <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-muted-foreground marker:text-muted-foreground/60">
-            {t.settings.deleteRequirements.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </section>
-
-        {walletBalance > 0 && (
-          <Surface
-            tone="subtle"
-            className="flex items-start gap-2.5 bg-premium/8 px-4 py-3 ring-premium/25"
-          >
-            <Wallet className="mt-0.5 size-4 shrink-0 text-premium" />
-            <p className="text-xs text-foreground/90">
-              {t.settings.deleteBalanceNotice(formatKyat(walletBalance))}
-            </p>
-          </Surface>
-        )}
-
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl px-1 py-1 text-sm text-foreground">
-          <input
-            type="checkbox"
-            checked={acknowledged}
-            onChange={(event) => setAcknowledged(event.target.checked)}
-            disabled={isDeleting}
-            className="focus-ring mt-0.5 size-4 shrink-0 cursor-pointer accent-destructive"
-          />
-          <span>{t.settings.deleteAcknowledge}</span>
-        </label>
-
-        {error && (
-          <Surface
-            role="alert"
-            tone="subtle"
-            className="flex items-start gap-2.5 bg-destructive/6 px-4 py-3 ring-destructive/25"
-          >
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
-            <p className="text-xs text-destructive">{error}</p>
-          </Surface>
-        )}
-
-        <DialogFooter className={dialogFooterClass}>
-          <DialogClose
-            render={<Button variant="ghost" className="h-11 rounded-full px-5" />}
-            disabled={isDeleting}
-          >
+    <Modal
+      open={open}
+      onOpenChange={handleOpenChange}
+      title={t.settings.deleteConfirmTitle}
+      subtitle={t.settings.deleteConfirmDescription}
+      dismissible={!isDeleting}
+      className="desk:max-w-[min(600px,calc(100%-48px))]"
+      bodyClassName="gap-[22px]"
+      footer={
+        <>
+          <Button variant="tonal" size="cta" onClick={() => handleOpenChange(false)} disabled={isDeleting}>
             {t.common.cancel}
-          </DialogClose>
+          </Button>
           <Button
-            variant="destructive"
-            className="h-11 rounded-full bg-destructive px-5 text-white hover:bg-destructive/90 dark:bg-destructive dark:hover:bg-destructive/90"
+            variant="danger"
+            size="cta"
             onClick={onConfirm}
-            disabled={!acknowledged || isDeleting}
+            disabled={!acknowledged}
+            busy={isDeleting}
+            busyLabel={t.settings.deleteConfirmButton}
           >
-            {isDeleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
             {t.settings.deleteConfirmButton}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <section>
+        <h3 className="text-[15px] leading-5 font-extrabold text-fg">{t.settings.deleteEffectsTitle}</h3>
+        <ul className={listClass}>
+          {t.settings.deleteEffects.map((line) => (
+            <li key={line} className={itemClass}>
+              {dot}
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <h3 className="text-[15px] leading-5 font-extrabold text-fg">{t.settings.deleteRequirementsTitle}</h3>
+        <ul className={listClass}>
+          {t.settings.deleteRequirements.map((line) => (
+            <li key={line} className={itemClass}>
+              {dot}
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {walletBalance > 0 && (
+        <div
+          role="note"
+          className="flex items-start gap-2.5 rounded-[12px] bg-pending/12 px-4 py-3.5 text-sm leading-[21px] text-pending tabular-nums"
+        >
+          <WalletIcon size={18} className="mt-0.5 shrink-0" />
+          <span className="text-fg-body">
+            {t.settings.deleteBalanceNotice(formatKyat(walletBalance))}{" "}
+            <Link
+              href="/wallet"
+              className="mq-link rounded-[4px] outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link"
+            >
+              {t.wallet.withdraw}
+            </Link>
+          </span>
+        </div>
+      )}
+
+      <label className="flex cursor-pointer items-start gap-3">
+        <input
+          type="checkbox"
+          checked={acknowledged}
+          onChange={(event) => setAcknowledged(event.target.checked)}
+          disabled={isDeleting}
+          className="focus-ring m-0 size-[22px] shrink-0 cursor-pointer accent-crimson"
+        />
+        <span className="text-[15px] leading-[22px] font-semibold text-fg">{t.settings.deleteAcknowledge}</span>
+      </label>
+
+      {error && (
+        <p
+          role="alert"
+          className="flex items-start gap-2 rounded-[12px] bg-danger/10 px-3.5 py-3 text-sm leading-[21px] text-danger"
+        >
+          <AlertCircleIcon size={18} className="mt-px shrink-0" />
+          <span>{error}</span>
+        </p>
+      )}
+    </Modal>
   );
 }

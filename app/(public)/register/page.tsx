@@ -1,33 +1,23 @@
 "use client";
 
 import { Suspense } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AuthLayout } from "@/components/auth/AuthLayout";
+import { AuthCrossLink, AuthLayout } from "@/components/auth/AuthLayout";
 import { PhoneAuthForm } from "@/components/auth/PhoneAuthForm";
 import { useLanguage } from "@/lib/context/language-context";
 import { loginHref, safeReturnTo } from "@/lib/auth/return-to";
 
+/** Sign up (Register + LoginCode boards) — the same flow as /login, opened with sign-up words. */
 export default function RegisterPage() {
   const { t } = useLanguage();
 
   return (
     <AuthLayout
-      kicker={t.auth.createOne}
-      title={t.auth.registerTitle}
-      subtitle={t.auth.registerSubtitle}
       footer={
         <>
           {t.auth.haveAccount}{" "}
           <Suspense
-            fallback={
-              <Link
-                href="/login"
-                className="focus-ring rounded-md font-medium text-primary hover:underline"
-              >
-                {t.auth.signInLink}
-              </Link>
-            }
+            fallback={<AuthCrossLink href="/login">{t.auth.signInLink}</AuthCrossLink>}
           >
             <SignInLink label={t.auth.signInLink} />
           </Suspense>
@@ -36,7 +26,7 @@ export default function RegisterPage() {
     >
       {/* useSearchParams needs its own Suspense boundary so the rest of the
           page can still be prerendered. */}
-      <Suspense fallback={<PhoneAuthForm />}>
+      <Suspense fallback={<PhoneAuthForm mode="signUp" />}>
         <RegisterForm />
       </Suspense>
     </AuthLayout>
@@ -47,7 +37,7 @@ export default function RegisterPage() {
 function RegisterForm() {
   const searchParams = useSearchParams();
   const returnTo = safeReturnTo(searchParams.get("next"));
-  return <PhoneAuthForm returnTo={returnTo} />;
+  return <PhoneAuthForm mode="signUp" returnTo={returnTo} />;
 }
 
 /** Carries `?next=` across to /login so switching forms never loses the destination. */
@@ -55,11 +45,6 @@ function SignInLink({ label }: { label: string }) {
   const searchParams = useSearchParams();
   const returnTo = safeReturnTo(searchParams.get("next"));
   return (
-    <Link
-      href={returnTo ? loginHref(returnTo) : "/login"}
-      className="focus-ring rounded-md font-medium text-primary hover:underline"
-    >
-      {label}
-    </Link>
+    <AuthCrossLink href={returnTo ? loginHref(returnTo) : "/login"}>{label}</AuthCrossLink>
   );
 }

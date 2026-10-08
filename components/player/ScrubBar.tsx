@@ -1,12 +1,20 @@
 "use client";
 
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useLanguage } from "@/lib/context/language-context";
 import { formatTimecode } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const ARROW_STEP_SECONDS = 5;
 const PAGE_STEP_SECONDS = 60;
+/**
+ * While dragging, seek at most this often (about 4 a second). Every seek makes
+ * the player abort the segment it was loading and fetch a new one, so seeking
+ * on every pointer move (up to 60 a second) burned mobile data for nothing.
+ * The thumb and time chip still follow the pointer on every move, and the
+ * last position is always committed when the drag ends.
+ */
+const DRAG_SEEK_INTERVAL_MS = 250;
 
 interface ScrubBarProps {
   currentTime: number;
@@ -39,7 +47,45 @@ export function ScrubBar({
   const [hoverFraction, setHoverFraction] = useState<number | null>(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
 
-  const playedFraction = duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
+  // Drag-seek throttle state. The latest onSeek is kept in a ref so a trailing
+  // seek fired from a timer never calls a stale callback.
+  const onSeekRef = useRef(onSeek);
+  const lastDragSeekAtRef = useRef(0);
+  const pendingSeekRef = useRef<number | null>(null);
+  const dragSeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    onSeekRef.current = onSeek;
+  }, [onSeek]);
+  useEffect(() => {
+    return () => {
+      if (dragSeekTimerRef.current) clearTimeout(dragSeekTimerRef.current);
+    };
+  }, []);
+
+  const flushDragSeek = () => {
+    if (dragSeekTimerRef.current) {
+      clearTimeout(dragSeekTimerRef.current);
+      dragSeekTimerRef.current = null;
+    }
+    const pending = pendingSeekRef.current;
+    if (pending === null) return;
+    pendingSeekRef.current = null;
+    lastDragSeekAtRef.current = performance.now();
+    onSeekRef.current(pending);
+  };
+
+  const queueDragSeek = (seconds: number) => {
+    pendingSeekRef.current = seconds;
+    if (dragSeekTimerRef.current) return;
+    const wait = DRAG_SEEK_INTERVAL_MS - (performance.now() - lastDragSeekAtRef.current);
+    if (wait <= 0) flushDragSeek();
+    else dragSeekTimerRef.current = setTimeout(flushDragSeek, wait);
+  };
+
+  // While dragging, the thumb and fill follow the pointer itself rather than
+  // the (throttled) playback position, so the bar never lags the finger.
+  const shownTime = isScrubbing && hoverFraction !== null ? hoverFraction * duration : currentTime;
+  const playedFraction = duration > 0 ? Math.min(1, Math.max(0, shownTime / duration)) : 0;
   const asPercent = (seconds: number) => (duration > 0 ? Math.min(100, (seconds / duration) * 100) : 0);
 
   const fractionFromEvent = (clientX: number) => {
@@ -59,6 +105,8 @@ export function ScrubBar({
     setScrubbing(true);
     const fraction = fractionFromEvent(event.clientX);
     setHoverFraction(fraction);
+    pendingSeekRef.current = null;
+    lastDragSeekAtRef.current = performance.now();
     onSeek(fraction * duration);
   };
 
@@ -66,11 +114,13 @@ export function ScrubBar({
     if (duration <= 0) return;
     const fraction = fractionFromEvent(event.clientX);
     setHoverFraction(fraction);
-    if (isScrubbing) onSeek(fraction * duration);
+    if (isScrubbing) queueDragSeek(fraction * duration);
   };
 
   const endScrub = (event: PointerEvent<HTMLDivElement>) => {
     if (!isScrubbing) return;
+    // Always land exactly where the drag ended.
+    flushDragSeek();
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -130,18 +180,20 @@ export function ScrubBar({
       }}
       onKeyDown={handleKeyDown}
       className={cn(
-        "group relative flex h-5 w-full cursor-pointer touch-none items-center outline-none select-none",
-        // The seek bar is the most-reached-for control on the player, and a 20px band is
-        // well under a thumb. The pseudo-element grows the pointer target to ~42px —
-        // mostly upward, into the empty gradient above, so the transport row's own
-        // buttons keep every pixel of theirs — while the painted bar stays hairline thin.
-        "before:absolute before:inset-x-0 before:-top-4 before:-bottom-1.5 before:content-['']",
+        "group relative flex h-6 w-full cursor-pointer touch-none items-center rounded-full outline-none select-none",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link",
+        // The seek bar is the most-reached-for control on the player, and a 24px band is
+        // under a thumb. The pseudo-element grows the pointer target upward, into the
+        // empty scrim above, so the control row's own buttons keep every pixel of theirs —
+        // while the painted bar stays hairline thin.
+        "before:absolute before:inset-x-0 before:-top-3 before:-bottom-1 before:content-['']",
         className,
       )}
     >
       {showChip && (
         <div
-          className="pointer-events-none absolute bottom-full mb-2 -translate-x-1/2 rounded-lg bg-black/70 px-2 py-1 text-[11px] font-semibold text-white tabular-nums shadow-e2 ring-1 ring-white/15 backdrop-blur-xl ring-inset"
+          aria-hidden
+          className="pointer-events-none absolute bottom-[26px] h-[26px] -translate-x-1/2 rounded-[8px] bg-art-badge px-2 text-[12px] leading-[26px] font-bold text-fg tabular-nums backdrop-blur-[14px]"
           style={{ left: `${hoverFraction * 100}%` }}
         >
           {formatTimecode(hoverFraction * duration)}
@@ -150,12 +202,12 @@ export function ScrubBar({
 
       <div
         ref={trackRef}
-        className="relative h-1 w-full overflow-hidden rounded-full bg-white/25 transition-[height] duration-150 ease-out group-hover:h-[6px] group-focus-visible:h-[6px] group-data-[scrubbing=true]:h-[6px]"
+        className="relative h-1 w-full overflow-hidden rounded-[3px] bg-white/24 transition-[height] duration-150 ease-out group-hover:h-[6px] group-focus-visible:h-[6px] group-data-[scrubbing=true]:h-[6px]"
       >
         {bufferedRanges.map(([start, end], index) => (
           <div
             key={index}
-            className="absolute inset-y-0 rounded-full bg-white/40"
+            className="absolute inset-y-0 bg-white/45"
             style={{ left: `${asPercent(start)}%`, width: `${Math.max(0, asPercent(end) - asPercent(start))}%` }}
           />
         ))}
@@ -163,21 +215,21 @@ export function ScrubBar({
         {/* Where the pointer currently sits, so the destination reads before committing. */}
         {showChip && !isScrubbing && (
           <div
-            className="absolute inset-y-0 left-0 rounded-full bg-white/25"
+            className="absolute inset-y-0 left-0 bg-white/20"
             style={{ width: `${hoverFraction * 100}%` }}
           />
         )}
 
-        {/* Violet is the action colour everywhere else in the app; here it is
-            literally the progress of the action being taken. */}
+        {/* Crimson is the progress colour everywhere in Marquee. */}
         <div
-          className="absolute inset-y-0 left-0 rounded-full bg-primary shadow-[0_0_12px_-2px_var(--primary)]"
+          className="absolute inset-y-0 left-0 rounded-[3px] bg-crimson"
           style={{ width: `${playedFraction * 100}%` }}
         />
       </div>
 
       <div
-        className="pointer-events-none absolute size-3.5 -translate-x-1/2 scale-0 rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.25),0_2px_10px_rgba(0,0,0,0.55)] transition-transform duration-150 ease-out group-hover:scale-100 group-focus-visible:scale-100 group-data-[scrubbing=true]:scale-110"
+        aria-hidden
+        className="pointer-events-none absolute size-3.5 -translate-x-1/2 rounded-full bg-play shadow-[0_2px_6px_rgba(0,0,0,0.5)] transition-transform duration-150 ease-out group-data-[scrubbing=true]:scale-110"
         style={{ left: `${playedFraction * 100}%` }}
       />
     </div>

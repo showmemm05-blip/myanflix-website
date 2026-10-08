@@ -1,63 +1,66 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
-import { Check, Info, Loader2, TriangleAlert, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
+
+import { AlertCircleIcon, CheckIcon, CloseIcon, InfoIcon } from "@/components/system/icons";
+import { isAuthRoute, isImmersiveRoute } from "@/components/system/nav";
 
 /**
- * THE SLATE — MyanFlix's notification.
+ * MARQUEE TOAST (DesignSystem "Toasts", SHELL.md §16).
  *
- * Not a rounded rectangle in a corner. It is built from the language of the
- * thing this product actually is: a broadcast lower-third. A flat accent SPINE
- * runs down the left edge (square there, rounded on the right, so the
- * silhouette is asymmetric and reads as "clipped on" rather than "floating"),
- * the icon sits in a tinted slate rather than a circle, and the lifetime of the
- * message drains along the bottom edge like a playhead running out — pausing
- * the moment you point at it, exactly as the timer itself does.
+ * Bottom centre, 24px up, at most 440px wide, 4 seconds. A popover slab
+ * (#16161C, radius 12, hairline ring) with a coloured icon — green tick for
+ * success, danger for errors, amber for warnings, blue for info — a 14/20
+ * message, and an optional crimson-text action ("Undo").
  *
- * It enters from the TOP CENTRE: the bottom of the screen belongs to the tab
- * bar on a phone and to the player's controls on every device, and a toast
- * must never land on either. On a phone it clears the top bar; on desktop it
- * sits just under the top edge, nudged right so it centres over the content
- * column rather than the rail.
+ * Two exceptions, decided per route:
+ * - The full-screen player and the reader have their own controls along the
+ *   bottom edge, and a toast must never land on them: there it enters from
+ *   the TOP centre instead (16px down — those routes have no top bar).
+ * - On phones it lifts above the floating dock — but only on pages that
+ *   actually show the dock (not the sign-in pages, not the player). The lift
+ *   is the `.mf-toaster-dock` rule in globals.css.
  *
- * All visual treatment lives in the `.mf-toast` component class in globals.css
- * (spine, drain, glow, per-state accents) — keyed off the `data-type` Sonner
- * already writes, so success/error/warning/info are one CSS variable apart and
- * every existing `toast.*` call keeps working untouched.
+ * Every existing `toast.success/error/info/warning(...)` call keeps working
+ * untouched; the look lives in the `.mf-toast` rules in globals.css.
  */
 const Toaster = (props: ToasterProps) => {
+  const pathname = usePathname() ?? "/";
+  const immersive = isImmersiveRoute(pathname);
+  const hasDock = !immersive && !isAuthRoute(pathname);
+
   return (
     <Sonner
-      // Dark is the product; letting the OS flip this would hand us a white
-      // slab on a black page.
       theme="dark"
-      position="top-center"
-      // Clears the mobile top bar (56px) — desktop has no bar to clear.
-      offset={{ top: "16px" }}
-      mobileOffset={{ top: "68px", left: "12px", right: "12px" }}
+      position={immersive ? "top-center" : "bottom-center"}
+      offset={immersive ? { top: "16px" } : { bottom: "24px" }}
+      mobileOffset={
+        immersive
+          ? { top: "16px", left: "16px", right: "16px" }
+          : { bottom: "24px", left: "16px", right: "16px" }
+      }
+      className={hasDock ? "mf-toaster-dock" : undefined}
       duration={TOAST_DURATION_MS}
       visibleToasts={3}
       gap={10}
       closeButton
       icons={{
-        success: <Check className="size-4" />,
-        info: <Info className="size-4" />,
-        warning: <TriangleAlert className="size-4" />,
-        error: <X className="size-4" />,
-        loading: <Loader2 className="size-4 animate-spin" />,
+        success: <CheckIcon size={20} />,
+        info: <InfoIcon size={20} />,
+        warning: <AlertCircleIcon size={20} />,
+        error: <AlertCircleIcon size={20} />,
+        loading: <Loader2 className="size-5 animate-spin" />,
+        close: <CloseIcon size={16} />,
       }}
-      style={{ "--width": "400px" } as React.CSSProperties}
+      style={{ "--width": "min(440px, calc(100vw - 32px))" } as React.CSSProperties}
       toastOptions={{ className: "mf-toast" }}
       {...props}
     />
   );
 };
 
-/**
- * Kept in lockstep with `--mf-toast-duration` in globals.css: the drain bar is
- * a CSS animation, so it can only tell the truth if it runs for exactly as long
- * as Sonner's timer.
- */
-const TOAST_DURATION_MS = 4500;
+const TOAST_DURATION_MS = 4000;
 
 export { Toaster };

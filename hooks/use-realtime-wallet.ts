@@ -69,6 +69,8 @@ export function useRealtimeWallet() {
 
     const handleDepositUpdated = (payload: DepositUpdatedPayload) => {
       queryClient.invalidateQueries({ queryKey: ["wallet-transactions"] });
+      // The full Transactions page keys its pages ["transactions", page].
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["deposits"] });
 
       // Only a real status change deserves a toast. An admin correcting the
@@ -91,6 +93,7 @@ export function useRealtimeWallet() {
 
     const handleWithdrawalUpdated = (payload: WithdrawalUpdatedPayload) => {
       queryClient.invalidateQueries({ queryKey: ["wallet-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["withdrawals"] });
 
       // Same rule as deposits: an admin editing the transfer account of an
@@ -110,8 +113,8 @@ export function useRealtimeWallet() {
     };
 
     const handleNotificationCreated = () => {
+      // A prefix match: this also refreshes ["notifications", "unread-count"].
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
     };
 
     // An admin activated, deactivated, edited or removed one of our

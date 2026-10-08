@@ -59,9 +59,9 @@ export function saveSubtitleStyle(style: SubtitleStyleSettings): void {
  * unreadable or ballooning over the picture.
  */
 const FONT_SIZE: Record<SubtitleSize, string> = {
-  small: "clamp(0.8rem, 1.6vw, 1.05rem)",
-  medium: "clamp(0.95rem, 2.2vw, 1.4rem)",
-  large: "clamp(1.15rem, 3vw, 1.9rem)",
+  small: "clamp(14px, 1.25vw, 18px)",
+  medium: "clamp(15px, 1.67vw, 24px)",
+  large: "clamp(17px, 2.1vw, 30px)",
 };
 
 export function SubtitleOverlay({
@@ -75,30 +75,47 @@ export function SubtitleOverlay({
   /** True while the control bar is showing — the caption steps up out of its way. */
   liftForControls: boolean;
 }) {
-  if (lines.length === 0) return null;
+  // One row per caption line (a cue's own line breaks included). Each row gets
+  // its own backing plate as a BLOCK, not one inline span wrapping every line:
+  // Noto Sans Myanmar has very tall ascent/descent metrics, so an inline
+  // background is far taller than the 1.5 line height and each line's plate
+  // covered the line above it (owner report, 2026-10-07). A block plate is
+  // exactly as tall as its line box, and the gap keeps the plates apart.
+  const rows = lines.flatMap((line) => line.split("\n")).map((row) => row.trim()).filter(Boolean);
+  if (rows.length === 0) return null;
 
   return (
     <div
       aria-live="off"
       className={cn(
-        "pointer-events-none absolute inset-x-0 z-[5] flex justify-center px-4",
+        "pointer-events-none absolute inset-x-[8%] z-[5] flex justify-center",
         "transition-[bottom] duration-300 ease-out",
       )}
-      style={{ bottom: liftForControls ? "clamp(4.25rem, 16%, 7.5rem)" : "clamp(0.75rem, 5%, 2.5rem)" }}
+      // Clears the scrub bar and control row while they show (Player.dc.html: 136px
+      // over a full window), and sits low on the picture once they fade.
+      style={{ bottom: liftForControls ? "clamp(96px, 18%, 136px)" : "clamp(16px, 6%, 48px)" }}
     >
       <div
         className={cn(
           // 60ch caps the measure so a long sentence wraps into readable
           // lines instead of one edge-to-edge strip.
-          "max-w-[min(92%,60ch)] text-center font-medium text-white",
-          "whitespace-pre-line [overflow-wrap:anywhere]",
-          style.background
-            ? "rounded-lg bg-black/75 px-3 py-1.5 backdrop-blur-[2px]"
-            : "[text-shadow:0_1px_2px_rgba(0,0,0,0.9),0_0_8px_rgba(0,0,0,0.7)]",
+          "flex max-w-[60ch] flex-col items-center gap-1 text-center font-semibold text-fg",
+          !style.background && "[text-shadow:0_1px_3px_rgba(0,0,0,0.9)]",
         )}
-        style={{ fontSize: FONT_SIZE[style.size], lineHeight: 1.35 }}
+        style={{ fontSize: FONT_SIZE[style.size], lineHeight: 1.5 }}
       >
-        {lines.join("\n")}
+        {rows.map((row, index) => (
+          <p
+            // Rows are re-rendered wholesale on every cue change; position is the identity.
+            key={index}
+            className={cn(
+              "m-0 max-w-full [overflow-wrap:anywhere]",
+              style.background && "rounded-[6px] bg-black/62 px-3 py-0.5",
+            )}
+          >
+            {row}
+          </p>
+        ))}
       </div>
     </div>
   );

@@ -1,52 +1,78 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useId, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import {
-  ArrowLeft,
-  CalendarDays,
-  Check,
-  Crown,
-  Film,
-  Globe,
-  LogIn,
-  Play,
-  Plus,
-  Share2,
-  Star,
-  Tv,
-  type LucideIcon,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { PosterRail } from "@/components/browse/PosterRail";
-import { CastRail } from "@/components/media/CastRail";
+import { Film, LogIn } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+
+import { Button, buttonVariants } from "@/components/ui/button";
 import { CommentsSection } from "@/components/comments/CommentsSection";
 import { movieToBrowseItem } from "@/components/browse/browse-item";
-import { EmptyState } from "@/components/empty/EmptyState";
 import { SubscribeDialog } from "@/components/dialogs/SubscribeDialog";
 import { ShareDialog } from "@/components/modals/ShareDialog";
-import { AccessBadge, Chip, Kicker, SectionHeader, Surface } from "@/components/system";
-import { useQuery } from "@tanstack/react-query";
-import { useMovie, useSimilarMovies } from "@/hooks/use-movies";
+import { AGE_RATING_LABELS } from "@/components/filters/filter-types";
+import {
+  CheckIcon,
+  CrownIcon,
+  HeroMeta,
+  HeroTags,
+  HeroTitle,
+  MediaCard,
+  PlayIcon,
+  PlusIcon,
+  Rating,
+  Row,
+  RowSkeleton,
+  ShareIcon,
+  Tag,
+  filterChipClass,
+} from "@/components/system";
+import { useContinueWatching, useMovie, useSimilarMovies } from "@/hooks/use-movies";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLibrary } from "@/lib/context/library-context";
 import { useSubscription } from "@/lib/context/subscription-context";
 import { useLanguage } from "@/lib/context/language-context";
+import { useSection } from "@/lib/i18n/sections/define";
+import { shellText } from "@/lib/i18n/sections/shell";
+import { titlesText } from "@/lib/i18n/sections/titles";
 import { seriesService } from "@/services/api/seriesService";
 import { loginHref } from "@/lib/auth/return-to";
 import { formatDuration } from "@/lib/format";
-import { FALLBACK_COVER_URL, FALLBACK_POSTER_URL } from "@/lib/placeholder";
+import { RESUME_COMPLETE_PERCENT, resumeHref } from "@/lib/player/resume";
 import { cn } from "@/lib/utils";
+import { DetailHero, HeroChips, HeroProgress, HeroSynopsisToggle } from "../_detail/DetailHero";
+import {
+  CastRow,
+  DetailColumns,
+  DetailsPanel,
+  TitleNotFound,
+  TitleSkeleton,
+  UpsellPanel,
+  type CastPerson,
+  type DetailFact,
+} from "../_detail/DetailPanels";
+
+const MOVIES_HREF = "/media/movies?tab=movies";
+
+/** A catalog link filtered to one value of one facet (the catalog reads these params on load). */
+function catalogHref(param: "genres" | "actorIds" | "directors", value: string) {
+  return `${MOVIES_HREF}&${param}=${encodeURIComponent(value)}`;
+}
 
 export default function MovieDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { t } = useLanguage();
+  const s = useSection(titlesText);
+  const shell = useSection(shellText);
+  const titleId = useId();
   const { data: movie, isLoading } = useMovie(id);
-  const { data: similarMovies, isLoading: isSimilarLoading } = useSimilarMovies(id);
+  const { data: similarMovies, isLoading: isSimilarLoading } = useSimilarMovies(id, { genre: movie?.genre });
   const { isInWatchlist, toggleWatchlist } = useLibrary();
   const { isSubscribed } = useSubscription();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  // The same in-progress history the Home "Continue watching" row reads
+  // (shared cache key) — it is what turns Play into Resume here.
+  const { data: inProgress } = useContinueWatching(isAuthenticated);
 
   // An episode's access is always governed by its parent series' own
   // accessType, never its own — this page must never gate an episode on
@@ -60,22 +86,17 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
-  if (isLoading) return <DetailSkeleton />;
+  if (isLoading) return <TitleSkeleton kind="title" label={s.loadingTitle} />;
 
   if (!movie) {
     return (
-      <div className="mx-auto max-w-[1600px] px-4 py-24 sm:px-6 lg:px-8">
-        <EmptyState
-          icon={Film}
-          title={t.movieDetail.notFoundTitle}
-          description={t.movieDetail.notFoundBody}
-          action={
-            <Button render={<Link href="/movies?tab=movies" />} nativeButton={false}>
-              {t.movieDetail.backToMovies}
-            </Button>
-          }
-        />
-      </div>
+      <TitleNotFound
+        icon={<Film className="size-7" strokeWidth={1.75} />}
+        title={t.movieDetail.notFoundTitle}
+        body={t.movieDetail.notFoundBody}
+        backHref={MOVIES_HREF}
+        backLabel={t.movieDetail.backToMovies}
+      />
     );
   }
 
@@ -86,216 +107,221 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
   // need a session) never opens. Settled auth only, so a returning member's
   // profile load doesn't flash the guest button first.
   const isGuest = !isAuthenticated && !isAuthLoading;
+  const canWatch = !isGuest && !isAuthLoading && hasAccess;
   const inWatchlist = isInWatchlist(movie.id);
   const similarItems = (similarMovies ?? []).map((m) => movieToBrowseItem(m, formatDuration(m.duration)));
-  // null when the runtime was never measured — the hero meta line skips it (dot included).
+  // null when the runtime was never measured — the meta line skips it.
   const runtime = formatDuration(movie.duration);
+  const premium = accessType === "SUBSCRIPTION";
+
+  // Resume: a started, unfinished entry for this film in the viewer's history.
+  const progress = canWatch ? (inProgress ?? []).find((entry) => entry.movieId === movie.id) : undefined;
+  const resuming = Boolean(progress && progress.progressPercent > 0 && progress.progressPercent < RESUME_COMPLETE_PERCENT);
+  const playHref = progress && resuming
+    ? resumeHref(movie.id, progress.progressPercent, progress.lastPositionSeconds)
+    : `/player/${movie.id}`;
+  const watchedLine = (() => {
+    if (!progress) return "";
+    // Same rounding and "unknown" rule as formatDuration, but the units are
+    // written in the viewer's language, because they sit inside a sentence.
+    const spoken = (minutes: number) => {
+      if (formatDuration(minutes) === null) return null;
+      const whole = Math.round(minutes);
+      return s.hoursMinutes(Math.floor(whole / 60), whole % 60);
+    };
+    const watched = spoken(progress.lastPositionSeconds / 60);
+    const left = movie.duration > 0 ? spoken(movie.duration - progress.lastPositionSeconds / 60) : null;
+    return watched && left ? s.positionLeft(watched, left) : shell.percentWatched(progress.progressPercent);
+  })();
+
+  const people: CastPerson[] = [
+    ...(movie.director
+      ? [{ key: `director:${movie.director}`, name: movie.director, role: s.director, imageUrl: null, href: catalogHref("directors", movie.director) }]
+      : []),
+    ...movie.actors.map((actor) => ({
+      key: actor.id,
+      name: actor.name,
+      role: s.actor,
+      imageUrl: actor.imageUrl,
+      href: catalogHref("actorIds", actor.id),
+    })),
+  ];
+  const crewLine = movie.director
+    ? s.crewLine(s.directorCount(1), t.movieDetail.castCount(movie.actors.length))
+    : t.movieDetail.castCount(movie.actors.length);
+
+  const facts: DetailFact[] = [
+    { label: t.movieDetail.genre, value: movie.genre },
+    ...(movie.categories.length > 0
+      ? [{ label: t.movieDetail.categories, value: movie.categories.map((c) => c.name).join(", ") }]
+      : []),
+    { label: t.movieDetail.language, value: movie.language },
+    { label: t.movieDetail.releaseYear, value: String(movie.releaseYear) },
+    ...(runtime ? [{ label: s.length, value: runtime }] : []),
+    ...(movie.director ? [{ label: s.director, value: movie.director }] : []),
+    ...(movie.country ? [{ label: s.country, value: movie.country }] : []),
+    ...(movie.ageRating ? [{ label: s.ageRatingLabel, value: AGE_RATING_LABELS[movie.ageRating] }] : []),
+    ...(accessType
+      ? [{ label: s.access, value: premium ? t.badges.premium : t.badges.free, tone: premium ? ("gold" as const) : ("money" as const) }]
+      : []),
+  ];
 
   return (
     <div className="flex flex-col">
-      {/* ── THE STAGE ──────────────────────────────────────────────────────
-          The artwork is the page, not a banner above it: the backdrop runs the
-          full height of the hero, three gradient passes hold the type side, and
-          an aurora blush at the bottom edge dissolves the picture into the
-          content spine instead of ending it on a hard line. */}
-      <section className="relative isolate flex min-h-[74vh] flex-col justify-end overflow-hidden lg:min-h-[82vh]">
-        <div className="absolute inset-0 -z-10">
-          <Image
-            src={movie.coverUrl ?? movie.posterUrl ?? FALLBACK_COVER_URL}
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="scale-105 object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/82 to-background/25" />
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/65 to-transparent" />
-          <div aria-hidden className="aurora-wash-soft absolute inset-x-0 bottom-0 h-80 opacity-45 blur-3xl" />
-          <div className="absolute inset-0 shadow-[inset_0_-80px_120px_-40px_var(--background)]" />
-        </div>
+      <DetailHero
+        imageUrl={movie.coverUrl ?? movie.posterUrl}
+        seed={movie.title}
+        backHref={MOVIES_HREF}
+        backLabel={t.movieDetail.backToMovies}
+        titleId={titleId}
+      >
+        <HeroTags>
+          {accessType &&
+            (premium ? <Tag kind="premium">{shell.premiumTag}</Tag> : <Tag kind="free">{shell.freeTag}</Tag>)}
+          {/* The eyebrow slot: a live link back to the show for an episode,
+              a plain "Film" label for a standalone film. */}
+          {movie.seriesId && parentSeries ? (
+            <Link href={`/series/${movie.seriesId}`} className={cn(filterChipClass({ onArt: true }), "h-[26px] px-3 text-[13px]")}>
+              {parentSeries.title}
+              {movie.seasonNumber !== null && movie.episodeNumber !== null && (
+                <span className="font-semibold text-fg-muted">
+                  · {t.player.meta.seasonEpisode(movie.seasonNumber, movie.episodeNumber)}
+                </span>
+              )}
+            </Link>
+          ) : (
+            <span className="text-sm leading-5 font-semibold text-fg-body">{s.film}</span>
+          )}
+        </HeroTags>
 
-        <div className="mx-auto w-full max-w-[1600px] px-4 pt-20 pb-12 sm:px-6 sm:pb-16 lg:px-8 lg:pt-28 lg:pb-20">
-          <Link
-            href="/movies?tab=movies"
-            className="focus-ring mb-7 inline-flex h-10 items-center gap-2 rounded-full bg-white/8 px-4 text-sm font-medium text-white/80 ring-1 ring-white/12 backdrop-blur-md transition-colors duration-150 ease-out ring-inset hover:bg-white/14 hover:text-white"
+        <HeroTitle className="max-w-3xl">
+          <span id={titleId}>{movie.title}</span>
+        </HeroTitle>
+
+        <HeroMeta>
+          {movie.rating > 0 && (
+            <span>
+              <span className="sr-only">{s.rated(movie.rating.toFixed(1))}</span>
+              <span aria-hidden>
+                <Rating value={movie.rating} size="lg" />
+              </span>
+            </span>
+          )}
+          <span>{movie.releaseYear}</span>
+          {runtime && <span>{runtime}</span>}
+          <span>{movie.language}</span>
+          {movie.ageRating && (
+            <Tag kind="age">
+              <span className="sr-only">{s.ageRating(AGE_RATING_LABELS[movie.ageRating])}</span>
+              <span aria-hidden>{AGE_RATING_LABELS[movie.ageRating]}</span>
+            </Tag>
+          )}
+        </HeroMeta>
+
+        <HeroChips
+          label={s.genreAndCategories}
+          chips={[
+            { key: `genre:${movie.genre}`, label: movie.genre, href: catalogHref("genres", movie.genre) },
+            ...movie.categories
+              .filter((category) => category.name !== movie.genre)
+              .map((category) => ({ key: category.id, label: category.name })),
+          ]}
+        />
+
+        {movie.description && <HeroSynopsisToggle>{movie.description}</HeroSynopsisToggle>}
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          {isAuthLoading ? (
+            // Auth is still settling: hold the slot so neither "Play" nor
+            // "Sign in" flashes before we know who is looking.
+            <span aria-hidden className="mq-skeleton block h-[52px] w-40 rounded-[12px]" />
+          ) : isGuest ? (
+            <Link href={loginHref(`/movie/${movie.id}`)} className={buttonVariants({ variant: "play", size: "hero" })}>
+              <LogIn aria-hidden strokeWidth={1.75} />
+              {t.movieDetail.signInToWatch}
+            </Link>
+          ) : hasAccess ? (
+            <Link
+              href={playHref}
+              aria-label={resuming && progress ? shell.resume(movie.title, progress.progressPercent) : s.playTitle(movie.title)}
+              className={buttonVariants({ variant: "play", size: "hero" })}
+            >
+              <PlayIcon />
+              {resuming ? s.resume : s.play}
+            </Link>
+          ) : (
+            <Button variant="gold" size="hero" className="px-6" aria-haspopup="dialog" onClick={() => setSubscribeOpen(true)}>
+              <CrownIcon size={17} />
+              {t.movieDetail.subscribeToWatch}
+            </Button>
+          )}
+
+          <Button
+            variant="tonal"
+            size="hero"
+            className="px-[22px] text-base font-bold"
+            aria-pressed={inWatchlist}
+            onClick={() => toggleWatchlist(movie.id)}
           >
-            <ArrowLeft className="size-4" />
-            {t.movieDetail.backToMovies}
-          </Link>
+            {inWatchlist ? <CheckIcon className="text-link" strokeWidth={2.4} /> : <PlusIcon />}
+            {inWatchlist ? s.inMyList : shell.myList}
+          </Button>
 
-          <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:gap-12">
-            {/* Poster is desktop-only: on a phone the backdrop already carries
-                the artwork, and a second copy just pushes the buttons off-screen. */}
-            <div className="relative hidden aspect-2/3 w-52 shrink-0 overflow-hidden rounded-3xl ring-1 shadow-[0_30px_60px_-25px_rgba(0,0,0,0.9)] ring-white/12 ring-inset lg:block xl:w-60">
-              <Image
-                src={movie.posterUrl ?? FALLBACK_POSTER_URL}
-                alt=""
-                fill
-                sizes="240px"
-                className="object-cover"
-              />
-            </div>
+          <Button
+            variant="tonal"
+            size="icon-hero"
+            aria-haspopup="dialog"
+            aria-label={s.share(movie.title)}
+            onClick={() => setShareOpen(true)}
+          >
+            <ShareIcon size={22} />
+          </Button>
+        </div>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-5">
-              {/* The eyebrow slot: a live link back to the show for an episode,
-                  a plain kicker for a standalone film. */}
-              {movie.seriesId && parentSeries ? (
-                <Link
-                  href={`/series/${movie.seriesId}`}
-                  className="focus-ring inline-flex w-fit items-center gap-2 rounded-full bg-white/8 px-3 py-1.5 text-xs font-medium text-white/85 ring-1 ring-white/15 backdrop-blur-md transition-colors duration-150 ease-out ring-inset hover:bg-white/15"
-                >
-                  <Tv className="size-3.5" />
-                  {parentSeries.title}
-                  {movie.seasonNumber !== null && movie.episodeNumber !== null && (
-                    <span className="text-white/55">
-                      · {t.player.meta.seasonEpisode(movie.seasonNumber, movie.episodeNumber)}
-                    </span>
-                  )}
-                </Link>
-              ) : (
-                <Kicker>{t.nav.movies}</Kicker>
+        {canWatch && resuming && progress && (
+          <HeroProgress percent={progress.progressPercent} label={s.watched} caption={watchedLine} />
+        )}
+        {canWatch && !resuming && premium && (
+          <p className="mt-4 flex items-center gap-2 text-sm leading-5 font-semibold text-gold">
+            <CrownIcon size={11} />
+            {s.includedWithPlan}
+          </p>
+        )}
+      </DetailHero>
+
+      <div className="mt-8 flex flex-col gap-[clamp(36px,3.4vw,52px)]">
+        {/* Who is in this film is a fact about the film, so the cast comes
+            before the pivot to other titles. Renders nothing with no cast. */}
+        <CastRow title={s.castAndCrew} subtitle={crewLine} people={people} />
+
+        {isSimilarLoading ? (
+          <RowSkeleton kind="poster" />
+        ) : similarItems.length > 0 ? (
+          <Row
+            title={t.movieDetail.similar}
+            seeAllHref={catalogHref("genres", movie.genre)}
+          >
+            {similarItems.map((item) => (
+              <MediaCard key={item.id} item={item} layout="rail" sizes="(max-width: 719px) 33vw, 184px" />
+            ))}
+          </Row>
+        ) : null}
+
+        <DetailColumns
+          className="mt-3"
+          asideLabel={s.aboutFilm}
+          aside={
+            <>
+              <DetailsPanel facts={facts} />
+              {!isGuest && !isAuthLoading && !hasAccess && (
+                <UpsellPanel title={movie.title} onSeePlans={() => setSubscribeOpen(true)} />
               )}
-
-              <h1 className="text-display max-w-3xl">{movie.title}</h1>
-
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-                <Chip tone="premium" className="font-semibold">
-                  <Star className="fill-current" />
-                  <span className="nums">{movie.rating.toFixed(1)}</span>
-                </Chip>
-                <span className="text-muted-foreground nums">{movie.releaseYear}</span>
-                {runtime && (
-                  <>
-                    <Dot />
-                    <span className="text-muted-foreground nums">{runtime}</span>
-                  </>
-                )}
-                <Dot />
-                <span className="text-muted-foreground">{movie.language}</span>
-                {accessType && <AccessBadge accessType={accessType} wording="full" />}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                {isAuthLoading ? (
-                  // Auth is still settling: hold the slot so neither "Watch
-                  // now" nor "Sign in" flashes before we know who is looking.
-                  <span aria-hidden className="h-11 w-40 animate-pulse rounded-full bg-white/10" />
-                ) : isGuest ? (
-                  <Button
-                    variant="onArt"
-                    size="pill"
-                    render={<Link href={loginHref(`/movie/${movie.id}`)} />}
-                    nativeButton={false}
-                  >
-                    <LogIn className="size-4" />
-                    {t.movieDetail.signInToWatch}
-                  </Button>
-                ) : hasAccess ? (
-                  <Button
-                    variant="onArt"
-                    size="pill"
-                    render={<Link href={`/player/${movie.id}`} />}
-                    nativeButton={false}
-                  >
-                    <Play className="size-4 fill-current" />
-                    {t.movieDetail.watchNow}
-                  </Button>
-                ) : (
-                  <Button
-                    size="pill"
-                    onClick={() => setSubscribeOpen(true)}
-                  >
-                    <Crown className="size-4" />
-                    {t.movieDetail.subscribeToWatch}
-                  </Button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => toggleWatchlist(movie.id)}
-                  aria-pressed={inWatchlist}
-                  className={cn(
-                    "focus-ring flex h-11 items-center gap-2 rounded-full px-5 text-sm font-medium ring-1 backdrop-blur-md transition-colors duration-150 ease-out ring-inset",
-                    inWatchlist
-                      ? "bg-primary/20 text-foreground ring-primary/50"
-                      : "bg-white/8 text-white ring-white/20 hover:bg-white/15",
-                  )}
-                >
-                  {inWatchlist ? <Check className="size-4" /> : <Plus className="size-4" />}
-                  {inWatchlist ? t.movieDetail.inWatchlist : t.movieDetail.watchlist}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShareOpen(true)}
-                  aria-label={t.movieDetail.share}
-                  className="focus-ring flex size-11 items-center justify-center rounded-full bg-white/8 text-white ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 ease-out ring-inset hover:bg-white/15"
-                >
-                  <Share2 className="size-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── THE SPINE ──────────────────────────────────────────────────────
-          One idea per region: the story on the left, the hard facts in their
-          own panel on the right, so neither has to interrupt the other. */}
-      <section className="mx-auto w-full max-w-[1600px] px-4 pt-10 sm:px-6 lg:px-8 lg:pt-14">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
-          <Surface padding="lg" className="min-w-0">
-            <SectionHeader as="h2" kicker={movie.genre} title={t.movieDetail.storyline} />
-            <p className="text-body-muted mt-4 max-w-3xl leading-relaxed">{movie.description}</p>
-
-            {movie.categories.length > 0 && (
-              <div className="mt-6 flex flex-wrap gap-2">
-                {movie.categories.map((category) => (
-                  <Chip key={category.id} tone="neutral" variant="outline">
-                    {category.name}
-                  </Chip>
-                ))}
-              </div>
-            )}
-          </Surface>
-
-          <Surface tone="subtle" padding="md" className="h-fit">
-            <Kicker>{t.movieDetail.details}</Kicker>
-            <dl className="mt-3 flex flex-col">
-              <DetailRow
-                icon={CalendarDays}
-                label={t.movieDetail.releaseYear}
-                value={String(movie.releaseYear)}
-                numeric
-              />
-              <DetailRow icon={Globe} label={t.movieDetail.language} value={movie.language} />
-              <DetailRow icon={Film} label={t.movieDetail.genre} value={movie.genre} />
-              {movie.categories.length > 0 && (
-                <DetailRow
-                  icon={Tv}
-                  label={t.movieDetail.categories}
-                  value={movie.categories.map((category) => category.name).join(", ")}
-                />
-              )}
-            </dl>
-          </Surface>
-        </div>
-      </section>
-
-      {/* The cast sits above "More like this": who is in this film is a fact
-          about the film, and belongs with it rather than after the pivot to
-          other titles. CastRail renders nothing when there is no cast. */}
-      <CastRail actors={movie.actors} className="mt-12" />
-
-      {similarItems.length > 0 || isSimilarLoading ? (
-        <div className="mt-12">
-          <PosterRail title={t.movieDetail.similar} items={similarItems} isLoading={isSimilarLoading} />
-        </div>
-      ) : null}
-
-      <CommentsSection movieId={movie.id} />
-
-      <div className="h-16" />
+            </>
+          }
+        >
+          <CommentsSection movieId={movie.id} className="max-w-[820px]" />
+        </DetailColumns>
+      </div>
 
       <SubscribeDialog open={subscribeOpen} onOpenChange={setSubscribeOpen} />
       <ShareDialog
@@ -304,54 +330,6 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
         title={movie.title}
         url={typeof window !== "undefined" ? window.location.href : ""}
       />
-    </div>
-  );
-}
-
-function Dot() {
-  return <span aria-hidden className="size-1 rounded-full bg-muted-foreground/50" />;
-}
-
-/** One fact in the details panel — label left, value right, hairline between. */
-function DetailRow({
-  icon: Icon,
-  label,
-  value,
-  numeric = false,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  numeric?: boolean;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 border-b border-white/6 py-2.5 last:border-0">
-      <dt className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-        <Icon className="size-3.5" />
-        {label}
-      </dt>
-      <dd className={cn("min-w-0 text-right text-sm font-medium", numeric && "nums")}>{value}</dd>
-    </div>
-  );
-}
-
-/** Mirrors the hero's shape so the page doesn't jump when the data lands. */
-function DetailSkeleton() {
-  return (
-    <div className="mx-auto w-full max-w-[1600px] px-4 pt-28 pb-10 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:gap-12">
-        <div className="hidden aspect-2/3 w-52 shrink-0 animate-pulse rounded-3xl bg-secondary/60 lg:block xl:w-60" />
-        <div className="flex w-full flex-col gap-4">
-          <div className="h-3 w-24 animate-pulse rounded bg-secondary/60" />
-          <div className="h-12 w-3/4 animate-pulse rounded-lg bg-secondary/60" />
-          <div className="h-4 w-1/2 animate-pulse rounded bg-secondary/60" />
-          <div className="h-12 w-64 animate-pulse rounded-full bg-secondary/60" />
-        </div>
-      </div>
-      <div className="mt-12 grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
-        <div className="h-48 animate-pulse rounded-2xl bg-secondary/40" />
-        <div className="hidden h-48 animate-pulse rounded-2xl bg-secondary/40 lg:block" />
-      </div>
     </div>
   );
 }
