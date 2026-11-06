@@ -35,6 +35,7 @@ import { useLanguage } from "@/lib/context/language-context";
 import { useSection } from "@/lib/i18n/sections/define";
 import { shellText } from "@/lib/i18n/sections/shell";
 import { titlesText } from "@/lib/i18n/sections/titles";
+import { mediaTypeLabel, mediaTypeText } from "@/lib/i18n/sections/mediaType";
 import { seriesService } from "@/services/api/seriesService";
 import { loginHref } from "@/lib/auth/return-to";
 import { formatDuration } from "@/lib/format";
@@ -64,6 +65,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
   const { t } = useLanguage();
   const s = useSection(titlesText);
   const shell = useSection(shellText);
+  const mt = useSection(mediaTypeText);
   const titleId = useId();
   const { data: movie, isLoading } = useMovie(id);
   const { data: similarMovies, isLoading: isSimilarLoading } = useSimilarMovies(id, { genre: movie?.genre });
@@ -150,6 +152,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
     ? s.crewLine(s.directorCount(1), t.movieDetail.castCount(movie.actors.length))
     : t.movieDetail.castCount(movie.actors.length);
 
+  const typeLabel = mediaTypeLabel(mt, movie.country, "movie");
   const facts: DetailFact[] = [
     { label: t.movieDetail.genre, value: movie.genre },
     ...(movie.categories.length > 0
@@ -159,7 +162,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
     { label: t.movieDetail.releaseYear, value: String(movie.releaseYear) },
     ...(runtime ? [{ label: s.length, value: runtime }] : []),
     ...(movie.director ? [{ label: s.director, value: movie.director }] : []),
-    ...(movie.country ? [{ label: s.country, value: movie.country }] : []),
+    ...(typeLabel ? [{ label: mt.label, value: typeLabel }] : []),
     ...(movie.ageRating ? [{ label: s.ageRatingLabel, value: AGE_RATING_LABELS[movie.ageRating] }] : []),
     ...(accessType
       ? [{ label: s.access, value: premium ? t.badges.premium : t.badges.free, tone: premium ? ("gold" as const) : ("money" as const) }]
@@ -209,6 +212,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
           )}
           <span>{movie.releaseYear}</span>
           {runtime && <span>{runtime}</span>}
+          {typeLabel && <span>{typeLabel}</span>}
           <span>{movie.language}</span>
           {movie.ageRating && (
             <Tag kind="age">

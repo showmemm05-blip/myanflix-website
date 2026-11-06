@@ -295,6 +295,8 @@ interface PlayerControlsProps {
   onScrubbingChange?: (scrubbing: boolean) => void;
   /** Real buffered ranges straight off the `<video>` element, in seconds. */
   bufferedRanges: [number, number][];
+  /** Seconds of the ad breaks still to come, ticked on the scrub bar (a stable array). */
+  breakMarkers?: readonly number[];
   prefetchStatus: PrefetchStatusDisplay | null;
   volume: number; // 0-100
   onVolumeChange: (value: number) => void;
@@ -348,6 +350,7 @@ export function PlayerControls({
   onSkip,
   onScrubbingChange,
   bufferedRanges,
+  breakMarkers,
   prefetchStatus,
   volume,
   onVolumeChange,
@@ -402,6 +405,7 @@ export function PlayerControls({
           currentTime={currentTimeSeconds}
           duration={durationSeconds}
           bufferedRanges={bufferedRanges}
+          markers={breakMarkers}
           onSeek={onSeek}
           onScrubbingChange={onScrubbingChange}
         />

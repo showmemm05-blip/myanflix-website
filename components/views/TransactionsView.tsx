@@ -26,6 +26,7 @@ const FILTER_VALUES: TransactionTypeFilter[] = [
   "WITHDRAWAL",
   "SUBSCRIPTION",
   "ADJUSTMENTS",
+  "LOTTERY",
 ];
 
 /** first · … · current−1 · current · current+1 · … · last */
@@ -109,6 +110,9 @@ export function TransactionsView({
     ADJUSTMENTS: t.transactions.typeAdjustment,
     ADJUSTMENT_CREDIT: t.transactions.typeAdjustment,
     ADJUSTMENT_DEBIT: t.transactions.typeAdjustment,
+    LOTTERY: t.transactions.typeLottery,
+    LOTTERY_PURCHASE: t.transactions.typeLottery,
+    LOTTERY_PRIZE: t.transactions.typeLottery,
   };
 
   const filtered = typeFilter !== "all" || search.trim() !== "";

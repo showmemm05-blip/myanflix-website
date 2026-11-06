@@ -18,7 +18,7 @@ import { loginHref } from "@/lib/auth/return-to";
 import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { useSection } from "@/lib/i18n/sections/define";
-import { titlesText } from "@/lib/i18n/sections/titles";
+import { titlesText, type TitlesText } from "@/lib/i18n/sections/titles";
 import { cn } from "@/lib/utils";
 import { commentService } from "@/services/api/commentService";
 import { ApiError } from "@/services/api/apiClient";
@@ -58,9 +58,15 @@ import type { TranslationShape } from "@/lib/i18n/translations";
 /** How close to the backend's ceiling the draft gets before the count appears. */
 const COUNTER_VISIBLE_FROM = 100;
 
-/** The author's name as the thread shows it — the display name, else the handle. */
-function authorName(comment: Comment): string {
-  return comment.user.displayName?.trim() || comment.user.username;
+/**
+ * The author's name as the thread shows it — the display name, else the
+ * `Member #<tag>` pseudonym with its prefix in the viewer's language. Never a
+ * username: for a phone sign-up that is the phone number, which is why the
+ * server no longer sends one (SEC-007).
+ */
+function authorName(comment: Comment, s: TitlesText): string {
+  const { displayName, memberTag } = comment.user;
+  return memberTag ? s.memberLabel(memberTag) : displayName;
 }
 
 /**
@@ -122,6 +128,7 @@ export function CommentsSection(props: CommentTarget & { className?: string }) {
       : { bookId: props.bookId! };
 
   const { t } = useLanguage();
+  const s = useSection(titlesText);
   const pathname = usePathname();
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
@@ -284,7 +291,7 @@ export function CommentsSection(props: CommentTarget & { className?: string }) {
                     <ReplyComposer
                       avatarUrl={myAvatar}
                       name={myName}
-                      replyToName={authorName(comment)}
+                      replyToName={authorName(comment, s)}
                       isPending={postReply.isPending}
                       onCancel={() => setReplyingTo(null)}
                       onSubmit={(body) =>
@@ -499,7 +506,8 @@ function CommentRow({
   compact?: boolean;
 }) {
   const { t } = useLanguage();
-  const name = authorName(comment);
+  const s = useSection(titlesText);
+  const name = authorName(comment, s);
 
   return (
     <article className="flex gap-3">

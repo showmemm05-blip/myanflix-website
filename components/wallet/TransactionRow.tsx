@@ -9,6 +9,7 @@ import {
   CrownOutlineIcon,
   FilmIcon,
   RefundIcon,
+  TicketIcon,
   WalletLineIcon,
 } from "@/components/wallet/icons";
 import { useLanguage } from "@/lib/context/language-context";
@@ -30,6 +31,8 @@ const KIND: Record<
   WITHDRAWAL: { icon: ArrowUpIcon, tone: "outflow", credit: false },
   ADJUSTMENT_CREDIT: { icon: WalletLineIcon, tone: "adj", credit: true },
   ADJUSTMENT_DEBIT: { icon: WalletLineIcon, tone: "adj", credit: false },
+  LOTTERY_PURCHASE: { icon: TicketIcon, tone: "buy", credit: false },
+  LOTTERY_PRIZE: { icon: ArrowDownIcon, tone: "inflow", credit: true },
 };
 
 /** Icon, tile colour, direction and the row label for a transaction type. */
@@ -42,6 +45,8 @@ export function transactionKind(type: TransactionType, t: TranslationShape) {
     WITHDRAWAL: t.transactions.rowWithdrawal,
     ADJUSTMENT_CREDIT: t.transactions.rowAdjustment,
     ADJUSTMENT_DEBIT: t.transactions.rowAdjustment,
+    LOTTERY_PURCHASE: t.transactions.rowLotteryPurchase,
+    LOTTERY_PRIZE: t.transactions.rowLotteryPrize,
   };
   return { ...KIND[type], label: label[type] };
 }

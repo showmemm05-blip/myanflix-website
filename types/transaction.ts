@@ -5,14 +5,18 @@ export type TransactionType =
   | "REFUND"
   | "WITHDRAWAL"
   | "ADJUSTMENT_CREDIT"
-  | "ADJUSTMENT_DEBIT";
+  | "ADJUSTMENT_DEBIT"
+  /** A lottery ticket purchase, and (phase 3) a lottery prize paid into the wallet. */
+  | "LOTTERY_PURCHASE"
+  | "LOTTERY_PRIZE";
 export type TransactionStatus = "COMPLETED" | "PENDING" | "FAILED";
 
 /**
  * Transaction-list filter chips. "ADJUSTMENTS" is a combined chip covering
  * both adjustment directions — one concept to the user, two ledger types.
+ * "LOTTERY" does the same for ticket purchases and prizes.
  */
-export type TransactionTypeFilter = TransactionType | "all" | "ADJUSTMENTS";
+export type TransactionTypeFilter = TransactionType | "all" | "ADJUSTMENTS" | "LOTTERY";
 
 export interface Transaction {
   id: string;

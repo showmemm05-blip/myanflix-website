@@ -33,6 +33,7 @@ export interface Movie {
   rating: number;
   /** Nullable metadata added for the filter system — null until the admin backfills it. */
   director: string | null;
+  /** The movie TYPE word ("Korean", "English"… — lib/i18n/sections/mediaType.ts), not a country name. */
   country: string | null;
   ageRating: AgeRating | null;
   /** Episode rows carry this too, but it's vestigial — episode access is always governed by the parent series' own accessType. */

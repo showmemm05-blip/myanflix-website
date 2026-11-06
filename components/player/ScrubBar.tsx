@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { memo, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useLanguage } from "@/lib/context/language-context";
 import { formatTimecode } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -16,11 +16,34 @@ const PAGE_STEP_SECONDS = 60;
  */
 const DRAG_SEEK_INTERVAL_MS = 250;
 
+/**
+ * The ad-break ticks on the track (lib/player/midroll.ts midrollMarkers): one
+ * thin gold line per break still to come. Memoised apart from the bar, which
+ * re-renders with every clock tick — the breaks change only when one plays.
+ */
+const BreakTicks = memo(function BreakTicks({ markers, duration }: { markers: readonly number[]; duration: number }) {
+  if (duration <= 0 || markers.length === 0) return null;
+  return (
+    <>
+      {markers.map((seconds) => (
+        <div
+          key={seconds}
+          aria-hidden
+          className="absolute inset-y-0 w-[3px] -translate-x-1/2 bg-gold"
+          style={{ left: `${Math.min(100, (seconds / duration) * 100)}%` }}
+        />
+      ))}
+    </>
+  );
+});
+
 interface ScrubBarProps {
   currentTime: number;
   duration: number;
   /** Real `<video>.buffered` ranges, in seconds. */
   bufferedRanges: [number, number][];
+  /** Seconds of the ad breaks still to come; keep the array stable between renders. */
+  markers?: readonly number[];
   onSeek: (seconds: number) => void;
   /** Lets the parent pin the controls open for the whole drag. */
   onScrubbingChange?: (scrubbing: boolean) => void;
@@ -38,6 +61,7 @@ export function ScrubBar({
   currentTime,
   duration,
   bufferedRanges,
+  markers,
   onSeek,
   onScrubbingChange,
   className,
@@ -225,6 +249,8 @@ export function ScrubBar({
           className="absolute inset-y-0 left-0 rounded-[3px] bg-crimson"
           style={{ width: `${playedFraction * 100}%` }}
         />
+
+        {markers && <BreakTicks markers={markers} duration={duration} />}
       </div>
 
       <div

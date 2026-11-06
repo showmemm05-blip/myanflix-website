@@ -1,8 +1,14 @@
 export interface CommentAuthor {
-  id: string;
-  username: string;
-  /** The cosmetic name. `null` for accounts that never set one — fall back to `username`. */
-  displayName: string | null;
+  /** The author's user id — on your own comments only (`Comment.isMine`); never another reader's. */
+  id?: string;
+  /**
+   * The name the thread shows: the account's display name, else the server's
+   * `Member #<tag>` pseudonym. Always set, and never the username — for a
+   * phone sign-up that is the phone number, so the server no longer sends it.
+   */
+  displayName: string;
+  /** The tag behind a `Member #<tag>` pseudonym, so the prefix can be translated; `null` when `displayName` is the account's own. */
+  memberTag: string | null;
   avatarUrl: string | null;
 }
 
@@ -17,6 +23,12 @@ export interface Comment {
   /** Server-assigned ISO timestamp — the client never sends one. */
   createdAt: string;
   user: CommentAuthor;
+  /**
+   * True when the signed-in viewer wrote it. The thread is read without a
+   * token today (`commentService.list` is `skipAuth`), so this is false on
+   * every listed comment and true only on the one `create` just returned.
+   */
+  isMine: boolean;
   /** For a top-level comment: its first REPLY_PAGE_SIZE replies, oldest first. */
   replies: Comment[];
   /** Every visible reply, whether or not it is in `replies`. */

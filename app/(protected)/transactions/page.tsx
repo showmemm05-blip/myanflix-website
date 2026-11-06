@@ -30,9 +30,10 @@ export default function TransactionsPage() {
     const matchesType =
       typeFilter === "all" ||
       t.type === typeFilter ||
-      // One combined chip covers both adjustment directions.
+      // One combined chip covers both adjustment directions; one covers lottery tickets and prizes.
       (typeFilter === "ADJUSTMENTS" &&
-        (t.type === "ADJUSTMENT_CREDIT" || t.type === "ADJUSTMENT_DEBIT"));
+        (t.type === "ADJUSTMENT_CREDIT" || t.type === "ADJUSTMENT_DEBIT")) ||
+      (typeFilter === "LOTTERY" && t.type.startsWith("LOTTERY_"));
     return matchesSearch && matchesType;
   });
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));

@@ -35,7 +35,6 @@ export const titlesText = defineSection({
     length: "Length",
     director: "Director",
     actor: "Actor",
-    country: "Country",
     ageRatingLabel: "Age rating",
     access: "Access",
     upsellTitle: "Included with Premium",
@@ -108,6 +107,8 @@ export const titlesText = defineSection({
     // ── Comments ────────────────────────────────────────────────────────
     yourComment: "Your comment",
     replyTo: (name: string) => `Reply to ${name}`,
+    /** The name shown for a commenter who never set a display name; the server sends the tag. */
+    memberLabel: (tag: string) => `Member #${tag}`,
   },
   mm: {
     film: "ရုပ်ရှင်",
@@ -133,7 +134,6 @@ export const titlesText = defineSection({
     length: "ကြာချိန်",
     director: "ဒါရိုက်တာ",
     actor: "သရုပ်ဆောင်",
-    country: "နိုင်ငံ",
     ageRatingLabel: "အသက်အရွယ် သတ်မှတ်ချက်",
     access: "ကြည့်ရှုခွင့်",
     upsellTitle: "Premium တွင် ပါဝင်သည်",
@@ -200,6 +200,7 @@ export const titlesText = defineSection({
     loadingBook: "စာအုပ် ဖွင့်နေသည်",
     yourComment: "သင့်မှတ်ချက်",
     replyTo: (name: string) => `${name} ထံ ပြန်စာရေးရန်`,
+    memberLabel: (tag: string) => `အဖွဲ့ဝင် #${tag}`,
   },
 });
 

@@ -13,6 +13,7 @@ import { SearchableMultiSelect, type MultiSelectOption } from "./SearchableMulti
 import { useActorSearch } from "@/hooks/use-actors";
 import { useLanguage } from "@/lib/context/language-context";
 import { useSection } from "@/lib/i18n/sections/define";
+import { mediaTypeName, mediaTypeText } from "@/lib/i18n/sections/mediaType";
 import { searchText } from "@/lib/i18n/sections/search";
 import { cn } from "@/lib/utils";
 import type { AccessType, AgeRating, FacetValue } from "@/types/movie";
@@ -92,6 +93,7 @@ export function FilterSheet({
 }) {
   const { t } = useLanguage();
   const sx = useSection(searchText);
+  const mt = useSection(mediaTypeText);
   const ids = useId();
 
   // The cast picker's live search — the term lives here (it's sheet-local UI
@@ -498,15 +500,15 @@ export function FilterSheet({
                 {(facets?.countries?.length ?? 0) > 0 && (
                   <Group
                     id={`${ids}-country`}
-                    label={t.filters.country}
+                    label={mt.filterLabel}
                     labelFor={`${ids}-country-input`}
                     value={selectedMeta(values.countries.length)}
                     onClear={() => onChange({ countries: [] })}
                   >
                     <SearchableMultiSelect
                       inputId={`${ids}-country-input`}
-                      options={facets!.countries!.map((f) => ({ id: f.value, label: f.value }))}
-                      value={values.countries.map((c) => ({ id: c, label: c }))}
+                      options={facets!.countries!.map((f) => ({ id: f.value, label: mediaTypeName(mt, f.value) }))}
+                      value={values.countries.map((c) => ({ id: c, label: mediaTypeName(mt, c) }))}
                       onChange={(next) => onChange({ countries: next.map((o) => o.id) })}
                       placeholder={sx.any}
                     />

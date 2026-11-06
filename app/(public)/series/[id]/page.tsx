@@ -34,6 +34,7 @@ import { useLanguage } from "@/lib/context/language-context";
 import { useSection } from "@/lib/i18n/sections/define";
 import { shellText } from "@/lib/i18n/sections/shell";
 import { titlesText } from "@/lib/i18n/sections/titles";
+import { mediaTypeLabel, mediaTypeText } from "@/lib/i18n/sections/mediaType";
 import { loginHref } from "@/lib/auth/return-to";
 import { formatDuration, UNKNOWN_DURATION } from "@/lib/format";
 import { RESUME_COMPLETE_PERCENT, resumeHref } from "@/lib/player/resume";
@@ -59,6 +60,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
   const { t } = useLanguage();
   const s = useSection(titlesText);
   const shell = useSection(shellText);
+  const mt = useSection(mediaTypeText);
   const titleId = useId();
   const { data: series, isLoading } = useQuery({
     queryKey: ["series", id],
@@ -180,12 +182,14 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
     .slice(0, 12)
     .map((item) => seriesToBrowseItem(item, t.browse.episodeCount(item.episodeCount)));
 
+  const typeLabel = mediaTypeLabel(mt, series.country, "series");
   const facts: DetailFact[] = [
     { label: t.movieDetail.genre, value: series.genre },
     ...(series.categories.length > 0
       ? [{ label: t.movieDetail.categories, value: series.categories.map((c) => c.name).join(", ") }]
       : []),
     { label: t.movieDetail.language, value: series.language },
+    ...(typeLabel ? [{ label: mt.label, value: typeLabel }] : []),
     { label: t.movieDetail.releaseYear, value: String(series.releaseYear) },
     {
       label: s.access,
@@ -230,6 +234,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
           )}
           <span>{series.releaseYear}</span>
           <span>{countLine}</span>
+          {typeLabel && <span>{typeLabel}</span>}
           <span>{series.language}</span>
         </HeroMeta>
 

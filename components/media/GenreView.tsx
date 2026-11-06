@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/context/auth-context";
 import { useLanguage } from "@/lib/context/language-context";
 import { useSection } from "@/lib/i18n/sections/define";
 import { mediaText } from "@/lib/i18n/sections/media";
+import { mediaTypeName, mediaTypeText } from "@/lib/i18n/sections/mediaType";
 import { shellText } from "@/lib/i18n/sections/shell";
 import { cn } from "@/lib/utils";
 import { movieService } from "@/services/api/movieService";
@@ -94,6 +95,7 @@ function GenreViewInner({
   const { t } = useLanguage();
   const m = useSection(mediaText);
   const s = useSection(shellText);
+  const mt = useSection(mediaTypeText);
   const { isAuthenticated } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -191,15 +193,21 @@ function GenreViewInner({
   );
 
   const pills: ActivePill[] = [];
-  const pushList = (key: string, values: string[], field: "genres" | "languages" | "directors" | "countries") => {
+  const pushList = (
+    key: string,
+    values: string[],
+    field: "genres" | "languages" | "directors" | "countries",
+    labelOf: (value: string) => string = (value) => value,
+  ) => {
     for (const value of values) {
-      pills.push({ key: `${key}:${value}`, label: value, onRemove: () => update({ [field]: filters[field].filter((v) => v !== value) }) });
+      pills.push({ key: `${key}:${value}`, label: labelOf(value), onRemove: () => update({ [field]: filters[field].filter((v) => v !== value) }) });
     }
   };
   if (!genre) pushList("genre", visibleFilters.genres, "genres");
   pushList("language", visibleFilters.languages, "languages");
   pushList("director", visibleFilters.directors, "directors");
-  pushList("country", visibleFilters.countries, "countries");
+  // The movie TYPE ("Korean movies"), kept in the API's `country` field.
+  pushList("country", visibleFilters.countries, "countries", (value) => mt.movies(mediaTypeName(mt, value)));
   for (const actor of visibleFilters.actors) {
     pills.push({ key: `actor:${actor.id}`, label: actor.name, onRemove: () => update({ actors: filters.actors.filter((a) => a.id !== actor.id) }) });
   }

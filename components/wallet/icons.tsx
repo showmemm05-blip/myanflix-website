@@ -36,6 +36,10 @@ export const ClockIcon = make("M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM12 7.5V12l3 
 export const RefundIcon = make("M9 14l-5-5 5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11");
 export const FilmIcon = make("M4 5h16v14H4zM8 5v14M16 5v14M4 9.5h4M16 9.5h4M4 14.5h4M16 14.5h4");
 export const CrownOutlineIcon = make("M3 18h18l1-11-5.5 4L12 4 7.5 11 2 7z");
+/** A lottery ticket: a stub with a notch on each side and a dotted tear line. */
+export const TicketIcon = make(
+  "M4 8.5V6a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2.5a2 2 0 0 0 0 4V15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2.5a2 2 0 0 0 0-4zM10 5v1.5M10 9v1.5M10 13v1.5",
+);
 export const WalletLineIcon = make(
   "M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5zM15 12h2.5",
 );
