@@ -79,6 +79,7 @@ import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { useNetworkQuality } from "@/lib/hooks/use-network-quality";
 import { usePlayerHotkeys } from "@/lib/hooks/use-player-hotkeys";
 import { formatDuration, formatTimecode } from "@/lib/format";
+import { localizedDescription } from "@/lib/localized-description";
 import { parseStartSeconds, START_PARAM, usableStartSeconds } from "@/lib/player/resume";
 import {
   PREROLL_STALL_MS,
@@ -296,7 +297,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const { movieId } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const p = useSection(playText);
   const { data: movie, isLoading } = useMovie(movieId);
   const { data: similarMovies, isLoading: isSimilarLoading } = useSimilarMovies(movieId);
@@ -1549,6 +1550,9 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
   const railOpen = showRail && isRailOpen;
   // null when the runtime was never measured — the runtime is dropped rather than reading "0m".
   const runtime = formatDuration(movie.duration);
+  // The synopsis in the site's language (the other one when that is missing);
+  // "" for a title with neither, and then the paragraph is left out.
+  const description = localizedDescription(movie, language);
   // The bar has to survive a drag and an open menu, and there's no reason to hide
   // it from a paused picture — nobody is watching anything at that moment.
   const showControls = controlsVisible || !isPlaying || isScrubbing || isMenuOpen;
@@ -2255,7 +2259,7 @@ export default function PlayerPage({ params }: { params: Promise<{ movieId: stri
             ))}
           </div>
 
-          <p className="mt-4 max-w-[68ch] text-body text-fg-body">{movie.description}</p>
+          {description && <p className="mt-4 max-w-[68ch] text-body text-fg-body">{description}</p>}
 
           <p
             className="mt-[18px] flex flex-wrap items-center gap-x-3.5 gap-y-2 text-[13px] leading-[18px] text-fg-faint max-desk:hidden"

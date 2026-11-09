@@ -15,10 +15,11 @@ import { shellText } from "@/lib/i18n/sections/shell";
  * THE QUIET FOOTER (SHELL.md §7) — on long, scrolling pages.
  *
  * One surface band (#121217): the wordmark and the site-wide peak-viewers
- * figure on the left; Privacy, Help & feedback (opens the shared feedback
- * dialog), the English | မြန်မာ switch and © on the right. The old browse/
- * account links live in the top bar and the account menu now, and the dead
- * Help centre / Contact / Terms / social links are gone (owner default).
+ * figure on the left; Privacy, About (the page that carries the TMDB credit,
+ * owner 2026-11-06), Help & feedback (opens the shared feedback dialog), the
+ * English | မြန်မာ switch and © on the right. The old browse/account links
+ * live in the top bar and the account menu now, and the dead Help centre /
+ * Contact / Terms / social links are gone (owner default).
  */
 export function Footer() {
   const { t } = useLanguage();
@@ -44,6 +45,9 @@ export function Footer() {
         >
           <Link href="/privacy" className="rounded-[6px] text-fg-muted outline-none hover:text-link focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link">
             {s.privacy}
+          </Link>
+          <Link href="/about" className="rounded-[6px] text-fg-muted outline-none hover:text-link focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link">
+            {s.about}
           </Link>
           <button
             type="button"

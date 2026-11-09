@@ -32,6 +32,7 @@ import { formatDuration } from "@/lib/format";
 import { useSection } from "@/lib/i18n/sections/define";
 import { mediaText } from "@/lib/i18n/sections/media";
 import { shellText } from "@/lib/i18n/sections/shell";
+import { localizedDescription } from "@/lib/localized-description";
 import type { Movie } from "@/types/movie";
 import { HeroAnnouncer } from "./HeroAnnouncer";
 import { isRecent } from "./media-data";
@@ -65,7 +66,7 @@ export function MovieHero({
   /** Replaces the NEW-based kicker (e.g. "Top pick in Drama"). */
   kicker?: string;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const m = useSection(mediaText);
   const s = useSection(shellText);
   const { isAuthenticated } = useAuth();
@@ -86,6 +87,8 @@ export function MovieHero({
   const canWatch = !premium || isSubscribed;
   const isNew = isRecent(movie.createdAt);
   const runtime = formatDuration(movie.duration);
+  // The synopsis in the site's language (the other one when that is missing).
+  const description = localizedDescription(movie, language);
   const saved = isInWatchlist(movie.id);
   const query = params.toString();
   const here = query ? `${pathname}?${query}` : pathname;
@@ -123,7 +126,7 @@ export function MovieHero({
               <span>{movie.genre}</span>
               {movie.ageRating && <Tag kind="age">{AGE_RATING_LABELS[movie.ageRating]}</Tag>}
             </HeroMeta>
-            {size === "hub" && movie.description && <HeroSynopsis>{movie.description}</HeroSynopsis>}
+            {size === "hub" && description && <HeroSynopsis>{description}</HeroSynopsis>}
           </div>
           <HeroActions className={size === "detail" ? "mt-[22px]" : undefined}>
             {canWatch ? (

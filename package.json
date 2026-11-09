@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --port 3003",
     "lint": "eslint",
-    "test": "node --test lib/security/*.test.ts hooks/*.test.ts lib/streaming/*.test.ts lib/player/*.test.ts components/home/*.test.ts",
+    "test": "node --test lib/*.test.ts lib/credits/*.test.ts lib/security/*.test.ts hooks/*.test.ts lib/streaming/*.test.ts lib/player/*.test.ts components/home/*.test.ts",
     "test:headers": "node --test lib/security/*.test.ts"
   },
   "dependencies": {

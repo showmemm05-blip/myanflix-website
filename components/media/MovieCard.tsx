@@ -14,6 +14,7 @@ import { formatDuration } from "@/lib/format";
 import { useSection } from "@/lib/i18n/sections/define";
 import { mediaText } from "@/lib/i18n/sections/media";
 import { shellText } from "@/lib/i18n/sections/shell";
+import { metaLine } from "@/lib/title-facts";
 import type { Movie } from "@/types/movie";
 import type { SeriesListItem } from "@/types/series";
 import { isRecent } from "./media-data";
@@ -161,7 +162,8 @@ export const SeriesWideCard = memo(function SeriesWideCard({ series }: { series:
         {series.title}
       </span>
       <span className="block truncate text-[13px] leading-[18px] text-fg-faint tabular-nums">
-        {series.genre} · {series.releaseYear} · {episodes}
+        {/* A show made from TMDB can be live with no genre word: no leading " · " then. */}
+        {metaLine([series.genre, series.releaseYear, episodes])}
       </span>
       <Link
         href={`/series/${series.id}`}

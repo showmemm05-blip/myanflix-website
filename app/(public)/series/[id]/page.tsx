@@ -37,7 +37,9 @@ import { titlesText } from "@/lib/i18n/sections/titles";
 import { mediaTypeLabel, mediaTypeText } from "@/lib/i18n/sections/mediaType";
 import { loginHref } from "@/lib/auth/return-to";
 import { formatDuration, UNKNOWN_DURATION } from "@/lib/format";
+import { localizedDescription } from "@/lib/localized-description";
 import { RESUME_COMPLETE_PERCENT, resumeHref } from "@/lib/player/resume";
+import { genreChip, optionalFact } from "@/lib/title-facts";
 import { cn } from "@/lib/utils";
 import type { Movie } from "@/types/movie";
 import type { PlayerEpisodeProgress } from "@/types/series";
@@ -57,7 +59,7 @@ const SERIES_HREF = "/media/movies?tab=series";
 
 export default function SeriesDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const s = useSection(titlesText);
   const shell = useSection(shellText);
   const mt = useSection(mediaTypeText);
@@ -164,6 +166,8 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
   }
 
   const premium = series.accessType === "SUBSCRIPTION";
+  // The synopsis in the site's language (the other one when that is missing).
+  const description = localizedDescription(series, language);
   const seriesCatalogHref = `${SERIES_HREF}&genres=${encodeURIComponent(series.genre)}`;
   const episodeTitle = (episode: Movie) => episode.title || t.seriesDetail.episodeFallbackTitle(episode.episodeNumber ?? 0);
   const countLine = t.seriesDetail.seasonSummary(seasons.size, episodes?.length ?? 0);
@@ -183,12 +187,15 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
     .map((item) => seriesToBrowseItem(item, t.browse.episodeCount(item.episodeCount)));
 
   const typeLabel = mediaTypeLabel(mt, series.country, "series");
+  // A show made from TMDB can be live with no genre or no language word
+  // (lib/title-facts.ts): each row, the hero's language and the genre chip
+  // show only when there is something to say.
   const facts: DetailFact[] = [
-    { label: t.movieDetail.genre, value: series.genre },
+    ...optionalFact(t.movieDetail.genre, series.genre),
     ...(series.categories.length > 0
       ? [{ label: t.movieDetail.categories, value: series.categories.map((c) => c.name).join(", ") }]
       : []),
-    { label: t.movieDetail.language, value: series.language },
+    ...optionalFact(t.movieDetail.language, series.language),
     ...(typeLabel ? [{ label: mt.label, value: typeLabel }] : []),
     { label: t.movieDetail.releaseYear, value: String(series.releaseYear) },
     {
@@ -235,20 +242,20 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
           <span>{series.releaseYear}</span>
           <span>{countLine}</span>
           {typeLabel && <span>{typeLabel}</span>}
-          <span>{series.language}</span>
+          {series.language && <span>{series.language}</span>}
         </HeroMeta>
 
         <HeroChips
           label={s.genreAndCategories}
           chips={[
-            { key: `genre:${series.genre}`, label: series.genre, href: seriesCatalogHref },
+            ...genreChip(series.genre, seriesCatalogHref),
             ...series.categories
               .filter((category) => category.name !== series.genre)
               .map((category) => ({ key: category.id, label: category.name })),
           ]}
         />
 
-        {series.description && <HeroSynopsisToggle>{series.description}</HeroSynopsisToggle>}
+        {description && <HeroSynopsisToggle>{description}</HeroSynopsisToggle>}
 
         <div className="mt-6 flex flex-wrap gap-3">
           {isAuthLoading ? (
@@ -471,8 +478,10 @@ function EpisodeRow({
   signInHref: string;
   onLockedClick: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const s = useSection(titlesText);
+  // An episode is a movie row, so it has both texts too.
+  const summary = localizedDescription(episode, language);
   const pct = progress?.progressPercent ?? 0;
   const done = pct >= RESUME_COMPLETE_PERCENT;
   const inProgress = pct > 0 && !done;
@@ -557,9 +566,9 @@ function EpisodeRow({
           {runtime}
           {done ? ` · ${s.watched}` : minutesLeft !== null ? ` · ${s.minutesLeft(minutesLeft)}` : ""}
         </span>
-        {episode.description && (
+        {summary && (
           <span className="mt-1.5 line-clamp-2 max-w-[64ch] text-sm leading-[21px] text-fg-muted max-desk:hidden">
-            {episode.description}
+            {summary}
           </span>
         )}
       </span>

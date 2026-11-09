@@ -19,7 +19,7 @@ import { Artwork } from "./Artwork";
  *     <HeroTags>…<Tag kind="new">NEW</Tag>…</HeroTags>
  *     <HeroTitle>{m.title}</HeroTitle>
  *     <HeroMeta>…</HeroMeta>
- *     <HeroSynopsis>{m.description}</HeroSynopsis>
+ *     <HeroSynopsis>{localizedDescription(m, language)}</HeroSynopsis>
  *     <HeroActions>…Play / My List / More info…</HeroActions>
  *     <HeroPager … />
  *   </HeroShell>

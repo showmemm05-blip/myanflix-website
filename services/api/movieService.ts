@@ -6,6 +6,8 @@ export interface BackendMovie {
   id: string;
   title: string;
   description: string;
+  /** Absent until the backend with the Burmese column is deployed. */
+  descriptionMm?: string | null;
   posterUrl: string | null;
   coverUrl: string | null;
   genre: string;
@@ -32,6 +34,9 @@ export function mapMovie(m: BackendMovie): Movie {
     id: m.id,
     title: m.title,
     description: m.description,
+    // The Burmese text: a backend from before the column sends nothing, and
+    // that must read exactly like "none".
+    descriptionMm: m.descriptionMm ?? null,
     posterUrl: m.posterUrl,
     coverUrl: m.coverUrl,
     genre: m.genre,

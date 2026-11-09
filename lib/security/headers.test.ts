@@ -178,8 +178,12 @@ describe("buildContentSecurityPolicy", () => {
     ]) {
       assert.ok(img.includes(v), `img-src missing ${v}`);
     }
-    // Never used by any page, so not allowed (tightened 2026-10-07).
+    // Never used by any page, so not allowed (tightened 2026-10-07). It
+    // stays that way now that staff fill details from TMDB (2026-11-06):
+    // viewers only load our own stored copies, and the About page's TMDB
+    // logo is a file of this site.
     assert.ok(!img.includes("https://image.tmdb.org"), "img-src should not allow image.tmdb.org");
+    assert.ok(!csp.includes("tmdb.org"), "no directive should name a TMDB host");
     assert.deepEqual(directive(csp, "frame-src"), ["https://accounts.google.com"]);
     assert.deepEqual(directive(csp, "font-src"), ["'self'", "data:"]);
   });

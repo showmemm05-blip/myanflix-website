@@ -40,6 +40,7 @@ import { homeText } from "@/lib/i18n/sections/home";
 import { mediaText } from "@/lib/i18n/sections/media";
 import { shellText } from "@/lib/i18n/sections/shell";
 import { walletText } from "@/lib/i18n/sections/wallet";
+import { localizedDescription } from "@/lib/localized-description";
 import { cn } from "@/lib/utils";
 import { PaymentChips, PLANS_ANCHOR } from "./HomePremiumBand";
 import { PromoVisual } from "./PromoArt";
@@ -363,7 +364,7 @@ function DotTabs({
 
 /** A featured title (the old hero, unchanged in behaviour). */
 function TitleSlide({ pick, onSubscribe }: { pick: HeroPick; onSubscribe: () => void }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const h = useSection(homeText);
   const m = useSection(mediaText);
   const s = useSection(shellText);
@@ -376,7 +377,8 @@ function TitleSlide({ pick, onSubscribe }: { pick: HeroPick; onSubscribe: () => 
   const id = pick.kind === "movie" ? pick.movie.id : pick.series.id;
   const createdAt = pick.kind === "movie" ? pick.movie.createdAt : pick.series.createdAt;
   const accessType = pick.kind === "movie" ? pick.movie.accessType : pick.series.accessType;
-  const description = pick.kind === "movie" ? pick.movie.description : pick.series.description;
+  // The synopsis in the site's language (the other one when that is missing).
+  const description = localizedDescription(pick.kind === "movie" ? pick.movie : pick.series, language);
   const premium = accessType === "SUBSCRIPTION";
   const isNew = isRecent(createdAt);
 

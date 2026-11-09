@@ -17,6 +17,7 @@ import { formatDuration } from "@/lib/format";
 import { useSection } from "@/lib/i18n/sections/define";
 import { homeText } from "@/lib/i18n/sections/home";
 import { shellText } from "@/lib/i18n/sections/shell";
+import { localizedDescription } from "@/lib/localized-description";
 import type { AgeRating } from "@/types/movie";
 import { PromoVisual } from "./PromoArt";
 import { promoText, titleHref, type ShowcaseSpotlight } from "./showcase-model";
@@ -48,7 +49,9 @@ export function HomeSpotlight({ spotlight }: { spotlight: ShowcaseSpotlight | nu
   const { title: item, promo, source } = spotlight;
   const text = promo ? promoText(promo, language) : null;
   const kicker = text?.kicker ?? (source === "PROMO" ? h.spotlight : h.newestOnMyanflix);
-  const line = text?.body ?? item.description;
+  // The admin's own line first; otherwise the title's description in the
+  // site's language (the other one when that is missing).
+  const line = text?.body ?? localizedDescription(item, language);
   const href = titleHref(item);
   const premium = item.accessType === "SUBSCRIPTION";
   const ownImage = promo?.imageUrl ?? null;

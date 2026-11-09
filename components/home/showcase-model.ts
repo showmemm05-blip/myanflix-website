@@ -24,6 +24,12 @@ export interface ShowcaseTitle {
   title: string;
   /** At most 300 characters, whitespace collapsed. */
   description: string;
+  /**
+   * The Burmese text, shortened the same way; null = none (books never have
+   * one). Absent on a backend from before the column, which reads as none
+   * (lib/localized-description.ts).
+   */
+  descriptionMm?: string | null;
   posterUrl: string | null;
   coverUrl: string | null;
   /** Movies only. */

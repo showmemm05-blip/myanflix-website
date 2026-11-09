@@ -38,8 +38,8 @@ const under = (pathname: string, ...roots: string[]) => roots.some((root) => isA
  * Which tab a page lights up (SHELL.md "Tab ownership"). The account pages —
  * Profile, My List, Watch history, Library, Notifications, Settings — light
  * none (owner, 2026-10-07: Profile left the nav because the avatar menu
- * already opens it), as the mobile app shows no tab on Profile. Privacy and
- * anything unknown light none too.
+ * already opens it), as the mobile app shows no tab on Profile. Privacy,
+ * About and anything unknown light none too.
  */
 export function activeShellTab(pathname: string): ShellTab | null {
   if (pathname === "/") return "home";

@@ -29,6 +29,7 @@ import { RESUME_COMPLETE_PERCENT, resumeHref } from "@/lib/player/resume";
 import { useSection } from "@/lib/i18n/sections/define";
 import { mediaText } from "@/lib/i18n/sections/media";
 import { shellText } from "@/lib/i18n/sections/shell";
+import { localizedDescription } from "@/lib/localized-description";
 import { seriesService } from "@/services/api/seriesService";
 import type { SeriesListItem } from "@/types/series";
 import { HeroAnnouncer } from "./HeroAnnouncer";
@@ -139,7 +140,7 @@ export function SeriesHero({
   label?: string;
   kicker?: string;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const m = useSection(mediaText);
   const s = useSection(shellText);
   const { isAuthenticated } = useAuth();
@@ -160,6 +161,8 @@ export function SeriesHero({
   if (!show) return null;
 
   const isNew = isRecent(show.createdAt);
+  // The synopsis in the site's language (the other one when that is missing).
+  const description = localizedDescription(show, language);
   const query = params.toString();
   const here = query ? `${pathname}?${query}` : pathname;
   const playText = target
@@ -200,7 +203,7 @@ export function SeriesHero({
               <span>{t.browse.episodeCount(show.episodeCount)}</span>
               <span>{show.genre}</span>
             </HeroMeta>
-            {size === "hub" && show.description && <HeroSynopsis>{show.description}</HeroSynopsis>}
+            {size === "hub" && description && <HeroSynopsis>{description}</HeroSynopsis>}
           </div>
           <HeroActions className={size === "detail" ? "mt-[22px]" : undefined}>
             {canWatch ? (

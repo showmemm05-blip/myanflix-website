@@ -39,7 +39,9 @@ import { mediaTypeLabel, mediaTypeText } from "@/lib/i18n/sections/mediaType";
 import { seriesService } from "@/services/api/seriesService";
 import { loginHref } from "@/lib/auth/return-to";
 import { formatDuration } from "@/lib/format";
+import { localizedDescription } from "@/lib/localized-description";
 import { RESUME_COMPLETE_PERCENT, resumeHref } from "@/lib/player/resume";
+import { genreChip, optionalFact } from "@/lib/title-facts";
 import { cn } from "@/lib/utils";
 import { DetailHero, HeroChips, HeroProgress, HeroSynopsisToggle } from "../_detail/DetailHero";
 import {
@@ -62,7 +64,7 @@ function catalogHref(param: "genres" | "actorIds" | "directors", value: string) 
 
 export default function MovieDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const s = useSection(titlesText);
   const shell = useSection(shellText);
   const mt = useSection(mediaTypeText);
@@ -114,6 +116,8 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
   const similarItems = (similarMovies ?? []).map((m) => movieToBrowseItem(m, formatDuration(m.duration)));
   // null when the runtime was never measured — the meta line skips it.
   const runtime = formatDuration(movie.duration);
+  // The synopsis in the site's language (the other one when that is missing).
+  const description = localizedDescription(movie, language);
   const premium = accessType === "SUBSCRIPTION";
 
   // Resume: a started, unfinished entry for this film in the viewer's history.
@@ -153,12 +157,15 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
     : t.movieDetail.castCount(movie.actors.length);
 
   const typeLabel = mediaTypeLabel(mt, movie.country, "movie");
+  // A movie published straight from its upload has no genre and no language
+  // yet (lib/title-facts.ts): each row, the hero's language and the genre
+  // chip show only when there is something to say.
   const facts: DetailFact[] = [
-    { label: t.movieDetail.genre, value: movie.genre },
+    ...optionalFact(t.movieDetail.genre, movie.genre),
     ...(movie.categories.length > 0
       ? [{ label: t.movieDetail.categories, value: movie.categories.map((c) => c.name).join(", ") }]
       : []),
-    { label: t.movieDetail.language, value: movie.language },
+    ...optionalFact(t.movieDetail.language, movie.language),
     { label: t.movieDetail.releaseYear, value: String(movie.releaseYear) },
     ...(runtime ? [{ label: s.length, value: runtime }] : []),
     ...(movie.director ? [{ label: s.director, value: movie.director }] : []),
@@ -213,7 +220,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
           <span>{movie.releaseYear}</span>
           {runtime && <span>{runtime}</span>}
           {typeLabel && <span>{typeLabel}</span>}
-          <span>{movie.language}</span>
+          {movie.language && <span>{movie.language}</span>}
           {movie.ageRating && (
             <Tag kind="age">
               <span className="sr-only">{s.ageRating(AGE_RATING_LABELS[movie.ageRating])}</span>
@@ -225,14 +232,14 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
         <HeroChips
           label={s.genreAndCategories}
           chips={[
-            { key: `genre:${movie.genre}`, label: movie.genre, href: catalogHref("genres", movie.genre) },
+            ...genreChip(movie.genre, catalogHref("genres", movie.genre)),
             ...movie.categories
               .filter((category) => category.name !== movie.genre)
               .map((category) => ({ key: category.id, label: category.name })),
           ]}
         />
 
-        {movie.description && <HeroSynopsisToggle>{movie.description}</HeroSynopsisToggle>}
+        {description && <HeroSynopsisToggle>{description}</HeroSynopsisToggle>}
 
         <div className="mt-6 flex flex-wrap gap-3">
           {isAuthLoading ? (

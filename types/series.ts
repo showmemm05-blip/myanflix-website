@@ -38,7 +38,14 @@ export interface SeriesFacets {
 export interface Series {
   id: string;
   title: string;
+  /** The English text (the one TMDB fills). May be "" when staff wrote only a Burmese one. */
   description: string;
+  /**
+   * The Burmese text, typed by staff; null = none. Optional only so an older
+   * backend row still type-checks. Never drawn directly:
+   * lib/localized-description.ts picks between the two.
+   */
+  descriptionMm?: string | null;
   posterUrl: string | null;
   coverUrl: string | null;
   genre: string;

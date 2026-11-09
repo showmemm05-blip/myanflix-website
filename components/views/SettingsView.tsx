@@ -8,13 +8,14 @@ import { DeleteAccountDialog } from "@/components/dialogs/DeleteAccountDialog";
 import { ErrorState } from "@/components/empty/ErrorState";
 import { ProfileDetailsForm, ProfilePasswordForm, ProfilePhotoEditor } from "@/components/profile/ProfileSections";
 import { SegmentedControl } from "@/components/system";
-import { AlertCircleIcon, FeedbackIcon, LockIcon } from "@/components/system/icons";
+import { AlertCircleIcon, FeedbackIcon, InfoIcon, LockIcon } from "@/components/system/icons";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { AccountKicker, AccountLayout, SETTINGS_SECTION_IDS } from "@/components/views/AccountShell";
 import { useShellFeedback } from "@/components/layout/shell-context";
 import { WithdrawalCodeDialog } from "@/components/withdrawal-code/WithdrawalCodeDialog";
 import { useLanguage } from "@/lib/context/language-context";
+import { aboutText } from "@/lib/i18n/sections/about";
 import { useSection } from "@/lib/i18n/sections/define";
 import { libraryText } from "@/lib/i18n/sections/library";
 import { shellText } from "@/lib/i18n/sections/shell";
@@ -187,6 +188,7 @@ export function SettingsView({
   const { t, language, setLanguage } = useLanguage();
   const lib = useSection(libraryText);
   const shell = useSection(shellText);
+  const about = useSection(aboutText);
   const openFeedback = useShellFeedback();
   const [displayName, setDisplayName] = useState(user.displayName ?? "");
   const tc = t.withdrawalCode;
@@ -378,6 +380,22 @@ export function SettingsView({
                   className={cn(buttonVariants({ variant: "tonal", size: "toolbar" }), "gap-1.5 pr-3 font-extrabold")}
                 >
                   {t.settings.privacyLink}
+                  <ArrowUpRight className="size-4" strokeWidth={1.75} />
+                </Link>
+              }
+            />
+            <div aria-hidden className="h-px bg-tonal-ghost" />
+            {/* The About page: what the site is, and the TMDB credit. */}
+            <HelpRow
+              icon={<InfoIcon size={20} />}
+              title={about.title}
+              body={about.settingsBody}
+              action={
+                <Link
+                  href="/about"
+                  className={cn(buttonVariants({ variant: "tonal", size: "toolbar" }), "gap-1.5 pr-3 font-extrabold")}
+                >
+                  {about.settingsLink}
                   <ArrowUpRight className="size-4" strokeWidth={1.75} />
                 </Link>
               }
